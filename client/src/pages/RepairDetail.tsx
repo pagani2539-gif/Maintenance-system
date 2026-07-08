@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { repairApi, UPLOAD_URL } from '../api';
 import { useNotification } from '../components/Layout';
 import type { RepairDetail as IRepairDetail } from '../types';
-import { 
-  ArrowLeft, 
-  History as HistoryIcon, 
+import { BackButton } from '../components/ui/BackButton';
+import {
+  History as HistoryIcon,
   Image as ImageIcon, 
   User, 
   FileText, 
@@ -25,6 +25,7 @@ import PermissionGate from '../components/PermissionGate';
 import { Select } from '../components/ui/Input';
 import StationSelector from '../components/ui/StationSelector';
 import FormSection from '../components/ui/FormSection';
+import { getApiErrorMessage } from '../utils/apiError';
 import Lightbox from '../components/ui/Lightbox';
 
 const RepairDetail: React.FC = () => {
@@ -64,7 +65,7 @@ const RepairDetail: React.FC = () => {
 
   const parseDate = (dateStr: string) => {
     if (!dateStr) return new Date();
-    // If it's SQLite format "YYYY-MM-DD HH:MM:SS", convert to ISO UTC
+    // If it's a space-separated UTC timestamp "YYYY-MM-DD HH:MM:SS", convert to ISO UTC
     if (dateStr.includes(' ') && !dateStr.includes('T')) {
       return new Date(dateStr.replace(' ', 'T') + 'Z');
     }
@@ -142,7 +143,7 @@ const RepairDetail: React.FC = () => {
       fetchRepair();
     } catch (err) {
       console.error(err);
-      notify('เกิดข้อผิดพลาดในการอัปเดตสถานะ', 'error');
+      notify(getApiErrorMessage(err, 'อัปเดตสถานะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -181,7 +182,7 @@ const RepairDetail: React.FC = () => {
       fetchRepair();
     } catch (err) {
       console.error(err);
-      notify('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      notify(getApiErrorMessage(err, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setReplacingDevice(false);
     }
@@ -241,7 +242,7 @@ const RepairDetail: React.FC = () => {
       fetchRepair();
     } catch (err) {
       console.error(err);
-      notify('เกิดข้อผิดพลาดในการแก้ไขข้อมูล', 'error');
+      notify(getApiErrorMessage(err, 'แก้ไขไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setUpdatingEdit(false);
     }
@@ -263,8 +264,8 @@ const RepairDetail: React.FC = () => {
       await repairApi.delete(id);
       notify(isClaim ? 'ลบรายการแจ้งเคลมสำเร็จ' : 'ลบรายการแจ้งซ่อมสำเร็จ');
       navigate(isClaim ? '/claim-history' : '/repairs');
-    } catch {
-      notify('เกิดข้อผิดพลาดในการลบรายการ', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     }
   };
 
@@ -302,11 +303,11 @@ const RepairDetail: React.FC = () => {
         templateId="pdf-print-template"
         docTitle={`${repair.type === 'claim' ? 'ใบเคลม' : 'ใบซ่อม'} - ${repair.ticket_no || repair.id}`}
         onBeforePrint={handleBeforePrint}
-        renderTemplate={(companyId, logoId) => (
+        renderTemplate={(company, logo) => (
           <PrintTemplate
             repair={repair}
-            companyId={companyId}
-            logoId={logoId}
+            company={company}
+            logo={logo}
           />
         )}
       />
@@ -325,9 +326,7 @@ const RepairDetail: React.FC = () => {
         margin: '0 -2.5rem 2.5rem -2.5rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button className="btn btn-outline" style={{ border: 'none', padding: '10px' }} onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-          </button>
+          <BackButton />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
               <Wrench size={14} /> แฟ้มบันทึกงานซ่อม
@@ -617,7 +616,7 @@ const RepairDetail: React.FC = () => {
                   <input
                     type="text"
                     maxLength={100}
-                    placeholder="ระบุตำแหน่งติดตั้งย่อยอย่างอิสระ เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก..."
+                    placeholder="ระบุตำแหน่งติดตั้งย่อย เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก..."
                     value={subLocation}
                     onChange={(e) => setSubLocation(e.target.value)}
                     disabled={updatingEdit}

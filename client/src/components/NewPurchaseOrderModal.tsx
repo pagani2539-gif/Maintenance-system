@@ -230,17 +230,16 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
         created_by: user?.full_name || 'System',
         items: items.map(it => ({
           inventory_id: it.inventory_id,
-          quantity: it.quantity,
-          unit_price: 0
+          quantity: it.quantity
         }))
       };
 
       if (editingPo) {
         await purchaseOrderApi.update(editingPo.id, poData);
-        notify(`🎉 อัปเดตใบสั่งซื้อ ${editingPo.po_no} เรียบร้อยแล้ว`);
+        notify(`อัปเดตใบสั่งซื้อ ${editingPo.po_no} เรียบร้อยแล้ว`);
       } else {
         const res = await purchaseOrderApi.create(poData);
-        notify(`🎉 สร้างใบสั่งซื้อ ${res.po_no} เรียบร้อยแล้ว`);
+        notify(`สร้างใบสั่งซื้อ ${res.po_no} เรียบร้อยแล้ว`);
       }
       onSuccess();
       handleClose();

@@ -18,7 +18,7 @@ interface Props {
    * Render the actual template component, given the user's selected company + logo.
    * The dialog will mount this element (hidden) and call printElement on it.
    */
-  renderTemplate: (companyId: number | null, logoId: number | null) => React.ReactNode;
+  renderTemplate: (company: Company | null, logo: CompanyLogo | null) => React.ReactNode;
   onBeforePrint?: (companyId: number, logoId: number) => Promise<void> | void;
 }
 
@@ -114,12 +114,13 @@ export const PrintDialog: React.FC<Props> = ({ open, onClose, templateId, docTit
   if (!open) return null;
 
   const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+  const selectedLogo = logos.find((l) => l.id === selectedLogoId) || null;
 
   return (
     <>
       {/* Hidden template — always rendered while dialog is open so printElement can find it */}
       <div style={{ position: 'absolute', left: '-99999px', top: 0, pointerEvents: 'none' }}>
-        {renderTemplate(selectedCompanyId, selectedLogoId)}
+        {renderTemplate(selectedCompany ?? null, selectedLogo)}
       </div>
 
       {/* Modal overlay */}

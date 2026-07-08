@@ -4,6 +4,7 @@ import { stationApi, repairApi, UPLOAD_URL, inventoryApi } from '../api';
 import { useApi } from '../hooks/useApi';
 import { useNotification } from '../components/Layout';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import Card from '../components/ui/Card';
 import Select from '../components/ui/Select';
 import type { Station, InventoryTransaction, Repair } from '../types';
@@ -15,7 +16,6 @@ import {
   Plus,
   Trash2,
   Pencil,
-  ArrowLeft,
   History as HistoryIcon,
   Info,
   Activity,
@@ -630,7 +630,7 @@ const StationSearch: React.FC = () => {
       render: (val) => <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--text-muted)' }}><Globe size={14} />{val}</div>
     },
     {
-      id: 'type', header: 'ประเภทหน่วยงาน', accessor: 'station_type', priority: 1, width: '160px',
+      id: 'type', header: 'ประเภทสถานี', accessor: 'station_type', priority: 1, width: '160px',
       render: (val) => {
         const typeLabel = stationTypes.find(t => t.value === val)?.label || val;
         return <span className="badge glass-card" style={{ border: '1px solid var(--primary-light)', color: 'var(--primary)', fontWeight: 800 }}>{typeLabel}</span>;
@@ -769,6 +769,7 @@ const StationSearch: React.FC = () => {
     <div className="station-page" style={{ padding: 'var(--main-padding)', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       {!selectedStationId ? (
         <>
+          <BackButton />
           <div className="page-header" style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)', marginBottom: '6px' }}>
@@ -786,7 +787,7 @@ const StationSearch: React.FC = () => {
                </button>
                <button className="btn btn-outline" onClick={loadInitialData} title="รีเฟรชข้อมูล"><RefreshCw size={20} /></button>
                {hasPermission('manage.stations') && (
-                 <button className="btn btn-primary" onClick={openCreateModal}><Plus size={20} /> เพิ่มหน่วยงานใหม่</button>
+                 <button className="btn btn-primary" onClick={openCreateModal}><Plus size={20} /> เพิ่มสถานีใหม่</button>
                )}
             </div>
           </div>
@@ -884,7 +885,7 @@ const StationSearch: React.FC = () => {
                     />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>ประเภทหน่วยงาน</label>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>ประเภทสถานี</label>
                     <Select
                       value={urlState.filters.type || 'All'}
                       options={stationTypes.map(t => ({ label: t.label, value: t.value }))}
@@ -906,6 +907,11 @@ const StationSearch: React.FC = () => {
                 columns={columns}
                 data={paginatedData}
                 state={{ loading: false, error: null, empty: paginatedData.length === 0 }}
+                totalCount={stations.length}
+                emptyState={{
+                  noData: { message: 'ยังไม่มีสถานีในระบบ', hint: 'กด "เพิ่มสถานีใหม่" เพื่อสร้างสถานีแรก' },
+                  noResults: { message: 'ไม่พบสถานีที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+                }}
                 actions={actions}
                 onRowClick={(st) => navigate(`/stations?id=${st.id}&q=${encodeURIComponent(st.name)}`)}
                 drawerTitle={(st) => st.name}
@@ -918,9 +924,7 @@ const StationSearch: React.FC = () => {
         </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-           <button onClick={() => navigate('/stations')} className="btn btn-outline" style={{ alignSelf: 'flex-start', border: 'none', background: 'var(--primary-light)', padding: '10px 20px', borderRadius: '12px', fontWeight: 800 }}>
-             <ArrowLeft size={18} /> <span style={{ marginLeft: '8px' }}>ย้อนกลับไปรายชื่อสถานี</span>
-           </button>
+           <BackButton to="/stations" label="ย้อนกลับไปรายชื่อสถานี" />
 
            {detailsLoading && (
              <div style={{ textAlign: 'center', padding: '5rem' }}>
@@ -1630,14 +1634,18 @@ const StationSearch: React.FC = () => {
                                             background: 'var(--bg-app)', border: '1px solid var(--border)',
                                             gap: '8px'
                                           }}>
-                                            <span style={{
-                                              fontSize: '0.72rem', fontWeight: 700,
-                                              fontFamily: "'JetBrains Mono', monospace",
-                                              color: 'var(--text-main)',
-                                              background: 'var(--bg-card)',
-                                              padding: '2px 6px', borderRadius: '4px',
-                                              border: '1px solid var(--border)'
-                                            }}>
+                                            <span
+                                              onClick={() => navigate(`/asset/${inst.id}`)}
+                                              title="ดูพาสปอร์ต/ประวัติเครื่องนี้"
+                                              style={{
+                                                fontSize: '0.72rem', fontWeight: 700,
+                                                fontFamily: "'JetBrains Mono', monospace",
+                                                color: 'var(--primary)',
+                                                background: 'var(--bg-card)',
+                                                padding: '2px 6px', borderRadius: '4px',
+                                                border: '1px solid var(--border)',
+                                                cursor: 'pointer', textDecoration: 'underline dotted'
+                                              }}>
                                               S/N: {inst.serial_number || '—'}
                                             </span>
                                             

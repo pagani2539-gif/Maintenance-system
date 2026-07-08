@@ -4,12 +4,12 @@ This document provides instructions and context for AI agents (like Gemini CLI) 
 
 ## Core Mandates
 
-1. **Tech Stack Integrity**: Always respect the established tech stack (React 19, TypeScript, Node.js, Express, SQLite). Do not introduce alternative frameworks or major libraries without explicit instruction.
+1. **Tech Stack Integrity**: Always respect the established tech stack (React 19, TypeScript, Node.js, Express, PostgreSQL). Do not introduce alternative frameworks or major libraries without explicit instruction.
 2. **Naming Conventions**:
-   - **Backend**: Use `camelCase` for variables and `PascalCase` for classes (if any). DB columns in SQLite should follow existing patterns (mostly `snake_case` in this project).
+   - **Backend**: Use `camelCase` for variables and `PascalCase` for classes (if any). DB columns in PostgreSQL should follow existing patterns (mostly `snake_case` in this project).
    - **Frontend**: Use `PascalCase` for React components and `camelCase` for hooks and utilities.
 3. **Task Tracking**: Whenever a feature is implemented or a bug is fixed, update `TASKS.md` to reflect the progress.
-4. **Safety**: Never log or commit sensitive information. SQLite database files (`.db`) should be ignored by git.
+4. **Safety**: Never log or commit sensitive information. `.env` files and SQLite artifacts (`.db`) should be ignored by git.
 
 ## Workflow Rules
 
@@ -29,4 +29,4 @@ This document provides instructions and context for AI agents (like Gemini CLI) 
 
 ## Contextual Knowledge
 - The system uses a specific PDF generation pattern (React Template -> html2canvas -> jspdf). Be cautious when modifying CSS in print templates as it directly affects PDF output.
-- Database migrations are handled manually via scripts in the root directory (e.g., `scripts/migrate.js`). Check these before suggesting schema changes.
+- Database migrations run automatically on server startup from `server/database/migrations-pg/` (PostgreSQL). Check these before suggesting schema changes.

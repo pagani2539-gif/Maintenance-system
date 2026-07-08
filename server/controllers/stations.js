@@ -1,18 +1,5 @@
-const db = require('../database/init');
+const { query } = require('../database/db');
 const { logAudit } = require('../utils/auditLogger');
-
-// SQLite Query Helpers for Async/Await
-const queryAll = (sql, params = []) => new Promise((resolve, reject) => {
-  db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-});
-
-const queryGet = (sql, params = []) => new Promise((resolve, reject) => {
-  db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-});
-
-const runQuery = (sql, params = []) => new Promise((resolve, reject) => {
-  db.run(sql, params, function (err) { err ? reject(err) : resolve(this); });
-});
 
 // สภาพอุปกรณ์ (manual) ที่ตั้งได้เองต่อ (สถานี × ชนิดอุปกรณ์)
 const VALID_ASSET_STATUSES = ['ปกติ', 'ชำรุด', 'ชำรุดรอเปลี่ยน', 'ปลดระวาง'];
@@ -20,14 +7,14 @@ const VALID_ASSET_STATUSES = ['ปกติ', 'ชำรุด', 'ชำรุ�
 exports.getUniqueStations = async (req, res) => {
   try {
     const { status } = req.query;
-    let query = `SELECT * FROM stations`;
+    let sql = `SELECT * FROM stations`;
     const params = [];
     if (status !== undefined) {
-      query += ` WHERE status = ?`;
+      sql += ` WHERE status = $1`;
       params.push(status);
     }
-    query += ` ORDER BY name ASC`;
-    const rows = await queryAll(query, params);
+    sql += ` ORDER BY name ASC`;
+    const { rows } = await query(sql, params);
     res.json(rows);
   } catch (err) {
     console.error('Get Unique Stations Error:', err);
@@ -38,12 +25,14 @@ exports.getUniqueStations = async (req, res) => {
 exports.getStationDetails = async (req, res) => {
   try {
     const { location, station_id } = req.query;
-    
+
     let station = null;
     if (station_id) {
-      station = await queryGet('SELECT * FROM stations WHERE id = ?', [station_id]);
+      const { rows } = await query('SELECT * FROM stations WHERE id = $1', [station_id]);
+      station = rows[0] || null;
     } else if (location && location.trim() !== '') {
-      station = await queryGet('SELECT * FROM stations WHERE name = ?', [location.trim()]);
+      const { rows } = await query('SELECT * FROM stations WHERE name = $1', [location.trim()]);
+      station = rows[0] || null;
     }
 
     if (!station) {
@@ -52,47 +41,47 @@ exports.getStationDetails = async (req, res) => {
     }
 
     const [
-      repairs,
-      claims,
-      withdrawals,
-      transactions,
-      stats
+      repairsResult,
+      claimsResult,
+      withdrawalsResult,
+      transactionsResult,
+      statsResult
     ] = await Promise.all([
       // 1. Repairs at this station
-      queryAll(`
+      query(`
         SELECT *
         FROM repairs_view
-        WHERE (station_id = ? OR (station_id IS NULL AND location_snapshot = ?)) AND type = 'repair'
+        WHERE (station_id = $1 OR (station_id IS NULL AND location_snapshot = $2)) AND type = 'repair'
         ORDER BY created_at DESC, id DESC
       `, [station.id, station.name]),
 
       // 2. Claims at this station
-      queryAll(`
+      query(`
         SELECT *
         FROM repairs_view
-        WHERE (station_id = ? OR (station_id IS NULL AND location_snapshot = ?)) AND type = 'claim'
+        WHERE (station_id = $1 OR (station_id IS NULL AND location_snapshot = $2)) AND type = 'claim'
         ORDER BY created_at DESC, id DESC
       `, [station.id, station.name]),
 
       // 3. Withdrawals at this station
-      queryAll(`
+      query(`
         SELECT *
         FROM withdrawals_view
-        WHERE station_id = ? OR (station_id IS NULL AND location_snapshot = ?)
+        WHERE station_id = $1 OR (station_id IS NULL AND location_snapshot = $2)
         ORDER BY created_at DESC, id DESC
       `, [station.id, station.name]),
 
       // 4. Inventory Transactions at this station
-      queryAll(`
+      query(`
         SELECT *
         FROM transactions_view
-        WHERE station_id = ? OR (station_id IS NULL AND location_snapshot = ?)
+        WHERE station_id = $1 OR (station_id IS NULL AND location_snapshot = $2)
         ORDER BY created_at DESC, id DESC
       `, [station.id, station.name]),
 
       // 5. Overall Stats for this station
-      queryGet(`
-        SELECT 
+      query(`
+        SELECT
           COUNT(CASE WHEN type = 'repair' THEN 1 END) as repair_total,
           COUNT(CASE WHEN type = 'claim' THEN 1 END) as claim_total,
           SUM(CASE WHEN TRIM(status) = 'รอดำเนินการ' THEN 1 ELSE 0 END) as pending,
@@ -100,17 +89,23 @@ exports.getStationDetails = async (req, res) => {
           SUM(CASE WHEN TRIM(status) = 'รออะไหล่' THEN 1 ELSE 0 END) as on_hold,
           SUM(CASE WHEN TRIM(status) = 'เสร็จสิ้น' THEN 1 ELSE 0 END) as completed
         FROM repairs
-        WHERE station_id = ? OR (station_id IS NULL AND location = ?)
+        WHERE station_id = $1 OR (station_id IS NULL AND location = $2)
       `, [station.id, station.name])
     ]);
+
+    const repairs = repairsResult.rows;
+    const claims = claimsResult.rows;
+    const withdrawals = withdrawalsResult.rows;
+    const transactions = transactionsResult.rows;
+    const stats = statsResult.rows[0] || {};
 
     // Fetch withdrawal items for withdrawals
     const withdrawalIds = withdrawals.map(w => w.id);
     let withdrawalItemsMap = {};
-    
+
     if (withdrawalIds.length > 0) {
-      const placeholders = withdrawalIds.map(() => '?').join(',');
-      const items = await queryAll(`
+      const placeholders = withdrawalIds.map((_, i) => `$${i + 1}`).join(',');
+      const { rows: items } = await query(`
         SELECT wi.*, i.name as item_name, i.model as item_model, i.description as item_description, i.image_path as item_image, i.requires_sn
         FROM withdrawal_items wi
         JOIN inventory i ON wi.inventory_id = i.id
@@ -134,31 +129,31 @@ exports.getStationDetails = async (req, res) => {
 
     // Manual asset condition statuses for this station (keyed by inventory_id on the client)
     const assetStatuses = station.id
-      ? await queryAll(
+      ? (await query(
           `SELECT inventory_id, status, note, updated_by, updated_at
-           FROM station_asset_status WHERE station_id = ?`,
+           FROM station_asset_status WHERE station_id = $1`,
           [station.id]
-        )
+        )).rows
       : [];
 
     // Fetch individual inventory instances deployed at this station
     const instances = station.id
-      ? await queryAll(
+      ? (await query(
           `SELECT id, inventory_id, serial_number, condition, status, updated_at
-           FROM inventory_instances WHERE station_id = ?`,
+           FROM inventory_instances WHERE station_id = $1`,
           [station.id]
-        )
+        )).rows
       : [];
 
     res.json({
       station: station,
       stats: {
-        repair_total: stats.repair_total || 0,
-        claim_total: stats.claim_total || 0,
-        pending: stats.pending || 0,
-        in_progress: stats.in_progress || 0,
-        on_hold: stats.on_hold || 0,
-        completed: stats.completed || 0,
+        repair_total: Number(stats.repair_total) || 0,
+        claim_total: Number(stats.claim_total) || 0,
+        pending: Number(stats.pending) || 0,
+        in_progress: Number(stats.in_progress) || 0,
+        on_hold: Number(stats.on_hold) || 0,
+        completed: Number(stats.completed) || 0,
         withdrawal_total: withdrawals.length
       },
       repairs,
@@ -186,23 +181,25 @@ exports.upsertAssetStatus = async (req, res) => {
   const noteVal = note != null && String(note).trim() !== '' ? String(note).trim() : null;
 
   try {
-    const old = await queryGet(
-      'SELECT * FROM station_asset_status WHERE station_id = ? AND inventory_id = ?',
+    const { rows: oldRows } = await query(
+      'SELECT * FROM station_asset_status WHERE station_id = $1 AND inventory_id = $2',
       [stationId, inventoryId]
     );
+    const old = oldRows[0];
 
-    await runQuery(`
+    await query(`
       INSERT INTO station_asset_status (station_id, inventory_id, status, note, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(station_id, inventory_id)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (station_id, inventory_id)
       DO UPDATE SET status = excluded.status, note = excluded.note,
-                    updated_by = excluded.updated_by, updated_at = CURRENT_TIMESTAMP
+                    updated_by = excluded.updated_by, updated_at = NOW()
     `, [stationId, inventoryId, status, noteVal, updatedBy]);
 
-    const row = await queryGet(
-      'SELECT inventory_id, status, note, updated_by, updated_at FROM station_asset_status WHERE station_id = ? AND inventory_id = ?',
+    const { rows } = await query(
+      'SELECT inventory_id, status, note, updated_by, updated_at FROM station_asset_status WHERE station_id = $1 AND inventory_id = $2',
       [stationId, inventoryId]
     );
+    const row = rows[0];
 
     logAudit('asset_status', inventoryId, 'update', old, { station_id: Number(stationId), ...row }, updatedBy)
       .catch(e => console.error(e));
@@ -221,9 +218,9 @@ exports.createStation = async (req, res) => {
   }
 
   try {
-    const row = await queryGet('SELECT MAX(id) as maxId FROM stations');
-    const maxId = row ? row.maxId : 0;
-    const nextId = (maxId || 0) + 1;
+    const { rows: maxRows } = await query('SELECT MAX(id) as "maxId" FROM stations');
+    const maxId = maxRows[0] ? maxRows[0].maxId : 0;
+    const nextId = (Number(maxId) || 0) + 1;
 
     let shortDir = 'NONE';
     if (direction === 'INBOUND') shortDir = 'IN';
@@ -233,62 +230,49 @@ exports.createStation = async (req, res) => {
 
     const code = `STN-${nextId}-${shortDir}`;
 
-    db.run(`
+    const { rows } = await query(`
       INSERT INTO stations (code, name, station_type, highway_no, direction, region, province, responsible_person)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim()], function(err) {
-      if (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(400).json({ error: 'ชื่อสถานีนี้มีอยู่แล้วในระบบ' });
-        }
-        return res.status(500).json({ error: err.message });
-      }
-      
-      const newId = this.lastID;
-      
-      // Return the created station
-      db.get('SELECT * FROM stations WHERE id = ?', [newId], (getErr, row) => {
-        if (getErr) return res.status(500).json({ error: getErr.message });
-        
-        // Log audit
-        logAudit('station', newId, 'create', null, row, 'System/Admin').catch(e => console.error(e));
-        
-        res.status(201).json(row);
-      });
-    });
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim()]);
+
+    const row = rows[0];
+    logAudit('station', row.id, 'create', null, row, 'System/Admin').catch(e => console.error(e));
+    res.status(201).json(row);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'ชื่อสถานีนี้มีอยู่แล้วในระบบ' });
+    }
     console.error('Create Station Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-exports.deleteStation = (req, res) => {
+exports.deleteStation = async (req, res) => {
   const { id } = req.params;
   const deleted_by = 'System/Admin';
-  
-  db.get('SELECT * FROM stations WHERE id = ?', [id], (err, oldStation) => {
-    if (err) return res.status(500).json({ error: err.message });
+
+  try {
+    const { rows: oldRows } = await query('SELECT * FROM stations WHERE id = $1', [id]);
+    const oldStation = oldRows[0];
     if (!oldStation) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการลบ' });
 
-    db.run(`
-      UPDATE stations 
-      SET status = 0, deleted_at = CURRENT_TIMESTAMP, deleted_by = ? 
-      WHERE id = ?
-    `, [deleted_by, id], function(err) {
-      if (err) {
-        console.error('Delete Station Error:', err);
-        return res.status(500).json({ error: err.message });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการลบ' });
-      }
+    const { rows } = await query(`
+      UPDATE stations
+      SET status = 0, deleted_at = NOW(), deleted_by = $1
+      WHERE id = $2
+      RETURNING *
+    `, [deleted_by, id]);
 
-      // Log audit
-      logAudit('station', id, 'deactivate', oldStation, { ...oldStation, status: 0, deleted_at: new Date().toISOString() }, deleted_by).catch(e => console.error(e));
+    if (!rows[0]) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการลบ' });
 
-      res.json({ message: 'ปิดใช้งานสถานีเรียบร้อยแล้ว (Soft Delete)' });
-    });
-  });
+    logAudit('station', id, 'deactivate', oldStation, { ...oldStation, status: 0, deleted_at: new Date().toISOString() }, deleted_by).catch(e => console.error(e));
+
+    res.json({ message: 'ปิดใช้งานสถานีเรียบร้อยแล้ว (Soft Delete)' });
+  } catch (err) {
+    console.error('Delete Station Error:', err);
+    res.status(500).json({ error: err.message });
+  }
 };
 
 exports.updateStation = async (req, res) => {
@@ -300,7 +284,8 @@ exports.updateStation = async (req, res) => {
   }
 
   try {
-    const oldStation = await queryGet('SELECT * FROM stations WHERE id = ?', [id]);
+    const { rows: oldRows } = await query('SELECT * FROM stations WHERE id = $1', [id]);
+    const oldStation = oldRows[0];
     if (!oldStation) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการแก้ไข' });
 
     let shortDir = 'NONE';
@@ -311,86 +296,23 @@ exports.updateStation = async (req, res) => {
 
     const code = `STN-${id}-${shortDir}`;
 
-    db.run(`
+    const { rows } = await query(`
       UPDATE stations
-      SET code = ?, name = ?, station_type = ?, highway_no = ?, direction = ?, region = ?, province = ?, responsible_person = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), id], function(err) {
-      if (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(400).json({ error: 'ชื่อสถานีนี้มีอยู่แล้วในระบบ' });
-        }
-        return res.status(500).json({ error: err.message });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการแก้ไข' });
-      }
+      SET code = $1, name = $2, station_type = $3, highway_no = $4, direction = $5, region = $6, province = $7, responsible_person = $8, updated_at = NOW()
+      WHERE id = $9
+      RETURNING *
+    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), id]);
 
-      db.get('SELECT * FROM stations WHERE id = ?', [id], (getErr, row) => {
-        if (getErr) return res.status(500).json({ error: getErr.message });
-        
-        // Log audit
-        logAudit('station', id, 'update', oldStation, row, 'System/Admin').catch(e => console.error(e));
+    const row = rows[0];
+    if (!row) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการแก้ไข' });
 
-        res.json(row);
-      });
-    });
+    logAudit('station', id, 'update', oldStation, row, 'System/Admin').catch(e => console.error(e));
+    res.json(row);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'ชื่อสถานีนี้มีอยู่แล้วในระบบ' });
+    }
     console.error('Update Station Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
-
-exports.getStationHealth = async (req, res) => {
-  try {
-    const [
-      stationsCount,
-      activeCount,
-      inactiveCount,
-      repairsCount,
-      withdrawalsCount,
-      transactionsCount
-    ] = await Promise.all([
-      queryGet('SELECT COUNT(*) as count FROM stations'),
-      queryGet('SELECT COUNT(*) as count FROM stations WHERE status = 1'),
-      queryGet('SELECT COUNT(*) as count FROM stations WHERE status = 0'),
-      queryGet('SELECT COUNT(*), COUNT(station_id) as mapped FROM repairs'),
-      queryGet('SELECT COUNT(*), COUNT(station_id) as mapped FROM withdrawals'),
-      queryGet('SELECT COUNT(*), COUNT(station_id) as mapped FROM inventory_transactions')
-    ]);
-
-    const totalStations = stationsCount.count;
-    const activeStations = activeCount.count;
-    const inactiveStations = inactiveCount.count;
-
-    const totalRepairs = repairsCount['COUNT(*)'];
-    const mappedRepairs = repairsCount.mapped;
-    const unmappedRepairs = totalRepairs - mappedRepairs;
-
-    const totalWithdrawals = withdrawalsCount['COUNT(*)'];
-    const mappedWithdrawals = withdrawalsCount.mapped;
-    const unmappedWithdrawals = totalWithdrawals - mappedWithdrawals;
-
-    const totalTransactions = transactionsCount['COUNT(*)'];
-    const mappedTransactions = transactionsCount.mapped;
-    const unmappedTransactions = totalTransactions - mappedTransactions;
-
-    const totalRecords = totalRepairs + totalWithdrawals + totalTransactions;
-    const mappedRecords = mappedRepairs + mappedWithdrawals + mappedTransactions;
-    const dataQualityScore = totalRecords > 0 ? Math.round((mappedRecords / totalRecords) * 10000) / 100 : 100;
-
-    res.json({
-      totalStations,
-      activeStations,
-      inactiveStations,
-      unmappedRepairs,
-      unmappedWithdrawals,
-      unmappedTransactions,
-      dataQualityScore
-    });
-  } catch (err) {
-    console.error('Get Station Health Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-};
-

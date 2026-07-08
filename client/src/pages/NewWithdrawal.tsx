@@ -6,10 +6,12 @@ import { PrintDialog } from '../components/PrintDialog';
 import PrintWithdrawalTemplate from '../components/PrintWithdrawalTemplate';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input, TextArea } from '../components/ui/Input';
 import StationSelector from '../components/ui/StationSelector';
 import ContractSelector from '../components/ui/ContractSelector';
 import DatePicker from '../components/ui/DatePicker';
+import { getApiErrorMessage } from '../utils/apiError';
 import FormSection from '../components/ui/FormSection';
 import type { InventoryItem } from '../types';
 import {
@@ -373,8 +375,7 @@ const NewWithdrawal: React.FC = () => {
       notify('บันทึกการเบิกอุปกรณ์เรียบร้อยแล้ว', 'success', 'ระบบคลังพัสดุ', 'inventory');
       playNotificationSound();
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      notify(err.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify(getApiErrorMessage(error, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error', 'ระบบคลังพัสดุ', 'inventory');
     } finally {
       setLoading(false);
     }
@@ -490,11 +491,11 @@ const NewWithdrawal: React.FC = () => {
             templateId="pdf-withdrawal-template"
             docTitle={`ใบเบิกอุปกรณ์ - WD-${lastWithdrawalData.id || 'XXXXXX'}`}
             onBeforePrint={handleBeforePrint}
-            renderTemplate={(companyId, logoId) => (
+            renderTemplate={(company, logo) => (
               <PrintWithdrawalTemplate
                 withdrawal={lastWithdrawalData}
-                companyId={companyId}
-                logoId={logoId}
+                company={company}
+                logo={logo}
               />
             )}
           />
@@ -505,6 +506,7 @@ const NewWithdrawal: React.FC = () => {
 
   return (
     <div className="new-withdrawal-page">
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">
           <h2>เบิกอุปกรณ์จากคลัง (หลายรายการ)</h2>
@@ -872,7 +874,7 @@ const NewWithdrawal: React.FC = () => {
                 <Input
                   label="จุดติดตั้ง / บริเวณพื้นที่ย่อย"
                   maxLength={100}
-                  placeholder="ระบุตำแหน่งติดตั้งย่อยอย่างอิสระ เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก, เสา ANPR ตัวที่ 2..."
+                  placeholder="ระบุตำแหน่งติดตั้งย่อย เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก..."
                   value={subLocation}
                   onChange={(e) => setSubLocation(e.target.value)}
                   disabled={loading}

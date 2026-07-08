@@ -9,6 +9,39 @@ This file tracks the progress of features, bug fixes, and maintenance tasks for 
 - 🔴 **Blocked**: Waiting on external factors or decisions.
 
 
+## ✅ Completed (2026-07-06)
+- [x] **"งานของฉัน" (My Tasks) — Option A (no schema changes)**: Added a personal work queue for technicians, reusing the existing `repairs.technician` text field (which is already overwritten with the acting user's name on every status update):
+  - Backend `getAllRepairs` ([server/controllers/repairs.js](server/controllers/repairs.js)) gained two optional filters: `technician` (exact match — "my active jobs") and `unassigned=true` (technician IS NULL/empty — "jobs nobody has picked up yet"). No new endpoints or tables needed.
+  - `getUnreadCount` now also returns `myTasks` (count of the caller's own active — non-completed — jobs) for the sidebar badge.
+  - New page [client/src/pages/MyTasks.tsx](client/src/pages/MyTasks.tsx) at route `/my-tasks`: three sections — "งานที่ฉันดูแลอยู่" (mine, sorted by priority then longest-waiting, with a one-click "advance status" button reusing the existing `PATCH /repairs/:id/status` endpoint), "งานที่ยังไม่มีคนรับ" (unassigned, with a "รับงานนี้" claim button — just calls the same status-update endpoint, which auto-assigns `technician` to whoever clicks it), and "อุปกรณ์ที่ฉันยืม/ค้างคืน" (borrowed items filtered client-side by `user_name`, deep-linking to `/pending-returns?search=<name>` to reuse the existing return flow instead of duplicating it).
+  - New sidebar entry "งานของฉัน" with a live pulse-dot badge wired into the existing 5s polling loop in `Layout.tsx`.
+  - Known limitation (accepted tradeoff for Option A): ownership is name-based, not a locked assignment — anyone who touches a ticket becomes its new "technician", and same-name techs would be indistinguishable. Documented for future upgrade to a real `assigned_to` user-ID column if needed.
+  - Verified end-to-end in the browser: created a test repair, watched it appear under "ยังไม่มีคนรับ", claimed it (moved to "ฉันดูแลอยู่", status → กำลังซ่อม, technician auto-set), marked it complete (disappeared from the list, status → เสร็จสิ้น confirmed via API), and confirmed the pending-returns deep link correctly pre-filters to the current user. Client build + all 10 server tests pass.
+
+
+- [x] **Asset Timeline / Equipment Passport (พาสปอร์ตอุปกรณ์)**: Added a per-instance history view aggregating a physical unit's whole life:
+  - New backend endpoint `GET /api/inventory/instances/:instanceId/timeline` (`controllers/inventory.js` `getInstanceTimeline`) merging stock movements (`transactions_view` by `instance_id`), repair/claim tickets (`repairs_view` by `instance_id`), and device swaps (`device_changes` matched by serial in/out) into a chronological event list (newest-first), plus an instance header with current status/station/contract and a `repair_count`.
+  - Client `AssetTimeline.tsx` at route `/asset/:instanceId`: passport-style header (S/N, status tint, station, meta strip), a "problem device" warning when `repair_count >= 3` (count only, no cost per no-money-display policy), quick actions (แจ้งซ่อม/แจ้งเคลม/ดูสถานี prefilled), and a vertical timeline with per-kind icons/colors; repair & claim events are click-through to their detail pages.
+  - Entry point: S/N chips in the Station detail asset list (`StationSearch.tsx`) now link to the asset passport. Types `AssetTimelineEvent/Instance/Response` + `inventoryApi.getInstanceTimeline` added.
+  - Verified in the browser end-to-end: opened instance ARK2250-002 (withdrawal event shown), created a test repair → repair event appeared, status flipped to "กำลังซ่อม", `repair_count` incremented, event card navigated to the repair detail; then removed the test repair and confirmed the instance reverted. Client build passes. 🟢
+  - Note: this is the intended landing page for the upcoming QR-scan feature (scan S/N → `/asset/:id`); "My Tasks" agreed to be built as Option A (no schema change, `technician`-based) separately. 🟢
+- [x] **Stocktaking / Cycle Count Feature (ตรวจนับสต็อก)**: Added a full physical inventory counting workflow:
+  - New tables `stock_counts` + `stock_count_items` (migration `014_stock_counts.js`) with document numbers `SC-YYMMDD-NNN` via the shared `generateDocNo` sequence.
+  - Backend `controllers/stockCounts.js` + `/api/stock-counts` routes: opening a session snapshots current quantities of all inventory items (only one IN_PROGRESS session allowed at a time), per-item count recording with counter name/timestamp, and a complete step that applies variances relative to the *current* quantity (preserving stock movements made during counting), logs adjustments into `inventory_transactions` (`ADD_STOCK`/`WITHDRAW` with a note referencing the count number so the existing Ledger renders them correctly), writes audit logs, notifies via LINE, and triggers auto-PO checks for negative adjustments.
+  - Completing/cancelling a session requires the new `manage.stock_counts` permission (admins bypass); counting itself is open to all authenticated users.
+  - Frontend: `StockCountList.tsx` (session list with progress bars + create modal) and `StockCountDetail.tsx` (counting sheet with expected-vs-counted inputs, variance highlighting, filter tabs, search, pre-completion adjustment preview modal, and read-only view for closed sessions), new sidebar entry "ตรวจนับสต็อก", routes `/stock-counts` and `/stock-counts/:id`.
+  - Verified end-to-end in the browser: opened session SC-690706-001, recorded a count with -1 variance, completed the session — inventory quantity adjusted 6→5, Ledger entry created with the count reference. Client build + all 10 server tests pass. 🟢
+
+## ✅ Completed (2026-07-03)
+- [x] **Migrated database from SQLite to PostgreSQL**: Full backend migration across all 8 stages (schema, controller rewrite, test suite, data migration tooling, backup/restore redesign, config/deploy wiring, cutover, cleanup):
+  - Rewrote all 11 controllers and shared utils (`auditLogger`, `docNumber`, `lineNotify`, `stationValidation`, `autoPo`) plus `middlewares/auth.js` from callback-style `sqlite3` to async/await on `pg` (`server/database/db.js`).
+  - New consolidated Postgres schema in `server/database/migrations-pg/` (replaces the old 39-file SQLite migration history) with a matching migration runner.
+  - New data migration/verification tooling (`server/database/scripts/migrate-sqlite-to-pg.js`, `verify-migration.js`) for moving real data across, with row-count/checksum/FK-orphan checks.
+  - Backup/restore rebuilt around `pg_dump`/`pg_restore` (`server/database/backupPg.js`), replacing `VACUUM INTO`/file-copy.
+  - Fixed several bugs surfaced only by the migration: a Postgres alias-in-expression restriction breaking a dashboard query, a 7-hour timestamp shift from session-timezone handling during data migration, and a JWT auth race condition (`password_changed_at` microsecond precision vs JWT `iat` second precision).
+  - Removed the old SQLite code path (`database/init.js`, `migrationRunner.js`, `backup.js`, old `migrations/`) and the `sqlite3` dependency once the dev/staging cutover was verified stable.
+  - Note: cutover so far only covers the dev/staging host — the separate production host still needs the same steps via `DEPLOY.md`. 🟢
+
 ## ✅ Completed (2026-06-18)
 - [x] **Production Readiness & Core Business Flow Validation**: Implemented comprehensive integration and unit test coverage to prepare the system for deployment:
   - Created backend tests `comprehensiveFlows.test.js` validating:

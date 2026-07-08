@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
 import { formatDateTimeThai } from '../utils/formatDate';
 import {
@@ -27,7 +28,7 @@ import {
 } from 'lucide-react';
 import NewPurchaseOrderModal from '../components/NewPurchaseOrderModal';
 import PrintPurchaseOrderTemplate from '../components/PrintPurchaseOrderTemplate';
-import { printElement } from '../utils/pdfGenerator';
+import { PrintDialog } from '../components/PrintDialog';
 import type { PurchaseOrder } from '../types';
 import type { TableColumn, TableAction } from '../types/table.types';
 import BaseDataTable from '../components/tables/BaseDataTable';
@@ -42,6 +43,7 @@ const PurchaseOrderList: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState(false);
   const [printPo, setPrintPo] = useState<PurchaseOrder | null>(null);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [printingId, setPrintingId] = useState<number | string | null>(null);
   const [editingPo, setEditingPo] = useState<PurchaseOrder | null>(null);
 
@@ -57,7 +59,7 @@ const PurchaseOrderList: React.FC = () => {
     setIsGenerating(true);
     try {
       await purchaseOrderApi.autoGenerate();
-      notify('🎉 สแกนและสร้างใบสั่งซื้อสำหรับพัสดุสต็อกต่ำเรียบร้อยแล้ว');
+      notify('สแกนและสร้างใบสั่งซื้อสำหรับพัสดุสต็อกต่ำเรียบร้อยแล้ว');
       fetchPOs();
     } catch (err) {
       const error = err as Error;
@@ -91,16 +93,22 @@ const PurchaseOrderList: React.FC = () => {
     try {
       const detail = await purchaseOrderApi.getById(id);
       setPrintPo(detail);
-      setTimeout(() => {
-        printElement("pdf-po-template", `ใบสั่งซื้อ ${detail.po_no}`);
-        setPrintPo(null);
-      }, 150);
+      setIsPrintDialogOpen(true);
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } }; message?: string };
       notify(error?.response?.data?.message || error?.message || 'ไม่สามารถพิมพ์ใบสั่งซื้อได้', 'error');
       setPrintPo(null);
     } finally {
       setPrintingId(null);
+    }
+  };
+
+  const handleBeforePrint = async (companyId: number) => {
+    if (!printPo) return;
+    try {
+      await purchaseOrderApi.updateCompany(printPo.id, companyId);
+    } catch (err) {
+      console.error('Failed to update company_id:', err);
     }
   };
 
@@ -344,12 +352,13 @@ const PurchaseOrderList: React.FC = () => {
   return (
     <div className="po-page fade-in" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+        <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
             <h2>การจัดซื้อพัสดุและอุปกรณ์ (PO)</h2>
             <p>จัดการใบสั่งซื้อ ตรวจรับพัสดุ และสแกนสต็อกต่ำเพื่อสั่งซื้ออัตโนมัติ</p>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <Button
               variant="outline"
               icon={isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
@@ -396,6 +405,11 @@ const PurchaseOrderList: React.FC = () => {
         columns={columns}
         data={paginatedData}
         state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
+        totalCount={pos?.length ?? 0}
+        emptyState={{
+          noData: { message: 'ยังไม่มีใบสั่งซื้อในระบบ', hint: 'ระบบจะสร้างใบสั่งซื้ออัตโนมัติเมื่อพัสดุต่ำกว่าเกณฑ์ หรือกด "สร้างใบสั่งซื้อ" เพื่อสร้างเอง' },
+          noResults: { message: 'ไม่พบใบสั่งซื้อที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+        }}
         actions={actions}
         onRetry={fetchPOs}
         drawerTitle={(po) => `ใบสั่งซื้อ ${po.po_no}`}
@@ -431,10 +445,21 @@ const PurchaseOrderList: React.FC = () => {
         editingPo={editingPo}
       />
 
-      {/* Offscreen print template */}
-      <div style={{ position: 'absolute', left: '-99999px', top: 0, pointerEvents: 'none' }}>
-        {printPo && <PrintPurchaseOrderTemplate po={printPo} />}
-      </div>
+      {printPo && (
+        <PrintDialog
+          open={isPrintDialogOpen}
+          onClose={() => {
+            setIsPrintDialogOpen(false);
+            setPrintPo(null);
+          }}
+          templateId="pdf-po-template"
+          docTitle={`ใบสั่งซื้อ ${printPo.po_no}`}
+          onBeforePrint={handleBeforePrint}
+          renderTemplate={(company, logo) => (
+            <PrintPurchaseOrderTemplate po={printPo} company={company} logo={logo} />
+          )}
+        />
+      )}
 
 
     </div>

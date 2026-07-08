@@ -8,8 +8,6 @@ export interface ParsedInventoryRow {
   quantity: number;
   min_stock: number;
   requires_sn: number;
-  unit_price?: number;
-  warranty_months?: number;
 }
 
 export interface ParseResult {
@@ -26,8 +24,6 @@ const HEADER_ALIASES: Record<string, keyof ParsedInventoryRow> = {
   'จำนวนคงเหลือ': 'quantity', 'จำนวน': 'quantity', 'quantity': 'quantity', 'qty': 'quantity',
   'จุดเตือนสต็อกขั้นต่ำ': 'min_stock', 'จุดแจ้งเตือนขั้นต่ำ': 'min_stock', 'จุดแจ้งเตือน': 'min_stock', 'min_stock': 'min_stock',
   'ต้องมี s/n': 'requires_sn', 'ต้องระบุ s/n': 'requires_sn', 's/n': 'requires_sn', 'requires_sn': 'requires_sn',
-  'ราคาต่อหน่วย': 'unit_price', 'ราคา': 'unit_price', 'unit_price': 'unit_price', 'price': 'unit_price',
-  'ระยะเวลาประกัน': 'warranty_months', 'ระยะประกัน': 'warranty_months', 'ประกัน (เดือน)': 'warranty_months', 'warranty_months': 'warranty_months', 'warranty': 'warranty_months',
 };
 
 const normalizeHeader = (h: string): string => String(h || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -41,11 +37,6 @@ const parseRequiresSn = (val: unknown): number => {
 
 const parseIntSafe = (val: unknown, fallback: number): number => {
   const n = parseInt(String(val ?? '').replace(/[^0-9-]/g, ''), 10);
-  return Number.isFinite(n) ? Math.max(0, n) : fallback;
-};
-
-const parseFloatSafe = (val: unknown, fallback: number): number => {
-  const n = parseFloat(String(val ?? '').replace(/[^0-9.-]/g, ''));
   return Number.isFinite(n) ? Math.max(0, n) : fallback;
 };
 
@@ -101,8 +92,6 @@ export const parseInventoryFile = async (file: File): Promise<ParseResult> => {
       quantity: parseIntSafe(record.quantity, 0),
       min_stock: parseIntSafe(record.min_stock, 10),
       requires_sn: parseRequiresSn(record.requires_sn),
-      unit_price: parseFloatSafe(record.unit_price, 0),
-      warranty_months: parseIntSafe(record.warranty_months, 36),
     });
   }
 

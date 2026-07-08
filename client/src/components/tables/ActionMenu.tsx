@@ -108,8 +108,8 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
               if (!isDisabled) action.onClick(row);
             }}
             style={{
-              width: '32px',
-              height: '32px',
+              width: '36px',
+              height: '36px',
               padding: 0,
               border: 'none',
               borderRadius: '8px',
@@ -142,13 +142,17 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
           <button
             ref={triggerRef}
             type="button"
+            title="ตัวเลือกเพิ่มเติม"
+            aria-label="ตัวเลือกเพิ่มเติม"
+            aria-haspopup="menu"
+            aria-expanded={isOpen}
             onClick={(e) => {
               e.stopPropagation();
               setIsOpen(!isOpen);
             }}
             style={{
-              width: '32px',
-              height: '32px',
+              width: '36px',
+              height: '36px',
               padding: 0,
               border: 'none',
               borderRadius: '50%',
@@ -169,6 +173,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
           {isOpen && createPortal(
             <div
               ref={menuRef}
+              role="menu"
               style={{
                 position: 'fixed',
                 top: `${coords.top}px`,
@@ -188,6 +193,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
                 return (
                   <button
                     key={action.id}
+                    role="menuitem"
                     disabled={isDisabled}
                     onClick={(e) => {
                       e.stopPropagation();

@@ -5,5 +5,6 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     fileParallelism: false,
+    globalSetup: './tests/globalSetup.js',
   },
 });

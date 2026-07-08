@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../index');
-const db = require('../database/init');
+const { query } = require('../database/db');
 const bcrypt = require('bcryptjs');
 
 describe('API Basic Endpoints', () => {
@@ -14,22 +14,18 @@ describe('API Basic Endpoints', () => {
 
     // Create a temporary test admin user
     const hash = bcrypt.hashSync(testPassword, 10);
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT OR REPLACE INTO users (username, password_hash, full_name, is_full, is_active) VALUES (?, ?, ?, 1, 1)`,
-        [testUsername, hash, 'Temporary Test Admin'],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
+    await query(
+      `INSERT INTO users (username, password_hash, full_name, is_full, is_active)
+       VALUES ($1, $2, $3, 1, 1)
+       ON CONFLICT (username) DO UPDATE SET password_hash = excluded.password_hash, full_name = excluded.full_name, is_full = excluded.is_full, is_active = excluded.is_active`,
+      [testUsername, hash, 'Temporary Test Admin']
+    );
 
     // Login to get token
     const res = await request(app)
       .post('/api/auth/login')
       .send({ username: testUsername, password: testPassword });
-    
+
     if (res.body && res.body.token) {
       token = res.body.token;
     }
@@ -37,12 +33,7 @@ describe('API Basic Endpoints', () => {
 
   afterAll(async () => {
     // Clean up temporary user
-    await new Promise((resolve, reject) => {
-      db.run(`DELETE FROM users WHERE username = ?`, [testUsername], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    await query(`DELETE FROM users WHERE username = $1`, [testUsername]);
   });
 
   it('should return API running message', async () => {
@@ -71,4 +62,3 @@ describe('API Basic Endpoints', () => {
     expect(res.body).toHaveProperty('total_items');
   });
 });
-

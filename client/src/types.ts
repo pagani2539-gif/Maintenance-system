@@ -84,8 +84,6 @@ export interface InventoryItem {
   requires_sn: number;
   image_path?: string;
   storage_location?: string;
-  unit_price?: number;
-  warranty_months?: number;
   created_at: string;
   updated_at: string;
 }
@@ -146,9 +144,10 @@ export interface Contract {
 
 export interface InventoryStats {
   total_items: number;
-  critical: number;
-  warning: number;
-  optimal: number;
+  out_of_stock: number; // quantity = 0
+  critical: number;     // 0 < quantity <= min_stock (วิกฤต)
+  warning: number;      // min_stock < quantity <= min_stock * 2 (ใกล้หมด)
+  optimal: number;      // quantity > min_stock * 2 (พร้อมใช้งาน)
 }
 
 export interface DashboardData {
@@ -164,14 +163,14 @@ export interface DashboardData {
   technicians: { name: string; completed: number; active: number; total: number }[];
   inventory: {
     topUsed: { name: string; count: number }[];
-    leastUsed: { name: string; count: number }[];
+    leastUsed: { name: string; days_idle: number | null }[];
     criticalItems: { name: string; quantity: number; min_stock: number }[];
     recentTransactions: (InventoryTransaction & { product_name: string })[];
     recentWithdrawals: Withdrawal[];
   };
   analysis: {
     mostBroken: { name: string; count: number }[];
-    overdue: { ticket_no: string; device_name: string; reporter: string; created_at: string; days_over: number }[];
+    overdue: { id?: number; ticket_no: string; device_name: string; reporter: string; created_at: string; days_over: number }[];
     monthlyTrend: { month: string; count: number }[];
   };
   withdrawalBreakdown: { name: string; count: number }[];
@@ -185,8 +184,6 @@ export interface DashboardData {
     total_po: number;
     pending_po: number;
     received_po: number;
-    total_spent: number;
-    recentPurchaseOrders: (PurchaseOrder & { total_cost?: number; total_items?: number })[];
   };
   supervisors?: {
     name: string;
@@ -265,7 +262,6 @@ export interface PurchaseOrderItem {
   po_id?: number;
   inventory_id: number;
   quantity: number;
-  unit_price: number;
   received_quantity?: number;
   item_name?: string;
   item_model?: string;
@@ -294,7 +290,6 @@ export interface PurchaseOrder {
   approved_by?: string;
   approved_at?: string;
   item_count?: number;
-  total_price?: number;
   items?: PurchaseOrderItem[];
 }
 
@@ -395,7 +390,59 @@ export interface Permissions {
     stations?: boolean;
     companies?: boolean;
     users?: boolean;
+    stock_counts?: boolean;
   };
+}
+
+export interface StockCount {
+  id: number;
+  count_no: string;
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  note?: string;
+  created_by?: string;
+  created_at: string;
+  completed_by?: string;
+  completed_at?: string;
+  total_items?: number;
+  counted_items?: number;
+  variance_items?: number;
+}
+
+export interface StockCountItem {
+  id: number;
+  count_id: number;
+  inventory_id: number;
+  expected_qty: number;
+  counted_qty: number | null;
+  note?: string;
+  counted_by?: string;
+  counted_at?: string;
+  name: string;
+  model?: string;
+  storage_location?: string;
+  image_path?: string;
+  requires_sn: number;
+  current_qty: number;
+}
+
+export interface StockCountDetailResponse extends StockCount {
+  items: StockCountItem[];
+}
+
+export interface StockCountCompleteSummary {
+  message: string;
+  count_no: string;
+  total_items: number;
+  counted_items: number;
+  uncounted_items: number;
+  adjustments: Array<{
+    inventory_id: number;
+    name: string;
+    expected_qty: number;
+    counted_qty: number;
+    variance: number;
+    new_quantity: number;
+  }>;
 }
 
 export interface User {
@@ -432,8 +479,8 @@ export interface AuditLog {
   entity_type: string;
   entity_id: number;
   action: string;
-  old_data?: string | null;
-  new_data?: string | null;
+  old_data?: string | Record<string, unknown> | null;
+  new_data?: string | Record<string, unknown> | null;
   user_name: string;
   created_at: string;
 }
@@ -448,7 +495,6 @@ export interface AssetLifecycleItem {
   inventory_id: number;
   device_name: string;
   model?: string;
-  warranty_months: number;
   station_name?: string;
   station_code?: string;
   contract_id?: number;
@@ -457,8 +503,136 @@ export interface AssetLifecycleItem {
   contract_year?: number;
   repair_count: number;
   age_months: number;
-  is_expired_warranty: boolean;
-  cost_exceeds_threshold: boolean;
-  recommended_replacement: boolean;
+}
+
+export type AssetTimelineEventKind =
+  | 'stock_in' | 'withdraw' | 'return' | 'repair' | 'claim' | 'device_swap';
+
+export interface AssetTimelineEvent {
+  kind: AssetTimelineEventKind;
+  timestamp: string;
+  title: string;
+  location?: string | null;
+  actor?: string | null;
+  project?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  note?: string | null;
+  quantity?: number;
+  ref_type?: 'transaction' | 'repair' | 'claim';
+  ref_id?: number | null;
+  ticket_no?: string | null;
+}
+
+export interface AssetTimelineInstance {
+  instance_id: number;
+  serial_number?: string;
+  condition?: string;
+  status?: string;
+  current_location?: string;
+  station_id?: number;
+  created_at: string;
+  updated_at?: string;
+  inventory_id: number;
+  device_name: string;
+  model?: string;
+  station_name?: string;
+  station_code?: string;
+  station_province?: string;
+  contract_no?: string;
+  contract_name?: string;
+  contract_year?: number;
+  repair_count: number;
+}
+
+export interface AssetTimelineResponse {
+  instance: AssetTimelineInstance;
+  events: AssetTimelineEvent[];
+}
+
+// ── Technician spare-stock (คลังอะไหล่ประจำตัวช่าง) ──
+export interface Technician {
+  id: number;
+  user_id?: number | null;
+  user_username?: string | null;
+  full_name: string;
+  code?: string | null;
+  phone?: string | null;
+  is_active: number;
+  item_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Summary row per technician (holdings list without technician_id filter)
+export interface TechnicianKitSummary {
+  technician_id: number;
+  full_name: string;
+  code?: string | null;
+  phone?: string | null;
+  is_active: number;
+  item_count: number;
+  total_qty: number;
+}
+
+export interface TechnicianHolding {
+  technician_id: number;
+  full_name: string;
+  inventory_id: number;
+  product_name: string;
+  model?: string | null;
+  requires_sn: number;
+  on_hand_qty: number;
+}
+
+export interface TechnicianHeldInstance {
+  instance_id: number;
+  technician_id: number;
+  full_name: string;
+  inventory_id: number;
+  product_name: string;
+  model?: string | null;
+  serial_number: string;
+  condition?: string | null;
+  instance_status: string;
+}
+
+export interface TechnicianHoldingsDetail {
+  holdings: TechnicianHolding[];
+  instances: TechnicianHeldInstance[];
+}
+
+export type TechnicianMovementType = 'LOAD' | 'INSTALL' | 'RETURN' | 'ADJUST';
+
+export interface TechnicianStockMovement {
+  id: number;
+  movement_no: string;
+  technician_id: number;
+  technician_name: string;
+  movement_type: TechnicianMovementType;
+  inventory_id: number;
+  product_name: string;
+  product_model?: string | null;
+  instance_id?: number | null;
+  serial_number?: string | null;
+  quantity: number;
+  station_id?: number | null;
+  station_name?: string | null;
+  station_code?: string | null;
+  station_area_id?: number | null;
+  station_area_name?: string | null;
+  repair_id?: number | null;
+  removed_serial?: string | null;
+  removed_model?: string | null;
+  note?: string | null;
+  performed_by?: string | null;
+  created_at: string;
+}
+
+// Item shape shared by load / install / return request bodies
+export interface TechnicianStockItemInput {
+  inventory_id: number;
+  quantity: number;
+  serial_numbers?: string[];
 }
 

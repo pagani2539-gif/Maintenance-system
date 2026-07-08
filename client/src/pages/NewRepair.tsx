@@ -5,10 +5,12 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input, TextArea, Select } from '../components/ui/Input';
 import StationSelector from '../components/ui/StationSelector';
 import StationAssetPicker from '../components/ui/StationAssetPicker';
 import FormSection from '../components/ui/FormSection';
+import { getApiErrorMessage } from '../utils/apiError';
 import {
   Upload,
   X,
@@ -148,13 +150,13 @@ const NewRepair: React.FC = () => {
       });
 
       await repairApi.create(data);
-      notify('🎉 ส่งข้อมูลแจ้งซ่อมเรียบร้อยแล้ว');
+      notify('ส่งข้อมูลแจ้งซ่อมเรียบร้อยแล้ว');
       playNotificationSound();
       refreshUnreadCounts();
       navigate('/repairs');
     } catch (error) {
       console.error('Error creating repair:', error);
-      notify('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      notify(getApiErrorMessage(error, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setLoading(false);
     }
@@ -162,6 +164,7 @@ const NewRepair: React.FC = () => {
 
   return (
     <div className="new-repair-page" style={{ padding: '2rem' }}>
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">
           <h2>แจ้งซ่อมอุปกรณ์ / แจ้งปัญหา</h2>
@@ -227,6 +230,7 @@ const NewRepair: React.FC = () => {
                 selectedStationId={formData.station_id}
                 showArea={false}
                 required={true}
+                ariaLabel="สถานที่ตั้งด่าน / จุดควบคุมน้ำหนักทางหลวง"
                 onChange={(data) => {
                   setFormData(prev => ({
                     ...prev,

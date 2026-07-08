@@ -80,6 +80,7 @@ export default defineConfig({
     })
   ],
   server: {
-    port: 5222,
+    host: true,
+    port: process.env.PORT ? Number(process.env.PORT) : 5222,
   }
 })

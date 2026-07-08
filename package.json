@@ -1,9 +1,5 @@
 {
   "scripts": {
     "production:check": "node scripts/production_check.js"
-  },
-  "dependencies": {
-    "impeccable": "^2.3.2",
-    "sqlite3": "^6.0.1"
   }
 }

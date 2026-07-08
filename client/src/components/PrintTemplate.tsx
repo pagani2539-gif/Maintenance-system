@@ -1,8 +1,7 @@
 import React from 'react';
 import { Camera } from 'lucide-react';
-import type { RepairDetail } from '../types';
+import type { RepairDetail, Company, CompanyLogo } from '../types';
 import { UPLOAD_URL } from '../api';
-import { useCompanyData } from '../hooks/useCompanyData';
 import { pdfTheme, docLabels } from './pdf/pdfTheme';
 import PdfPage from './pdf/PdfPage';
 import PdfHeader from './pdf/PdfHeader';
@@ -14,8 +13,8 @@ import PdfSignatureBlock from './pdf/PdfSignatureBlock';
 interface Props {
   repair: RepairDetail;
   isPreview?: boolean;
-  companyId?: number | null;
-  logoId?: number | null;
+  company?: Company | null;
+  logo?: CompanyLogo | null;
 }
 
 const parseDate = (dateStr: string): Date => {
@@ -59,9 +58,7 @@ const statusToTone = (status: string): 'success' | 'warning' | 'danger' | 'neutr
   return 'neutral';
 };
 
-const PrintTemplate: React.FC<Props> = ({ repair, isPreview, companyId, logoId }) => {
-  const { company, logo } = useCompanyData(companyId ?? null, logoId ?? null);
-
+const PrintTemplate: React.FC<Props> = ({ repair, isPreview, company = null, logo = null }) => {
   const isClaim = repair.type === 'claim';
   const docType = isClaim ? 'claim' : 'repair';
   const prefix = docLabels[docType].prefix;

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Repair, RepairDetail, RepairStatsResponse, InventoryItem, Withdrawal, InventoryStats, DashboardData, GlobalSearchResults, PurchaseOrder, StationDetailResponse, Station, StationArea, VendorContact, Company, CompanyLogo, User, SystemSettings, AuditLog, AssetLifecycleItem, Contract, AssetManualStatus } from './types';
+import type { Repair, RepairDetail, RepairStatsResponse, InventoryItem, Withdrawal, InventoryStats, DashboardData, GlobalSearchResults, PurchaseOrder, StationDetailResponse, Station, StationArea, VendorContact, Company, CompanyLogo, User, SystemSettings, AuditLog, AssetLifecycleItem, Contract, AssetManualStatus, StockCount, StockCountItem, StockCountDetailResponse, StockCountCompleteSummary, AssetTimelineResponse, Technician, TechnicianKitSummary, TechnicianHoldingsDetail, TechnicianStockMovement, TechnicianStockItemInput } from './types';
 
 const TOKEN_KEY = 'maintenance_auth_token';
 
@@ -53,7 +53,7 @@ api.interceptors.response.use(
 );
 
 export const repairApi = {
-  getAll: async (params: { status?: string; location?: string; station_id?: number | string; search?: string; type?: string; priority?: string; sortBy?: string }) => {
+  getAll: async (params: { status?: string; location?: string; station_id?: number | string; search?: string; type?: string; priority?: string; sortBy?: string; technician?: string; unassigned?: boolean }) => {
     const response = await api.get<Repair[]>('/repairs', { params });
     return response.data;
   },
@@ -69,7 +69,7 @@ export const repairApi = {
   },
   
   getUnreadCount: async () => {
-    const response = await api.get<{ repair: number; claim: number; lowStock: number; total: number; count: number; pendingReturns?: number }>('/repairs/unread-count');
+    const response = await api.get<{ repair: number; claim: number; lowStock: number; total: number; count: number; pendingReturns?: number; myTasks?: number }>('/repairs/unread-count');
     return response.data;
   },
   
@@ -194,6 +194,37 @@ export const inventoryApi = {
   getLifecycleReport: async () => {
     const response = await api.get<AssetLifecycleItem[]>('/inventory/lifecycle-report');
     return response.data;
+  },
+  getInstanceTimeline: async (instanceId: number | string) => {
+    const response = await api.get<AssetTimelineResponse>(`/inventory/instances/${instanceId}/timeline`);
+    return response.data;
+  }
+};
+
+export const stockCountApi = {
+  getAll: async () => {
+    const response = await api.get<StockCount[]>('/stock-counts');
+    return response.data;
+  },
+  getById: async (id: number | string) => {
+    const response = await api.get<StockCountDetailResponse>(`/stock-counts/${id}`);
+    return response.data;
+  },
+  create: async (data: { note?: string }) => {
+    const response = await api.post<StockCount>('/stock-counts', data);
+    return response.data;
+  },
+  updateItem: async (countId: number | string, itemId: number | string, data: { counted_qty: number | null; note?: string }) => {
+    const response = await api.patch<StockCountItem>(`/stock-counts/${countId}/items/${itemId}`, data);
+    return response.data;
+  },
+  complete: async (id: number | string) => {
+    const response = await api.post<StockCountCompleteSummary>(`/stock-counts/${id}/complete`);
+    return response.data;
+  },
+  cancel: async (id: number | string) => {
+    const response = await api.post<{ message: string }>(`/stock-counts/${id}/cancel`);
+    return response.data;
   }
 };
 
@@ -301,7 +332,7 @@ export const purchaseOrderApi = {
     buyer_department?: string;
     buyer_phone?: string;
     buyer_email?: string;
-    items: { inventory_id: number; quantity: number; unit_price?: number }[];
+    items: { inventory_id: number; quantity: number }[];
   }) => {
     const response = await api.post<{ id: number; po_no: string; message: string }>('/purchase-orders', data);
     return response.data;
@@ -309,7 +340,7 @@ export const purchaseOrderApi = {
   update: async (id: number | string, data: {
     status?: 'Draft' | 'Pending' | 'Approved' | 'Ordered' | 'Cancelled';
     note?: string;
-    items?: { inventory_id: number; quantity: number; unit_price?: number }[];
+    items?: { inventory_id: number; quantity: number }[];
     ordered_by?: string;
     project_name?: string;
     company_name?: string;
@@ -339,6 +370,28 @@ export const purchaseOrderApi = {
   },
   autoGenerate: async () => {
     const response = await api.post('/purchase-orders/auto-generate');
+    return response.data;
+  }
+};
+
+export interface ServerReportPayload {
+  title: string;
+  headers: string[];
+  rows: (string | number)[][];
+  colWidths?: string[];
+  totals?: { label: string; value: string }[];
+  count: number;
+  periodLabel: string;
+}
+
+export const reportApi = {
+  generate: async (type: string, params?: { startDate?: string; endDate?: string }) => {
+    const response = await api.get<ServerReportPayload>(`/reports/${type}`, { params });
+    return response.data;
+  },
+  // Row counts for every report type — powers the live preview on the cards.
+  getCounts: async (params?: { startDate?: string; endDate?: string }) => {
+    const response = await api.get<Record<string, number | null>>('/reports/summary/counts', { params });
     return response.data;
   }
 };
@@ -528,6 +581,62 @@ export const userApi = {
   },
   getAuditLogs: async (params?: { limit?: number; offset?: number; search?: string }) => {
     const response = await api.get<{ logs: AuditLog[]; total: number }>('/users/audit-logs', { params });
+    return response.data;
+  },
+};
+
+export const technicianApi = {
+  list: async (params?: { active?: boolean }) => {
+    const response = await api.get<Technician[]>('/technicians', { params });
+    return response.data;
+  },
+  create: async (data: { full_name: string; code?: string; phone?: string; user_id?: number | null }) => {
+    const response = await api.post<{ id: number; message: string }>('/technicians', data);
+    return response.data;
+  },
+  update: async (id: number | string, data: Partial<{ full_name: string; code: string; phone: string; user_id: number | null; is_active: boolean }>) => {
+    const response = await api.patch<{ message: string }>(`/technicians/${id}`, data);
+    return response.data;
+  },
+};
+
+export const technicianStockApi = {
+  // Summary per technician (no param) — for the master list page
+  getKitSummary: async () => {
+    const response = await api.get<TechnicianKitSummary[]>('/technician-stock/holdings');
+    return response.data;
+  },
+  // One technician's on-hand items + serialized units
+  getHoldings: async (technicianId: number | string) => {
+    const response = await api.get<TechnicianHoldingsDetail>('/technician-stock/holdings', { params: { technician_id: technicianId } });
+    return response.data;
+  },
+  getMovements: async (params?: { technician_id?: number | string; station_id?: number | string; type?: string; inventory_id?: number | string }) => {
+    const response = await api.get<TechnicianStockMovement[]>('/technician-stock/movements', { params });
+    return response.data;
+  },
+  load: async (data: { technician_id: number; items: TechnicianStockItemInput[]; note?: string }) => {
+    const response = await api.post<{ message: string }>('/technician-stock/load', data);
+    return response.data;
+  },
+  install: async (data: {
+    technician_id: number;
+    items: TechnicianStockItemInput[];
+    station_id: number;
+    station_area_id?: number;
+    removed_serial?: string;
+    removed_model?: string;
+    note?: string;
+  }) => {
+    const response = await api.post<{ message: string }>('/technician-stock/install', data);
+    return response.data;
+  },
+  returnStock: async (data: { technician_id: number; items: TechnicianStockItemInput[]; note?: string }) => {
+    const response = await api.post<{ message: string }>('/technician-stock/return', data);
+    return response.data;
+  },
+  deleteMovement: async (id: number | string) => {
+    const response = await api.delete<{ message: string }>(`/technician-stock/movements/${id}`);
     return response.data;
   },
 };

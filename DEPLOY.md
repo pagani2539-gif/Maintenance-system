@@ -4,6 +4,19 @@
 
 ---
 
+## 🐘 0. ติดตั้ง PostgreSQL (ครั้งเดียว)
+ระบบใช้ PostgreSQL เป็นฐานข้อมูลหลัก (ไม่ใช่ SQLite แล้ว)
+
+1. ติดตั้ง PostgreSQL บนเครื่อง production (แนะนำเวอร์ชัน 16 ขึ้นไป) — ดาวน์โหลดจาก [postgresql.org](https://www.postgresql.org/download/windows/)
+2. สร้าง role และ database เฉพาะแอป (ห้ามใช้ user `postgres` กับแอปโดยตรง):
+   ```sql
+   CREATE ROLE maintenance_app WITH LOGIN PASSWORD '<ตั้งรหัสผ่านสุ่มยาว>';
+   CREATE DATABASE maintenance_system OWNER maintenance_app;
+   ```
+3. จดตำแหน่งโฟลเดอร์ `bin` ของ PostgreSQL ไว้ (มี `pg_dump.exe`/`pg_restore.exe`) เช่น `C:\Program Files\PostgreSQL\18\bin` — จะใช้ตั้งค่า `PG_BIN_DIR` ในขั้นตอนถัดไป (จำเป็นสำหรับฟีเจอร์สำรอง/กู้คืนข้อมูล เพราะตัวติดตั้ง Windows ไม่ได้เพิ่มเข้า PATH ให้อัตโนมัติ)
+
+---
+
 ## 🔐 1. ตั้งค่า Environment (`server/.env`) — สำคัญที่สุด
 ระบบใช้ระบบล็อกอิน (JWT) จึง **ต้อง** ตั้งค่า environment ก่อนขึ้น production
 มิฉะนั้น Server จะไม่ยอมสตาร์ท (ตั้งใจให้ fail-closed เพื่อความปลอดภัย)
@@ -21,6 +34,12 @@
    # ต้องเป็นค่าสุ่มยาว (เช่น openssl rand -base64 48) — ห้ามใช้ค่า default
    JWT_SECRET=<ใส่ค่าสุ่มยาวของคุณเอง>
    JWT_EXPIRES_IN=7d
+
+   # เชื่อมต่อ PostgreSQL ที่ตั้งไว้ในขั้นตอนที่ 0
+   DATABASE_URL=postgres://maintenance_app:<รหัสผ่าน>@localhost:5432/maintenance_system
+
+   # โฟลเดอร์ bin ของ PostgreSQL (สำหรับฟีเจอร์สำรอง/กู้คืนข้อมูล)
+   PG_BIN_DIR=C:\Program Files\PostgreSQL\18\bin
 
    # เว้นว่างได้ถ้าเข้าผ่าน origin เดียวกับ Server (กรณีปกติ)
    CORS_ORIGIN=
@@ -110,7 +129,8 @@ npm run production:check
 ---
 
 ## 💾 9. การสำรอง/กู้คืนฐานข้อมูล
-- ฐานข้อมูล: `server/database/repair_system.db`
-- ระบบสำรองอัตโนมัติเก็บไว้ที่ `server/database/backups/`
-- จัดการ backup/restore ได้จากหน้า **Settings** ในแอป (ต้องเป็น user สิทธิ์เต็ม)
+- ฐานข้อมูล: PostgreSQL (`DATABASE_URL` ใน `.env`) — สำรองด้วย `pg_dump` (ไฟล์ `.dump`), กู้คืนด้วย `pg_restore`
+- ระบบสำรองอัตโนมัติเก็บไว้ที่ `server/database/backups/` (ทุก 24 ชม.)
+- จัดการ backup/restore ได้จากหน้า **Settings** ในแอป (ต้องเป็น user สิทธิ์เต็ม) — ต้องตั้ง `PG_BIN_DIR` ไว้ก่อน (ดูขั้นตอนที่ 0-1)
+- การกู้คืนจะรีสตาร์ท process อัตโนมัติหลังกู้คืนเสร็จ (ให้ PM2 restart ให้)
 - ปิดการสำรองชั่วคราวได้ด้วย `DISABLE_BACKUP_SCHEDULER=1` ใน `.env`

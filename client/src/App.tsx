@@ -12,7 +12,14 @@ import WithdrawalList from './pages/WithdrawalList';
 import WithdrawalDetail from './pages/WithdrawalDetail';
 import TransactionList from './pages/TransactionList';
 import PendingReturns from './pages/PendingReturns';
+import MyTasks from './pages/MyTasks';
+import StockCountList from './pages/StockCountList';
+import StockCountDetail from './pages/StockCountDetail';
+import AssetTimeline from './pages/AssetTimeline';
 import PurchaseOrderList from './pages/PurchaseOrderList';
+import TechnicianStockList from './pages/TechnicianStockList';
+import TechnicianStockMovements from './pages/TechnicianStockMovements';
+import Technicians from './pages/Technicians';
 import Reports from './pages/Reports';
 import StationSearch from './pages/StationSearch';
 import Settings from './pages/Settings';
@@ -51,6 +58,7 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="my-tasks" element={<MyTasks />} />
               <Route path="repairs" element={<RepairList />} />
               <Route path="repairs/:id" element={<RepairDetail />} />
               <Route path="new" element={<NewRepair />} />
@@ -63,7 +71,13 @@ function App() {
               <Route path="withdrawal/:id" element={<WithdrawalDetail />} />
               <Route path="transactions" element={<TransactionList />} />
               <Route path="pending-returns" element={<PendingReturns />} />
+              <Route path="stock-counts" element={<StockCountList />} />
+              <Route path="stock-counts/:id" element={<StockCountDetail />} />
+              <Route path="asset/:instanceId" element={<AssetTimeline />} />
               <Route path="purchase-orders" element={<PurchaseOrderList />} />
+              <Route path="technician-stock" element={<TechnicianStockList />} />
+              <Route path="technician-stock/movements" element={<TechnicianStockMovements />} />
+              <Route path="technicians" element={<Technicians />} />
               <Route path="reports" element={<Reports />} />
               <Route path="stations" element={<StationSearch />} />
               <Route path="settings" element={<Settings />} />

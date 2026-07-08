@@ -4,7 +4,7 @@ A comprehensive full-stack web application for managing device repairs, equipmen
 
 ## 📁 Project Structure
 - `/client`: Frontend application built with React 19, Vite, and TypeScript.
-- `/server`: Backend REST API built with Node.js, Express, and SQLite3.
+- `/server`: Backend REST API built with Node.js, Express, and PostgreSQL.
 
 ## 🛠 Tech Stack
 ### Frontend
@@ -17,7 +17,7 @@ A comprehensive full-stack web application for managing device repairs, equipmen
 
 ### Backend
 - **Runtime**: Node.js & Express
-- **Database**: SQLite3 (auto-migrations on startup)
+- **Database**: PostgreSQL (auto-migrations on startup), accessed via `pg`
 - **Authentication**: JWT (`jsonwebtoken`) + `bcryptjs` password hashing
 - **File Uploads**: Multer
 - **Middleware**: CORS, Morgan (logging), login rate limiting, security headers, centralized error handling.

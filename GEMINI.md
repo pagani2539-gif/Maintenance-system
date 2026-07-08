@@ -7,14 +7,14 @@ A full-stack web application designed to manage device repairs, equipment invent
 
 - **Frontend**: Single Page Application (SPA) built with React 19, Vite, and TypeScript.
 - **Backend**: REST API built with Node.js and Express.
-- **Database**: SQLite3 for persistent storage.
+- **Database**: PostgreSQL for persistent storage (migrated from SQLite).
 
 ## 2. Core Architecture
 The system follows a Client-Server model.
 
 - **Client (`/client`)**: Handles UI/UX and user interactions. Uses `axios` for API communication (via `useApi` hook).
 - **Server (`/server`)**: Manages business logic, database operations, and file storage (uploads).
-- **Data Flow**: User Interaction -> API Request -> Express Route -> Controller -> SQLite DB -> JSON Response.
+- **Data Flow**: User Interaction -> API Request -> Express Route -> Controller -> PostgreSQL -> JSON Response.
 
 ## 3. Tech Stack
 ### Frontend
@@ -28,14 +28,13 @@ The system follows a Client-Server model.
 ### Backend
 - **Runtime**: Node.js
 - **Framework**: Express
-- **Database**: SQLite3
+- **Database**: PostgreSQL (via `pg`), migrations run automatically on startup
 - **File Handling**: Multer (stores images in `/server/uploads`)
 
 ## 4. Key Commands
 ### Backend (`/server`)
 - `npm install`: Install dependencies.
 - `npm run dev`: Start server in watch mode (port 5221).
-- `npm run init-db`: Initialize the SQLite database.
 
 ### Frontend (`/client`)
 - `npm install`: Install dependencies.
@@ -79,7 +78,7 @@ The system follows a Client-Server model.
 - **Migrations**: Database schema changes should be handled via migration scripts (e.g., `server/database/migrations/`).
 
 ## 7. AI Agent Guidelines (Mandatory)
-- **Tech Stack Integrity**: Respect the established React 19 / Node / SQLite stack.
+- **Tech Stack Integrity**: Respect the established React 19 / Node / PostgreSQL stack.
 - **Surgical Edits**: Use the `replace` tool for targeted changes.
 - **Research**: Always check `types.ts` and existing routes before proposing changes.
 - **Validation**: Run `npm run lint` in `/client` and ensure the server starts after backend changes.

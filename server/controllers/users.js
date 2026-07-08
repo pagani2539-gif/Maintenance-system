@@ -1,16 +1,14 @@
 const bcrypt = require('bcryptjs');
-const db = require('../database/init');
+const { query } = require('../database/db');
 
 const sanitize = (row) => {
   if (!row) return null;
-  let permissions = {};
-  try { permissions = row.permissions ? JSON.parse(row.permissions) : {}; } catch { permissions = {}; }
   return {
     id: row.id,
     username: row.username,
     full_name: row.full_name,
     is_full: row.is_full === 1,
-    permissions,
+    permissions: row.permissions || {},
     force_password_change: row.force_password_change === 1,
     is_active: row.is_active === 1,
     last_login: row.last_login,
@@ -19,32 +17,19 @@ const sanitize = (row) => {
   };
 };
 
-exports.list = (req, res) => {
-  db.all(
-    `SELECT id, username, full_name, is_full, permissions, force_password_change, is_active, last_login, created_by, created_at
-     FROM users ORDER BY is_full DESC, id ASC`,
-    [],
-    (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json((rows || []).map(sanitize));
-    }
-  );
+exports.list = async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, username, full_name, is_full, permissions, force_password_change, is_active, last_login, created_by, created_at
+       FROM users ORDER BY is_full DESC, id ASC`
+    );
+    res.json((rows || []).map(sanitize));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.getById = (req, res) => {
-  db.get(
-    `SELECT id, username, full_name, is_full, permissions, force_password_change, is_active, last_login, created_by, created_at
-     FROM users WHERE id = ?`,
-    [req.params.id],
-    (err, row) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!row) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
-      res.json(sanitize(row));
-    }
-  );
-};
-
-exports.create = (req, res) => {
+exports.create = async (req, res) => {
   const { username, password, full_name, is_full, permissions, force_password_change } = req.body || {};
   if (!username || !password || !full_name) {
     return res.status(400).json({ error: 'กรุณาระบุ username, password และชื่อ-สกุล' });
@@ -56,12 +41,12 @@ exports.create = (req, res) => {
   const trimmedUsername = String(username).trim();
   const permissionsJson = JSON.stringify(permissions && typeof permissions === 'object' ? permissions : {});
 
-  bcrypt.hash(password, 10, (hashErr, hash) => {
-    if (hashErr) return res.status(500).json({ error: hashErr.message });
-
-    db.run(
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const { rows } = await query(
       `INSERT INTO users (username, password_hash, full_name, is_full, permissions, force_password_change, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id`,
       [
         trimmedUsername,
         hash,
@@ -70,27 +55,25 @@ exports.create = (req, res) => {
         permissionsJson,
         force_password_change ? 1 : 0,
         req.user.id,
-      ],
-      function (err) {
-        if (err) {
-          if (err.message.includes('UNIQUE')) {
-            return res.status(400).json({ error: 'ชื่อผู้ใช้นี้มีอยู่แล้ว' });
-          }
-          return res.status(500).json({ error: err.message });
-        }
-        res.status(201).json({ id: this.lastID, message: 'สร้างผู้ใช้เรียบร้อย' });
-      }
+      ]
     );
-  });
+    res.status(201).json({ id: rows[0].id, message: 'สร้างผู้ใช้เรียบร้อย' });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'ชื่อผู้ใช้นี้มีอยู่แล้ว' });
+    }
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.update = (req, res) => {
+exports.update = async (req, res) => {
   const { id } = req.params;
   const userId = parseInt(id, 10);
   const { full_name, password, is_full, permissions, is_active } = req.body || {};
 
-  db.get('SELECT * FROM users WHERE id = ?', [userId], (err, target) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const { rows: targetRows } = await query('SELECT * FROM users WHERE id = $1', [userId]);
+    const target = targetRows[0];
     if (!target) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
 
     // Self-protection
@@ -107,71 +90,59 @@ exports.update = (req, res) => {
 
     // Prevent removing the last Full user
     if (wantsToggleFull && target.is_full === 1 && !is_full) {
-      return db.get('SELECT COUNT(*) as cnt FROM users WHERE is_full = 1 AND is_active = 1', [], (cErr, row) => {
-        if (cErr) return res.status(500).json({ error: cErr.message });
-        if (row.cnt <= 1) {
-          return res.status(400).json({ error: 'ต้องมีผู้ดูแลระบบ (Full) อย่างน้อย 1 คน' });
-        }
-        applyUpdate();
-      });
+      const { rows: cntRows } = await query('SELECT COUNT(*) as cnt FROM users WHERE is_full = 1 AND is_active = 1');
+      if (Number(cntRows[0].cnt) <= 1) {
+        return res.status(400).json({ error: 'ต้องมีผู้ดูแลระบบ (Full) อย่างน้อย 1 คน' });
+      }
     }
-    applyUpdate();
 
-    function applyUpdate() {
-      const fields = [];
-      const params = [];
+    const fields = [];
+    const params = [];
+    let idx = 1;
 
-      if (full_name !== undefined) {
-        fields.push('full_name = ?');
-        params.push(String(full_name).trim());
-      }
-      if (is_full !== undefined) {
-        fields.push('is_full = ?');
-        params.push(is_full ? 1 : 0);
-      }
-      if (permissions !== undefined) {
-        fields.push('permissions = ?');
-        params.push(JSON.stringify(permissions && typeof permissions === 'object' ? permissions : {}));
-      }
-      if (is_active !== undefined) {
-        fields.push('is_active = ?');
-        params.push(is_active ? 1 : 0);
-      }
-
-      const finalizePassword = (callback) => {
-        if (!password) return callback();
-        if (password.length < 8) {
-          return res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' });
-        }
-        bcrypt.hash(password, 10, (hashErr, hash) => {
-          if (hashErr) return res.status(500).json({ error: hashErr.message });
-          fields.push('password_hash = ?', 'password_changed_at = CURRENT_TIMESTAMP', 'force_password_change = 0');
-          params.push(hash);
-          callback();
-        });
-      };
-
-      finalizePassword(() => {
-        if (fields.length === 0) return res.json({ message: 'ไม่มีข้อมูลที่ต้องอัปเดต' });
-        fields.push('updated_at = CURRENT_TIMESTAMP');
-        params.push(userId);
-
-        db.run(
-          `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
-          params,
-          function (uErr) {
-            if (uErr) return res.status(500).json({ error: uErr.message });
-            if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
-            res.json({ message: 'บันทึกข้อมูลผู้ใช้เรียบร้อย' });
-          }
-        );
-      });
+    if (full_name !== undefined) {
+      fields.push(`full_name = $${idx++}`);
+      params.push(String(full_name).trim());
     }
-  });
+    if (is_full !== undefined) {
+      fields.push(`is_full = $${idx++}`);
+      params.push(is_full ? 1 : 0);
+    }
+    if (permissions !== undefined) {
+      fields.push(`permissions = $${idx++}`);
+      params.push(JSON.stringify(permissions && typeof permissions === 'object' ? permissions : {}));
+    }
+    if (is_active !== undefined) {
+      fields.push(`is_active = $${idx++}`);
+      params.push(is_active ? 1 : 0);
+    }
+
+    if (password) {
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      fields.push(`password_hash = $${idx++}`, `password_changed_at = NOW()`, `force_password_change = 0`);
+      params.push(hash);
+    }
+
+    if (fields.length === 0) return res.json({ message: 'ไม่มีข้อมูลที่ต้องอัปเดต' });
+    fields.push('updated_at = NOW()');
+    params.push(userId);
+
+    const result = await query(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx}`,
+      params
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+    res.json({ message: 'บันทึกข้อมูลผู้ใช้เรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 // Soft-delete: set is_active = 0 (preserves history)
-exports.remove = (req, res) => {
+exports.remove = async (req, res) => {
   const { id } = req.params;
   const userId = parseInt(id, 10);
 
@@ -179,69 +150,57 @@ exports.remove = (req, res) => {
     return res.status(400).json({ error: 'ไม่สามารถลบบัญชีตัวเองได้' });
   }
 
-  db.get('SELECT is_full FROM users WHERE id = ?', [userId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const { rows } = await query('SELECT is_full FROM users WHERE id = $1', [userId]);
+    const row = rows[0];
     if (!row) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
 
-    const finalize = () => {
-      db.run(
-        `UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [userId],
-        function (uErr) {
-          if (uErr) return res.status(500).json({ error: uErr.message });
-          res.json({ message: 'ปิดการใช้งานบัญชีเรียบร้อย' });
-        }
-      );
-    };
-
     if (row.is_full) {
-      db.get('SELECT COUNT(*) as cnt FROM users WHERE is_full = 1 AND is_active = 1', [], (cErr, c) => {
-        if (cErr) return res.status(500).json({ error: cErr.message });
-        if (c.cnt <= 1) {
-          return res.status(400).json({ error: 'ต้องมีผู้ดูแลระบบ (Full) อย่างน้อย 1 คน' });
-        }
-        finalize();
-      });
-    } else {
-      finalize();
+      const { rows: cntRows } = await query('SELECT COUNT(*) as cnt FROM users WHERE is_full = 1 AND is_active = 1');
+      if (Number(cntRows[0].cnt) <= 1) {
+        return res.status(400).json({ error: 'ต้องมีผู้ดูแลระบบ (Full) อย่างน้อย 1 คน' });
+      }
     }
-  });
+
+    await query(`UPDATE users SET is_active = 0, updated_at = NOW() WHERE id = $1`, [userId]);
+    res.json({ message: 'ปิดการใช้งานบัญชีเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.getAuditLogs = (req, res) => {
+exports.getAuditLogs = async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
   const search = req.query.search;
-  
-  let sql = 'SELECT * FROM audit_logs';
-  const params = [];
-  
-  if (search) {
-    sql += ' WHERE entity_type LIKE ? OR action LIKE ? OR user_name LIKE ?';
-    const s = `%${search}%`;
-    params.push(s, s, s);
-  }
-  
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-  params.push(limit, offset);
-  
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    
+
+  try {
+    let sql = 'SELECT * FROM audit_logs';
+    const params = [];
+
+    if (search) {
+      sql += ' WHERE entity_type ILIKE $1 OR action ILIKE $1 OR user_name ILIKE $1';
+      params.push(`%${search}%`);
+    }
+
+    sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const { rows } = await query(sql, params);
+
     let countSql = 'SELECT COUNT(*) as count FROM audit_logs';
     const countParams = [];
     if (search) {
-      countSql += ' WHERE entity_type LIKE ? OR action LIKE ? OR user_name LIKE ?';
-      const s = `%${search}%`;
-      countParams.push(s, s, s);
+      countSql += ' WHERE entity_type ILIKE $1 OR action ILIKE $1 OR user_name ILIKE $1';
+      countParams.push(`%${search}%`);
     }
-    
-    db.get(countSql, countParams, (err2, countRow) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      res.json({
-        logs: rows || [],
-        total: countRow ? countRow.count : 0
-      });
+
+    const { rows: countRows } = await query(countSql, countParams);
+    res.json({
+      logs: rows || [],
+      total: countRows[0] ? Number(countRows[0].count) : 0
     });
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

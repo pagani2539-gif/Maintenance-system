@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authApi, tokenStorage } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input } from '../components/ui/Input';
 import { KeyRound, Lock, Check, AlertCircle } from 'lucide-react';
 
@@ -156,6 +157,7 @@ const ChangePassword: React.FC = () => {
           position: 'relative',
         }}
       >
+        {!isFirstLogin && <BackButton style={{ marginBottom: '1rem' }} />}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             display: 'inline-flex',

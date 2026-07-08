@@ -5,7 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
-const db = require('./database/init'); // This will also ensure tables are created
+require('./database/initPg'); // Connects the pg pool and runs Postgres migrations
 
 const app = express();
 const PORT = process.env.PORT || 5221;
@@ -56,8 +56,12 @@ const searchRoutes = require('./routes/search');
 const stationRoutes = require('./routes/stations');
 const contractRoutes = require('./routes/contracts');
 const settingsRoutes = require('./routes/settings');
+const stockCountRoutes = require('./routes/stockCounts');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
+const techniciansRoutes = require('./routes/technicians');
+const technicianStockRoutes = require('./routes/technicianStock');
+const reportsRoutes = require('./routes/reports');
 const errorHandler = require('./middlewares/errorHandler');
 const { requireAuth } = require('./middlewares/auth');
 
@@ -74,7 +78,11 @@ app.use('/api/search', requireAuth, searchRoutes);
 app.use('/api/stations', requireAuth, stationRoutes);
 app.use('/api/contracts', requireAuth, contractRoutes);
 app.use('/api/settings', requireAuth, settingsRoutes);
+app.use('/api/stock-counts', requireAuth, stockCountRoutes);
 app.use('/api/users', requireAuth, usersRoutes);
+app.use('/api/technicians', requireAuth, techniciansRoutes);
+app.use('/api/technician-stock', requireAuth, technicianStockRoutes);
+app.use('/api/reports', requireAuth, reportsRoutes);
 
 // Health check endpoint
 app.get('/api', (req, res) => {

@@ -5,10 +5,12 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input, TextArea, Select } from '../components/ui/Input';
 import StationSelector from '../components/ui/StationSelector';
 import StationAssetPicker from '../components/ui/StationAssetPicker';
 import FormSection from '../components/ui/FormSection';
+import { getApiErrorMessage } from '../utils/apiError';
 import {
   Upload,
   X,
@@ -148,13 +150,13 @@ const NewClaim: React.FC = () => {
       });
 
       await repairApi.createClaim(data);
-      notify('🎉 ส่งข้อมูลเคลมเรียบร้อยแล้ว');
+      notify('ส่งข้อมูลเคลมเรียบร้อยแล้ว');
       playNotificationSound();
       refreshUnreadCounts();
       navigate('/repairs');
     } catch (error) {
       console.error('Error creating claim:', error);
-      notify('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      notify(getApiErrorMessage(error, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setLoading(false);
     }
@@ -162,6 +164,7 @@ const NewClaim: React.FC = () => {
 
   return (
     <div className="new-claim-page" style={{ padding: '2rem' }}>
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">
           <h2>แจ้งเคลมอุปกรณ์</h2>

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input, TextArea } from '../components/ui/Input';
 import FormSection from '../components/ui/FormSection';
 import { useNotification } from '../components/Layout';
 import { settingsApi, UPLOAD_URL } from '../api';
+import { getApiErrorMessage } from '../utils/apiError';
 import type { Company, CompanyLogo, SystemSettings } from '../types';
 import {
   Building2,
@@ -194,8 +196,8 @@ const Settings: React.FC = () => {
         notify('บันทึกข้อมูลบริษัทเรียบร้อย');
         await fetchCompanies();
       }
-    } catch {
-      notify('เกิดข้อผิดพลาดในการบันทึก', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setSaving(false);
     }
@@ -209,7 +211,7 @@ const Settings: React.FC = () => {
     }
     const isConfirmed = await confirm({
       title: 'ยืนยันการลบบริษัท',
-      message: `ลบบริษัท "${form.name_th}" ใช่หรือไม่?\n(โลโก้ทั้งหมดของบริษัทนี้จะถูกลบด้วย)`,
+      message: `ลบบริษัท "${form.name_th}" ใช่หรือไม่?\n(โลโก้ทั้งหมดของบริษัทนี้จะถูกลบด้วย)\nการดำเนินการนี้ไม่สามารถย้อนกลับได้`,
       variant: 'danger'
     });
     if (!isConfirmed) return;
@@ -279,7 +281,7 @@ const Settings: React.FC = () => {
     if (!selectedId) return;
     const isConfirmed = await confirm({
       title: 'ยืนยันการลบโลโก้',
-      message: `ลบโลโก้ "${label}" ใช่หรือไม่?`,
+      message: `ลบโลโก้ "${label}" ใช่หรือไม่?\nการดำเนินการนี้ไม่สามารถย้อนกลับได้`,
       variant: 'danger'
     });
     if (!isConfirmed) return;
@@ -300,8 +302,8 @@ const Settings: React.FC = () => {
       await settingsApi.updateSystemSettings(systemSettings);
       notify('บันทึกการตั้งค่าระบบเรียบร้อยแล้ว');
       fetchSystemSettings();
-    } catch {
-      notify('เกิดข้อผิดพลาดในการบันทึกตั้งค่าระบบ', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setSavingSettings(false);
     }
@@ -395,6 +397,7 @@ const Settings: React.FC = () => {
 
   return (
     <div style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '1.5rem' }}>
         <div className="page-title">
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -917,7 +920,7 @@ const Settings: React.FC = () => {
                   ระบบสำรองข้อมูลและกู้คืนฐานข้อมูล (Database Backup)
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>
-                  ฐานข้อมูลทำงานบนระบบ SQLite3 คุณสามารถกดสั่งดาวน์โหลดไฟล์สำรองหรือสั่งสำรองข้อมูลชุดปัจจุบันได้ที่นี่
+                  ฐานข้อมูลทำงานบนระบบ PostgreSQL คุณสามารถกดสั่งดาวน์โหลดไฟล์สำรองหรือสั่งสำรองข้อมูลชุดปัจจุบันได้ที่นี่
                 </p>
               </div>
 
@@ -953,7 +956,7 @@ const Settings: React.FC = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>ชื่อไฟล์สำรอง (.db)</th>
+                      <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>ชื่อไฟล์สำรอง (.dump)</th>
                       <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>ขนาดไฟล์</th>
                       <th style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>วันที่สำรองข้อมูล</th>
                       <th style={{ padding: '12px 16px', color: 'var(--text-muted)', textAlign: 'right' }}>ดำเนินการ</th>

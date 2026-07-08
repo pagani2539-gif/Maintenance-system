@@ -33,7 +33,10 @@ import {
   Hourglass,
   Receipt,
   FileSignature,
-  TrendingUp
+  TrendingUp,
+  ClipboardCheck,
+  ListChecks,
+  Truck
 } from 'lucide-react';
 import { repairApi, transactionApi, searchApi } from '../api';
 import type { GlobalSearchResults } from '../types';
@@ -123,6 +126,7 @@ const Layout: React.FC = () => {
   const [unreadClaimCount, setUnreadClaimCount] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [pendingReturnsCount, setPendingReturnsCount] = useState(0);
+  const [myTasksCount, setMyTasksCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('sidebarCollapsed') === 'true';
@@ -274,26 +278,56 @@ const Layout: React.FC = () => {
 
   const prevUnreadRepairCount = React.useRef(0);
   const prevUnreadClaimCount = React.useRef(0);
+  const prevLowStockCount = React.useRef(0);
   const prevLatestTransactionId = React.useRef<number | null>(null);
 
   const playNotificationSound = useCallback(() => {
     try {
       const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      const now = audioContext.currentTime;
 
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+      const masterGain = audioContext.createGain();
+      masterGain.gain.value = 0.28;
+      masterGain.connect(audioContext.destination);
 
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.05);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      // Bell-like chime: fundamental + soft overtones through a warm low-pass filter
+      const playChime = (freq: number, startTime: number, duration: number, volume: number) => {
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 3500;
+        filter.connect(masterGain);
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+        const partials = [
+          { ratio: 1, gain: 1 },
+          { ratio: 2.01, gain: 0.35 },
+          { ratio: 3, gain: 0.12 },
+        ];
 
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.5);
+        partials.forEach(({ ratio, gain: partialGain }) => {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(freq * ratio, startTime);
+
+          gainNode.gain.setValueAtTime(0, startTime);
+          gainNode.gain.linearRampToValueAtTime(volume * partialGain, startTime + 0.015);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+          oscillator.connect(gainNode);
+          gainNode.connect(filter);
+          oscillator.start(startTime);
+          oscillator.stop(startTime + duration);
+        });
+      };
+
+      // Two-note ascending chime (perfect fourth: E6 -> A6) for a soft, premium "ding"
+      playChime(1318.51, now, 0.55, 0.8);
+      playChime(1760, now + 0.09, 0.75, 0.7);
+
+      setTimeout(() => {
+        audioContext.close().catch(() => {});
+      }, 1500);
     } catch (err) {
       console.error('Failed to play notification sound:', err);
     }
@@ -302,7 +336,7 @@ const Layout: React.FC = () => {
   const refreshUnreadCounts = useCallback(async () => {
     try {
       const data = await repairApi.getUnreadCount();
-      const { repair, claim, lowStock, pendingReturns } = data;
+      const { repair, claim, lowStock, pendingReturns, myTasks } = data;
  
       // If unread repair count increased, notify user
       if (repair > prevUnreadRepairCount.current && prevUnreadRepairCount.current !== 0) {
@@ -317,13 +351,22 @@ const Layout: React.FC = () => {
         notify(`มีงานแจ้งเคลมใหม่เข้ามา ${claim - prevUnreadClaimCount.current} รายการ`, 'info', 'งานแจ้งเคลมใหม่', 'claim', '/repairs');
         playNotificationSound();
       }
- 
+
+      // If low-stock item count increased, notify user
+      if (lowStock > prevLowStockCount.current && prevLowStockCount.current !== 0) {
+        console.log('New low-stock item detected, triggering notification...');
+        notify(`มีพัสดุใกล้หมดสต็อกเพิ่มขึ้น ${lowStock - prevLowStockCount.current} รายการ`, 'info', 'พัสดุใกล้หมดสต็อก', 'inventory', '/inventory');
+        playNotificationSound();
+      }
+
       prevUnreadRepairCount.current = repair;
       prevUnreadClaimCount.current = claim;
+      prevLowStockCount.current = lowStock;
       setUnreadRepairCount(repair);
       setUnreadClaimCount(claim);
       setLowStockCount(lowStock);
       setPendingReturnsCount(pendingReturns || 0);
+      setMyTasksCount(myTasks || 0);
     } catch (err) {
       console.error('Failed to fetch unread count:', err);
     }
@@ -618,7 +661,13 @@ const Layout: React.FC = () => {
             <NavLink to="/stations" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <Milestone size={18} /> <span className="nav-text">ค้นหาข้อมูลสถานี</span>
             </NavLink>
-            
+            <NavLink to="/my-tasks" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <ListChecks size={18} /> <span className="nav-text">งานของฉัน</span>
+              {myTasksCount > 0 && (
+                <span className="pulse-dot">{myTasksCount}</span>
+              )}
+            </NavLink>
+
             <div className="nav-label">งานซ่อมบำรุง</div>
             <NavLink to="/repairs" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <Sliders size={18} /> <span className="nav-text">ทะเบียนงานซ่อม</span>
@@ -648,8 +697,11 @@ const Layout: React.FC = () => {
                 <span className="pulse-dot">{lowStockCount}</span>
               )}
             </NavLink>
-            <NavLink to="/transactions" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
+            <NavLink to="/transactions" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <Receipt size={18} /> <span className="nav-text">บัญชีคุมยอดพัสดุ</span>
+            </NavLink>
+            <NavLink to="/stock-counts" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <ClipboardCheck size={18} /> <span className="nav-text">ตรวจนับสต็อก</span>
             </NavLink>
 
             <div className="nav-label">สต็อกขาเข้า (Inbound)</div>
@@ -667,8 +719,14 @@ const Layout: React.FC = () => {
             <NavLink to="/withdrawal" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
               <PackageCheck size={18} /> <span className="nav-text">ใบเบิกจ่ายพัสดุอุปกรณ์</span>
             </NavLink>
-            <NavLink to="/withdrawal-history" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
+            <NavLink to="/withdrawal-history" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <FileClock size={18} /> <span className="nav-text">ประวัติการเบิกจ่าย</span>
+            </NavLink>
+            <NavLink to="/technician-stock" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <Truck size={18} /> <span className="nav-text">อะไหล่สำรองประจำตัวช่าง</span>
+            </NavLink>
+            <NavLink to="/technician-stock/movements" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <FileClock size={18} /> <span className="nav-text">ประวัติการใช้อะไหล่สำรอง</span>
             </NavLink>
 
             <div className="nav-label">รายงานวิเคราะห์</div>
@@ -684,6 +742,9 @@ const Layout: React.FC = () => {
                 </NavLink>
                 <NavLink to="/users" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                   <Users size={18} /> <span className="nav-text">จัดการผู้ใช้และสิทธิ์</span>
+                </NavLink>
+                <NavLink to="/technicians" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+                  <Wrench size={18} /> <span className="nav-text">จัดการรายชื่อช่าง</span>
                 </NavLink>
                 <NavLink to="/users/audit-logs" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
                   <Fingerprint size={18} /> <span className="nav-text">ประวัติการใช้งาน (Audit)</span>

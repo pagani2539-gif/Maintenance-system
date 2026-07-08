@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../index');
-const db = require('../database/init');
+const { query } = require('../database/db');
 const bcrypt = require('bcryptjs');
 
 describe('Comprehensive Business Flows', () => {
@@ -14,22 +14,18 @@ describe('Comprehensive Business Flows', () => {
 
     // Create a temporary test admin user
     const hash = bcrypt.hashSync(testPassword, 10);
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT OR REPLACE INTO users (username, password_hash, full_name, is_full, is_active) VALUES (?, ?, ?, 1, 1)`,
-        [testUsername, hash, 'Comprehensive Test Admin'],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
+    await query(
+      `INSERT INTO users (username, password_hash, full_name, is_full, is_active)
+       VALUES ($1, $2, $3, 1, 1)
+       ON CONFLICT (username) DO UPDATE SET password_hash = excluded.password_hash, full_name = excluded.full_name, is_full = excluded.is_full, is_active = excluded.is_active`,
+      [testUsername, hash, 'Comprehensive Test Admin']
+    );
 
     // Login to get token
     const res = await request(app)
       .post('/api/auth/login')
       .send({ username: testUsername, password: testPassword });
-    
+
     if (res.body && res.body.token) {
       token = res.body.token;
     }
@@ -37,12 +33,7 @@ describe('Comprehensive Business Flows', () => {
 
   afterAll(async () => {
     // Clean up temporary user
-    await new Promise((resolve, reject) => {
-      db.run(`DELETE FROM users WHERE username = ?`, [testUsername], (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    await query(`DELETE FROM users WHERE username = $1`, [testUsername]);
   });
 
   // Test 1: Station Code Auto-Generation
@@ -76,27 +67,17 @@ describe('Comprehensive Business Flows', () => {
 
       // Clean up station
       const stationId = res.body.id;
-      await new Promise((resolve, reject) => {
-        db.run('DELETE FROM stations WHERE id = ?', [stationId], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
+      await query('DELETE FROM stations WHERE id = $1', [stationId]);
     }
   });
 
   // Test 2: Auto PO Generation on Stock Deficit
   it('should auto-generate draft PO items when stock falls below min_stock', async () => {
     // 1. Create a mock inventory item
-    const invId = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO inventory (name, model, quantity, min_stock, requires_sn) VALUES ('CompTest Item PO', 'Model PO-1', 20, 15, 0)`,
-        function(err) {
-          if (err) reject(err);
-          else resolve(this.lastID);
-        }
-      );
-    });
+    const { rows: invRows } = await query(
+      `INSERT INTO inventory (name, model, quantity, min_stock, requires_sn) VALUES ('CompTest Item PO', 'Model PO-1', 20, 15, 0) RETURNING id`
+    );
+    const invId = Number(invRows[0].id);
 
     // 2. Perform a withdrawal that drops it below min_stock
     const resWithdraw = await request(app)
@@ -118,7 +99,7 @@ describe('Comprehensive Business Flows', () => {
     const resPos = await request(app)
       .get('/api/purchase-orders')
       .set('Authorization', `Bearer ${token}`);
-    
+
     expect(resPos.statusCode).toEqual(200);
     const draftPos = resPos.body.filter(po => po.status === 'Draft');
     expect(draftPos.length).toBeGreaterThan(0);
@@ -128,43 +109,29 @@ describe('Comprehensive Business Flows', () => {
     const resPoDetail = await request(app)
       .get(`/api/purchase-orders/${latestDraftPoId}`)
       .set('Authorization', `Bearer ${token}`);
-    
+
     expect(resPoDetail.statusCode).toEqual(200);
     const poItems = resPoDetail.body.items;
-    const matchItem = poItems.find(item => item.inventory_id === invId);
+    const matchItem = poItems.find(item => Number(item.inventory_id) === invId);
     expect(matchItem).toBeDefined();
     expect(matchItem.quantity).toEqual(5); // Deficit = 15 - 10 = 5
 
     // Clean up
-    await new Promise((resolve) => {
-      db.run('DELETE FROM purchase_order_items WHERE po_id = ?', [latestDraftPoId], () => {
-        db.run('DELETE FROM purchase_orders WHERE id = ?', [latestDraftPoId], () => {
-          db.run('DELETE FROM inventory_transactions WHERE inventory_id = ?', [invId], () => {
-            db.run('DELETE FROM withdrawal_items WHERE inventory_id = ?', [invId], () => {
-              db.run('DELETE FROM withdrawals WHERE id = ?', [resWithdraw.body.id], () => {
-                db.run('DELETE FROM inventory WHERE id = ?', [invId], () => {
-                  resolve();
-                });
-              });
-            });
-          });
-        });
-      });
-    });
+    await query('DELETE FROM purchase_order_items WHERE po_id = $1', [latestDraftPoId]);
+    await query('DELETE FROM purchase_orders WHERE id = $1', [latestDraftPoId]);
+    await query('DELETE FROM inventory_transactions WHERE inventory_id = $1', [invId]);
+    await query('DELETE FROM withdrawal_items WHERE inventory_id = $1', [invId]);
+    await query('DELETE FROM withdrawals WHERE id = $1', [resWithdraw.body.id]);
+    await query('DELETE FROM inventory WHERE id = $1', [invId]);
   });
 
   // Test 3: Withdrawal Return Due Date and Return Flow
   it('should handle return due dates and return process', async () => {
     // 1. Create a mock inventory item
-    const invId = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO inventory (name, model, quantity, min_stock, requires_sn) VALUES ('CompTest Item Return', 'Model RT-1', 10, 2, 0)`,
-        function(err) {
-          if (err) reject(err);
-          else resolve(this.lastID);
-        }
-      );
-    });
+    const { rows: invRows } = await query(
+      `INSERT INTO inventory (name, model, quantity, min_stock, requires_sn) VALUES ('CompTest Item Return', 'Model RT-1', 10, 2, 0) RETURNING id`
+    );
+    const invId = Number(invRows[0].id);
 
     const dueDate = '2026-07-20';
 
@@ -181,13 +148,13 @@ describe('Comprehensive Business Flows', () => {
         ]
       });
     expect(resWithdraw.statusCode).toEqual(201);
-    const withdrawalId = resWithdraw.body.id;
+    const withdrawalId = Number(resWithdraw.body.id);
 
     // 3. Query withdrawals and verify due date is present
     const resGetWithdrawal = await request(app)
       .get(`/api/withdrawals/${withdrawalId}`)
       .set('Authorization', `Bearer ${token}`);
-    
+
     expect(resGetWithdrawal.statusCode).toEqual(200);
     expect(resGetWithdrawal.body.return_due_date).toEqual(dueDate);
 
@@ -195,9 +162,9 @@ describe('Comprehensive Business Flows', () => {
     const resGetPending = await request(app)
       .get('/api/transactions?pending_only=true')
       .set('Authorization', `Bearer ${token}`);
-    
+
     expect(resGetPending.statusCode).toEqual(200);
-    const pendingTx = resGetPending.body.find(tx => tx.withdrawal_id === withdrawalId && tx.inventory_id === invId);
+    const pendingTx = resGetPending.body.find(tx => Number(tx.withdrawal_id) === withdrawalId && Number(tx.inventory_id) === invId);
     expect(pendingTx).toBeDefined();
     expect(pendingTx.return_due_date).toEqual(dueDate);
 
@@ -215,34 +182,17 @@ describe('Comprehensive Business Flows', () => {
     expect(resReturn.statusCode).toEqual(200);
 
     // 6. Verify original transaction status is RETURNED
-    const updatedTx = await new Promise((resolve, reject) => {
-      db.get('SELECT status FROM inventory_transactions WHERE id = ?', [pendingTx.id], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-    expect(updatedTx.status).toEqual('RETURNED');
+    const { rows: updatedTxRows } = await query('SELECT status FROM inventory_transactions WHERE id = $1', [pendingTx.id]);
+    expect(updatedTxRows[0].status).toEqual('RETURNED');
 
     // 7. Verify inventory quantity restored to 10
-    const finalQty = await new Promise((resolve, reject) => {
-      db.get('SELECT quantity FROM inventory WHERE id = ?', [invId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row.quantity);
-      });
-    });
-    expect(finalQty).toEqual(10);
+    const { rows: finalQtyRows } = await query('SELECT quantity FROM inventory WHERE id = $1', [invId]);
+    expect(finalQtyRows[0].quantity).toEqual(10);
 
     // Clean up
-    await new Promise((resolve) => {
-      db.run('DELETE FROM inventory_transactions WHERE inventory_id = ?', [invId], () => {
-        db.run('DELETE FROM withdrawal_items WHERE inventory_id = ?', [invId], () => {
-          db.run('DELETE FROM withdrawals WHERE id = ?', [withdrawalId], () => {
-            db.run('DELETE FROM inventory WHERE id = ?', [invId], () => {
-              resolve();
-            });
-          });
-        });
-      });
-    });
+    await query('DELETE FROM inventory_transactions WHERE inventory_id = $1', [invId]);
+    await query('DELETE FROM withdrawal_items WHERE inventory_id = $1', [invId]);
+    await query('DELETE FROM withdrawals WHERE id = $1', [withdrawalId]);
+    await query('DELETE FROM inventory WHERE id = $1', [invId]);
   });
 });

@@ -4,6 +4,7 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
 import { Input, TextArea } from '../components/ui/Input';
 import { formatDateTimeThai, parseDate } from '../utils/formatDate';
@@ -35,6 +36,7 @@ import TableToolbar from '../components/tables/TableToolbar';
 import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
 import { exportToCsv } from '../utils/csvExporter';
+import { getApiErrorMessage } from '../utils/apiError';
 
 const ClaimList: React.FC = () => {
   const { notify, confirm } = useNotification();
@@ -135,12 +137,12 @@ const ClaimList: React.FC = () => {
         repair_note: modalData.note,
         note: modalData.note
       });
-      notify(status === 'เสร็จสิ้น' ? '🎉 บันทึกการเคลมเสร็จสิ้นเรียบร้อยแล้ว!' : `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`);
+      notify(status === 'เสร็จสิ้น' ? 'บันทึกการเคลมเสร็จสิ้นเรียบร้อยแล้ว' : `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`);
       setShowModal(null);
       setModalData({ technician: '', note: '' });
       fetchData();
-    } catch {
-      notify('เกิดข้อผิดพลาดในการอัปเดตสถานะ', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'อัปเดตสถานะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     }
   };
 
@@ -155,8 +157,8 @@ const ClaimList: React.FC = () => {
         await repairApi.delete(id);
         notify('ลบรายการสำเร็จ');
         fetchData();
-      } catch {
-        notify('เกิดข้อผิดพลาดในการลบข้อมูล', 'error');
+      } catch (err) {
+        notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
       }
     }
   };
@@ -353,12 +355,13 @@ const ClaimList: React.FC = () => {
 
   return (
     <div className="repair-board" style={{ padding: '2rem 2.5rem', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">
           <h2>กระดานติดตามสถานะงานเคลม</h2>
           <p>ติดตามและจัดการรายการเคลมอุปกรณ์ที่ส่งเข้าศูนย์บริการ</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก Excel</Button>
           <Link to="/claim"><Button variant="primary" icon={<Plus size={20} />}>แจ้งเคลมใหม่</Button></Link>
           <Link to="/new"><Button variant="outline" icon={<Plus size={20} />}>แจ้งซ่อมใหม่</Button></Link>
@@ -400,6 +403,11 @@ const ClaimList: React.FC = () => {
         columns={columns}
         data={paginatedData}
         state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
+        totalCount={claims?.length ?? 0}
+        emptyState={{
+          noData: { message: 'ยังไม่มีรายการเคลมในระบบ', hint: 'กด "แจ้งเคลมใหม่" เพื่อสร้างใบเคลมแรก' },
+          noResults: { message: 'ไม่พบงานเคลมที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+        }}
         actions={actions}
         onRetry={fetchData}
         drawerTitle={(row) => `ใบงานเคลม ${row.ticket_no}`}

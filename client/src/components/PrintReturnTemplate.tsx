@@ -1,7 +1,6 @@
 import React from 'react';
-import type { InventoryTransaction } from '../types';
+import type { InventoryTransaction, Company, CompanyLogo } from '../types';
 import { UPLOAD_URL } from '../api';
-import { useCompanyData } from '../hooks/useCompanyData';
 import { pdfTheme } from './pdf/pdfTheme';
 import PdfPage from './pdf/PdfPage';
 import PdfHeader from './pdf/PdfHeader';
@@ -12,8 +11,8 @@ import PdfSignatureBlock from './pdf/PdfSignatureBlock';
 interface Props {
   transaction: InventoryTransaction;
   isPreview?: boolean;
-  companyId?: number | null;
-  logoId?: number | null;
+  company?: Company | null;
+  logo?: CompanyLogo | null;
 }
 
 const parseDate = (dateStr: string): Date => {
@@ -50,9 +49,7 @@ const conditionTone = (condition?: string): 'success' | 'warning' | 'danger' | '
   return 'neutral';
 };
 
-const PrintReturnTemplate: React.FC<Props> = ({ transaction, isPreview, companyId, logoId }) => {
-  const { company, logo } = useCompanyData(companyId ?? null, logoId ?? null);
-
+const PrintReturnTemplate: React.FC<Props> = ({ transaction, isPreview, company = null, logo = null }) => {
   const docNumber = `RT-${String(transaction.id || 0).padStart(6, '0')}`;
   const docDate = formatDateThai(parseDate(transaction.created_at));
   const printedAt = formatDateTimeThai(new Date());

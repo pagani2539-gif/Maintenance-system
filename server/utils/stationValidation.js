@@ -1,12 +1,9 @@
-const db = require('../database/init');
-
-const queryGet = (sql, params = []) => new Promise((resolve, reject) => {
-  db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-});
+const { query } = require('../database/db');
 
 const validateStationExists = async (stationId) => {
   if (!stationId) return;
-  const row = await queryGet('SELECT status FROM stations WHERE id = ?', [stationId]);
+  const { rows } = await query('SELECT status FROM stations WHERE id = $1', [stationId]);
+  const row = rows[0];
   if (!row) {
     const err = new Error('ไม่พบสถานีที่เลือกในระบบ');
     err.status = 400;
@@ -26,11 +23,12 @@ const validateStationAreaBelongsToStation = async (stationId, stationAreaId) => 
     err.status = 400;
     throw err;
   }
-  
+
   // First ensure station exists and is active
   await validateStationExists(stationId);
 
-  const row = await queryGet('SELECT id, status FROM station_areas WHERE id = ? AND station_id = ?', [stationAreaId, stationId]);
+  const { rows } = await query('SELECT id, status FROM station_areas WHERE id = $1 AND station_id = $2', [stationAreaId, stationId]);
+  const row = rows[0];
   if (!row) {
     const err = new Error('พื้นที่ย่อยที่เลือกไม่อยู่ในสถานีนี้');
     err.status = 400;
@@ -45,8 +43,8 @@ const validateStationAreaBelongsToStation = async (stationId, stationAreaId) => 
 
 const getStationSnapshotName = async (stationId) => {
   if (!stationId) return null;
-  const row = await queryGet('SELECT name FROM stations WHERE id = ?', [stationId]);
-  return row ? row.name : null;
+  const { rows } = await query('SELECT name FROM stations WHERE id = $1', [stationId]);
+  return rows[0] ? rows[0].name : null;
 };
 
 module.exports = {

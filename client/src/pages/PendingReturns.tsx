@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { transactionApi } from '../api';
+import { getApiErrorMessage } from '../utils/apiError';
 import { useApi } from '../hooks/useApi';
 import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import Select from '../components/ui/Select';
 import { formatDateTimeThai } from '../utils/formatDate';
 import {
@@ -48,45 +50,47 @@ const PendingReturns: React.FC = () => {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const stats = useMemo(() => {
-    const list = transactions || [];
+  const isOverdueTx = useCallback((t: InventoryTransaction): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    if (!t.return_due_date) {
+      const daysOut = Math.floor((today.getTime() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      return daysOut >= 14;
+    }
+    const dueDate = new Date(t.return_due_date);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate.getTime() < today.getTime();
+  }, []);
 
-    const overdueList = list.filter((t: InventoryTransaction) => {
-      if (!t.return_due_date) {
-        const daysOut = Math.floor((today.getTime() - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        return daysOut >= 14;
-      }
-      const dueDate = new Date(t.return_due_date);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate.getTime() < today.getTime();
-    });
+  const stats = useMemo(() => {
+    const list = transactions || [];
+    const overdueList = list.filter(isOverdueTx);
 
     return {
       total: list.length,
       overdue: overdueList.length,
       normal: list.length - overdueList.length
     };
-  }, [transactions]);
+  }, [transactions, isOverdueTx]);
 
   const filteredData = useMemo(() => {
     const list = transactions || [];
     return list.filter((t: InventoryTransaction) => {
       if (urlState.search) {
         const s = urlState.search.toLowerCase();
-        const matches = 
-          t.product_name.toLowerCase().includes(s) || 
-          (t.project_name && t.project_name.toLowerCase().includes(s)) || 
-          (t.user_name && t.user_name.toLowerCase().includes(s)) || 
+        const matches =
+          t.product_name.toLowerCase().includes(s) ||
+          (t.project_name && t.project_name.toLowerCase().includes(s)) ||
+          (t.user_name && t.user_name.toLowerCase().includes(s)) ||
           (t.serial_number && t.serial_number.toLowerCase().includes(s)) ||
           (t.location && t.location.toLowerCase().includes(s));
         if (!matches) return false;
       }
       if (urlState.filters.type && urlState.filters.type !== 'All' && t.withdrawal_type !== urlState.filters.type) return false;
+      if (urlState.filters.overdue === 'yes' && !isOverdueTx(t)) return false;
       return true;
     });
-  }, [transactions, urlState]);
+  }, [transactions, urlState, isOverdueTx]);
 
   const indexOfLastItem = urlState.page * urlState.pageSize;
   const indexOfFirstItem = indexOfLastItem - urlState.pageSize;
@@ -149,12 +153,11 @@ const PendingReturns: React.FC = () => {
       }
 
       await transactionApi.return(formData);
-      notify('🎉 บันทึกการคืนอุปกรณ์เรียบร้อยแล้ว');
+      notify('บันทึกการคืนอุปกรณ์เรียบร้อยแล้ว');
       closeReturnModal();
       fetchTransactions();
     } catch (err) {
-      const error = err as Error;
-      notify(error.message || 'เกิดข้อผิดพลาดในการบันทึกการคืน', 'error');
+      notify(getApiErrorMessage(err, 'บันทึกการคืนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setReturning(false);
     }
@@ -356,6 +359,7 @@ const PendingReturns: React.FC = () => {
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
         
         {/* Header */}
+        <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
             <h2>อุปกรณ์ค้างส่งคืน</h2>
@@ -366,10 +370,15 @@ const PendingReturns: React.FC = () => {
         {/* Bento Stats */}
         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
           {[
-            { label: 'อุปกรณ์ค้างคืนทั้งหมด', val: stats.total, icon: Timer, color: 'var(--primary)', glow: false },
-            { label: 'เลยกำหนด / ค้างนานผิดปกติ', val: stats.overdue, icon: AlertTriangle, color: 'var(--danger)', glow: stats.overdue > 0 }
+            { label: 'อุปกรณ์ค้างคืนทั้งหมด', val: stats.total, icon: Timer, color: 'var(--primary)', glow: false, overdue: undefined },
+            { label: 'เลยกำหนด / ค้างนานผิดปกติ', val: stats.overdue, icon: AlertTriangle, color: 'var(--danger)', glow: stats.overdue > 0, overdue: 'yes' }
           ].map((s, i) => (
-            <Card key={i} className={s.glow ? 'led-breathe-danger' : ''}>
+            <Card
+              key={i}
+              className={s.glow ? 'led-breathe-danger' : ''}
+              onClick={() => setTableState({ filters: { ...urlState.filters, overdue: s.overdue }, page: 1 })}
+              style={{ cursor: 'pointer', borderColor: (urlState.filters.overdue || undefined) === s.overdue ? 'var(--primary)' : undefined }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                 <div 
                   className="stat-icon-wrapper" 
@@ -416,6 +425,11 @@ const PendingReturns: React.FC = () => {
           columns={columns}
           data={paginatedData}
           state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
+          totalCount={transactions?.length ?? 0}
+          emptyState={{
+            noData: { message: 'ไม่มีอุปกรณ์ค้างส่งคืน', hint: 'อุปกรณ์ที่เบิกแบบยืม/ทดสอบ/สำรอง และยังไม่ได้คืนจะแสดงที่นี่' },
+            noResults: { message: 'ไม่พบรายการที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+          }}
           actions={actions}
           onRetry={fetchTransactions}
           getRowAccent={(r) => {

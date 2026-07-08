@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input } from '../components/ui/Input';
 import { useNotification } from '../components/Layout';
 import { userApi } from '../api';
@@ -59,11 +60,17 @@ const AuditLogs: React.FC = () => {
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE) || 1;
 
-  const renderDiff = (oldStr?: string | null, newStr?: string | null) => {
-    if (!oldStr && !newStr) return <span style={{ color: 'var(--text-muted)' }}>ไม่มีรายละเอียดข้อมูลเพิ่มเติม</span>;
+  const parseData = (data?: string | Record<string, unknown> | null): Record<string, unknown> => {
+    if (!data) return {};
+    if (typeof data === 'string') return JSON.parse(data) as Record<string, unknown>;
+    return data;
+  };
+
+  const renderDiff = (oldData?: string | Record<string, unknown> | null, newData?: string | Record<string, unknown> | null) => {
+    if (!oldData && !newData) return <span style={{ color: 'var(--text-muted)' }}>ไม่มีรายละเอียดข้อมูลเพิ่มเติม</span>;
     try {
-      const oldObj = oldStr ? JSON.parse(oldStr) as Record<string, unknown> : {};
-      const newObj = newStr ? JSON.parse(newStr) as Record<string, unknown> : {};
+      const oldObj = parseData(oldData);
+      const newObj = parseData(newData);
       const keys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]));
       
       const changes: Array<{ key: string; oldVal: unknown; newVal: unknown }> = [];
@@ -104,9 +111,11 @@ const AuditLogs: React.FC = () => {
         </div>
       );
     } catch {
+      const fallback = newData || oldData;
+      const fallbackText = typeof fallback === 'string' ? fallback : JSON.stringify(fallback, null, 2);
       return (
         <pre style={{ fontSize: '0.75rem', margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-muted)' }}>
-          {newStr || oldStr}
+          {fallbackText}
         </pre>
       );
     }
@@ -125,6 +134,7 @@ const AuditLogs: React.FC = () => {
 
   return (
     <div style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '2rem' }}>
         <div className="page-title">
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
