@@ -5,6 +5,7 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import Select from '../components/ui/Select';
 import { formatDateTimeThai } from '../utils/formatDate';
 import {
@@ -36,6 +37,7 @@ import TableToolbar from '../components/tables/TableToolbar';
 import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
 import { exportToCsv } from '../utils/csvExporter';
+import { getApiErrorMessage } from '../utils/apiError';
 import PrintReturnTemplate from '../components/PrintReturnTemplate';
 import { PrintDialog } from '../components/PrintDialog';
 import { compressImage } from '../utils/imageCompressor';
@@ -378,12 +380,11 @@ const TransactionList: React.FC = () => {
       }
 
       await transactionApi.return(formData);
-      notify('🎉 บันทึกการคืนอุปกรณ์เรียบร้อยแล้ว');
+      notify('บันทึกการคืนอุปกรณ์เรียบร้อยแล้ว');
       closeReturnModal();
       fetchTransactions();
     } catch (err) {
-      const error = err as Error;
-      notify(error.message || 'เกิดข้อผิดพลาดในการบันทึกการคืน', 'error');
+      notify(getApiErrorMessage(err, 'บันทึกการคืนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setReturning(false);
     }
@@ -520,31 +521,31 @@ const TransactionList: React.FC = () => {
   return (
     <div className="ledger-page" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+        <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="page-title"><h2>สมุดบัญชีสต็อก (Ledger)</h2><p>ติดตามความเคลื่อนไหวพัสดุและประวัติการเบิก/คืนทั้งหมด</p></div>
           <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก Excel</Button>
         </div>
 
-      <div className="ledger-tabs-container">
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         {[
-          { id: 'all', label: 'ธุรกรรมทั้งหมด', count: stats.total },
-          { id: 'inbound', label: 'สต็อกขาเข้า (Inbound)', count: stats.totalInboundCount },
-          { id: 'outbound', label: 'สต็อกขาออก (Outbound)', count: stats.totalOutboundCount }
+          { id: 'all', label: 'ธุรกรรมทั้งหมด', count: stats.total, icon: RefreshCcw, color: 'var(--primary)' },
+          { id: 'inbound', label: 'สต็อกขาเข้า (Inbound)', count: stats.totalInboundCount, icon: ArrowUpCircle, color: 'var(--success)' },
+          { id: 'outbound', label: 'สต็อกขาออก (Outbound)', count: stats.totalOutboundCount, icon: ArrowDownCircle, color: 'var(--danger)' }
         ].map(tab => (
-          <button
-            type="button"
+          <Card
             key={tab.id}
             onClick={() => {
               setActiveLogTab(tab.id as 'all' | 'inbound' | 'outbound');
               setTableState({ filters: {}, page: 1 });
             }}
-            className={`ledger-tab-button ${activeLogTab === tab.id ? 'active' : ''}`}
+            style={{ cursor: 'pointer', borderColor: activeLogTab === tab.id ? 'var(--primary)' : undefined }}
           >
-            {tab.label}
-            <span className="ledger-tab-badge">
-              {tab.count}
-            </span>
-          </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div className="stat-icon-wrapper" style={{ color: tab.color }}><tab.icon size={24} /></div>
+              <div><div className="stat-value">{tab.count}</div><div className="stat-label">{tab.label}</div></div>
+            </div>
+          </Card>
         ))}
       </div>
 
@@ -584,6 +585,11 @@ const TransactionList: React.FC = () => {
         columns={columns}
         data={paginatedData}
         state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
+        totalCount={transactions?.length ?? 0}
+        emptyState={{
+          noData: { message: 'ยังไม่มีความเคลื่อนไหวสต็อกในระบบ', hint: 'รายการจะปรากฏเมื่อมีการเบิก รับเข้า หรือคืนอุปกรณ์' },
+          noResults: { message: 'ไม่พบรายการที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+        }}
         actions={actions}
         onRetry={fetchTransactions}
         drawerTitle={(tx) => `บันทึกเลขที่ TX-${tx.id.toString().padStart(6, '0')}`}
@@ -743,11 +749,11 @@ const TransactionList: React.FC = () => {
           }}
           templateId="pdf-return-template"
           docTitle={`ใบคืนอุปกรณ์ - RT-${String(printReturnTx.id).padStart(6, '0')}`}
-          renderTemplate={(companyId, logoId) => (
+          renderTemplate={(company, logo) => (
             <PrintReturnTemplate
               transaction={printReturnTx}
-              companyId={companyId}
-              logoId={logoId}
+              company={company}
+              logo={logo}
             />
           )}
         />

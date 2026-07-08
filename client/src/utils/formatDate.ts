@@ -2,7 +2,7 @@ export const parseDate = (dateStr: string | Date | null | undefined): Date => {
   if (!dateStr) return new Date();
   if (dateStr instanceof Date) return dateStr;
   
-  // Convert SQLite format "YYYY-MM-DD HH:MM:SS" to ISO UTC
+  // Convert space-separated UTC timestamp "YYYY-MM-DD HH:MM:SS" to ISO UTC
   if (typeof dateStr === 'string' && dateStr.includes(' ') && !dateStr.includes('T')) {
     return new Date(dateStr.replace(' ', 'T') + 'Z');
   }

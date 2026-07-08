@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { ScanLine } from 'lucide-react';
 import { Button } from './ui/Button';
 import { useNotification } from './Layout';
+import { getApiErrorMessage } from '../utils/apiError';
 import Select from './ui/Select';
 
 // โหลด scanner (กล้อง + บาร์โค้ด + OCR) เฉพาะตอนเปิดใช้ เพื่อไม่ถ่วง bundle หลัก
@@ -135,8 +136,7 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      notify(error.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      notify(getApiErrorMessage(err, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setLoading(false);
     }

@@ -21,10 +21,22 @@
   --primary-hover: #03a9f4;
   --primary-light: rgba(41, 182, 246, 0.08);
   --primary-glow: 0 0 15px rgba(41, 182, 246, 0.2);
-  
+
+  /* Solid-fill action colors: darker than --primary/--success/--warning so
+     white button text clears the WCAG AA 4.5:1 contrast minimum. The lighter
+     tokens above stay as accents (icons/borders/glows) where contrast rules
+     don't apply the same way. */
+  --primary-action: #0277bd;
+  --success-action: #047857;
+  --warning-action: #b45309;
+  --danger-solid: #b91c1c;
+  --danger-on-tint: #b91c1c;
+
   --text-main: #0f172a;
-  --text-muted: #64748b;
-  
+  /* slate-600, not slate-500 (#64748b): the lighter shade measured 4.40:1
+     against --bg-app, just under the WCAG AA 4.5:1 minimum for body text. */
+  --text-muted: #475569;
+
   --border: #e2e8f0;
   --border-hover: #cbd5e1;
   --border-active: #29b6f6;
@@ -110,6 +122,9 @@
   --warning: #f59e0b;
   --warning-light: rgba(245, 158, 11, 0.12);
   --warning-border: rgba(245, 158, 11, 0.25);
+  /* Dark theme's tinted --danger-light sits on a dark card, so the tint text
+     needs to be lighter (not darker) to keep 4.5:1 contrast against it. */
+  --danger-on-tint: #f87171;
   --info: #06b6d4;
   --info-light: rgba(6, 182, 212, 0.12);
   --info-border: rgba(6, 182, 212, 0.25);
@@ -779,9 +794,9 @@ nav {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--primary-action);
   color: white;
-  box-shadow: 0 8px 24px rgba(41, 182, 246, 0.25);
+  box-shadow: 0 8px 24px rgba(2, 119, 189, 0.25);
 }
 
 .btn-primary::after {
@@ -804,9 +819,11 @@ nav {
 }
 
 .btn-primary:hover {
-  background: var(--primary-hover);
+  /* Intentionally NOT lightening the background here: --primary-hover reads
+     ~2.3:1 for white text (same failure as the old --primary). Lift + glow
+     alone carry the hover affordance so contrast never drops on interaction. */
   transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(41, 182, 246, 0.4), var(--primary-glow);
+  box-shadow: 0 12px 32px rgba(2, 119, 189, 0.4), var(--primary-glow);
 }
 
 .btn-outline {
@@ -826,45 +843,71 @@ nav {
 
 .btn-danger {
   background: var(--danger-light);
-  color: var(--danger);
+  color: var(--danger-on-tint);
   border-color: var(--danger-border);
 }
 
 .btn-danger:hover {
-  background: var(--danger);
+  /* Solid fill on hover uses --danger-solid, not --danger: white-on-#ef4444
+     only reaches ~3.76:1. --danger-solid (#b91c1c) clears 4.5:1. */
+  background: var(--danger-solid);
   color: white;
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3), 0 0 15px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 8px 24px rgba(185, 28, 28, 0.3), 0 0 15px rgba(185, 28, 28, 0.2);
 }
 
 .btn-success {
-  background: var(--success);
+  background: var(--success-action);
   color: white;
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.25);
+  box-shadow: 0 8px 24px rgba(4, 120, 87, 0.25);
 }
 
 .btn-success:hover {
   filter: brightness(1.05);
   transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 12px 32px rgba(4, 120, 87, 0.4);
 }
 
 .btn-warning {
-  background: var(--warning);
+  background: var(--warning-action);
   color: white;
-  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 8px 24px rgba(180, 83, 9, 0.25);
 }
 
 .btn-warning:hover {
   filter: brightness(1.05);
   transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 12px 32px rgba(180, 83, 9, 0.4);
 }
 
 .btn-sm {
   padding: 8px 16px;
   font-size: 0.8rem;
   border-radius: 12px;
+}
+
+/* ==========================================================================
+   Accessibility: visible focus ring for keyboard navigation
+   This file resets outline:none in several places (.form-control,
+   .filter-input-std, .search-modal-input, etc). :focus-visible only fires
+   for keyboard/programmatic focus (not mouse clicks), so restoring the ring
+   here keeps Tab-navigation visible without adding a ring on every click.
+   ========================================================================== */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="combobox"]:focus-visible,
+[tabindex]:focus-visible {
+  /* Longhand on purpose: the `outline: 3px solid var(--primary)` shorthand
+     rendered with the element's own text color instead of var(--primary) on
+     buttons in testing (outline-color silently fell back to currentColor).
+     Setting outline-color separately sidesteps that shorthand parsing quirk. */
+  outline-width: 3px;
+  outline-style: solid;
+  outline-color: var(--primary);
+  outline-offset: 2px;
 }
 
 /* Hardened Custom Button Utilities */
@@ -1020,6 +1063,66 @@ nav {
   background-color: #4f46e5 !important;
   border-color: #4f46e5 !important;
   box-shadow: 0 8px 25px rgba(99, 102, 241, 0.45) !important;
+  transform: translateY(-3px);
+}
+.btn-report-red {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2) !important;
+}
+.btn-report-red:hover {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.45) !important;
+  transform: translateY(-3px);
+}
+.btn-report-violet {
+  background-color: #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2) !important;
+}
+.btn-report-violet:hover {
+  background-color: #7c3aed !important;
+  border-color: #7c3aed !important;
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.45) !important;
+  transform: translateY(-3px);
+}
+.btn-report-teal {
+  background-color: #14b8a6 !important;
+  border-color: #14b8a6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(20, 184, 166, 0.2) !important;
+}
+.btn-report-teal:hover {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+  box-shadow: 0 8px 25px rgba(20, 184, 166, 0.45) !important;
+  transform: translateY(-3px);
+}
+.btn-report-sky {
+  background-color: #0ea5e9 !important;
+  border-color: #0ea5e9 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2) !important;
+}
+.btn-report-sky:hover {
+  background-color: #0284c7 !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 8px 25px rgba(14, 165, 233, 0.45) !important;
+  transform: translateY(-3px);
+}
+.btn-report-rose {
+  background-color: #f43f5e !important;
+  border-color: #f43f5e !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(244, 63, 94, 0.2) !important;
+}
+.btn-report-rose:hover {
+  background-color: #e11d48 !important;
+  border-color: #e11d48 !important;
+  box-shadow: 0 8px 25px rgba(244, 63, 94, 0.45) !important;
   transform: translateY(-3px);
 }
 
@@ -1536,6 +1639,26 @@ select option {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 2.5rem;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0;
+  margin-bottom: 1rem;
+  transition: color 0.15s;
+}
+
+.back-button:hover {
+  color: var(--primary);
 }
 
 .page-title h2 {
@@ -3227,58 +3350,235 @@ select option {
   }
 }
 
-/* Ledger Premium Tabs System */
-.ledger-tabs-container {
-  display: flex;
-  width: 100%;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1.5rem;
-  padding-bottom: 0;
-  position: relative;
+/* ============================================================
+   DASHBOARD FLAT REDESIGN (Command Center)
+   Dashboard-scoped styles: flat solid surfaces, no glass/blur.
+   Used by pages/Dashboard.tsx + components/dashboard/*.
+   Do NOT reuse .glass-card here — dashboard cards are .dash-card.
+   ============================================================ */
+
+/* Flat card — neutralizes .card's tactile scale-hover for static cards */
+.card.dash-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--elevation-1);
 }
 
-.ledger-tab-button {
-  flex: 1;
+.card.dash-card:hover {
+  transform: none;
+  border-color: var(--border-hover);
+  box-shadow: var(--elevation-1);
+}
+
+.card.dash-card:active {
+  transform: none;
+}
+
+/* Clickable KPI tiles keep a toned-down lift affordance */
+.card.dash-card.kpi-tile {
+  padding: 1rem 1.1rem;
+}
+
+.card.dash-card.kpi-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-active);
+  box-shadow: var(--elevation-2);
+}
+
+.card.dash-card.kpi-tile:active {
+  transform: translateY(0);
+}
+
+/* Card headings (replaces repeated inline heading styles) */
+.dash-card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-card-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Attention strip chips (action-queue summary counts) */
+.dash-attn-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px;
+  margin: 0.9rem 0 1rem 0;
+}
+
+.dash-attn-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-app);
+  color: var(--text-muted);
+  text-decoration: none;
+  text-align: center;
+  min-width: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dash-attn-chip:hover {
+  border-color: var(--border-hover);
+}
+
+.dash-attn-chip .chip-top {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 18px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: var(--transition-smooth);
 }
 
-.ledger-tab-button:hover {
-  color: var(--text-main);
-  background: var(--bg-hover);
+.dash-attn-chip .chip-top svg {
+  flex-shrink: 0;
 }
 
-.ledger-tab-button.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-  background: var(--primary-light);
-}
-
-.ledger-tab-badge {
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.72rem;
+.dash-attn-chip .chip-count {
+  font-size: 1.35rem;
   font-weight: 800;
-  transition: var(--transition-smooth);
-  background: var(--border-hover);
-  color: var(--text-main);
+  font-family: 'Outfit', sans-serif;
+  line-height: 1;
 }
 
-.ledger-tab-button.active .ledger-tab-badge {
-  background: var(--primary);
-  color: #fff;
+.dash-attn-chip .chip-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-attn-chip--danger {
+  background: var(--danger-light);
+  border-color: var(--danger-border);
+  color: var(--danger-on-tint);
+}
+
+.dash-attn-chip--danger:hover {
+  border-color: var(--danger);
+}
+
+.dash-attn-chip--warning {
+  background: var(--warning-light);
+  border-color: var(--warning-border);
+  color: var(--warning);
+}
+
+.dash-attn-chip--warning:hover {
+  border-color: var(--warning);
+}
+
+/* Unified action-queue rows */
+.dash-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 8px;
+}
+
+.dash-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dash-action-row:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card);
+}
+
+.dash-action-row--danger {
+  border-left: 3px solid var(--danger);
+}
+
+.dash-action-row--warning {
+  border-left: 3px solid var(--warning);
+}
+
+/* Category badge inside action rows */
+.dash-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.dash-badge--danger {
+  background: var(--danger-light);
+  color: var(--danger-on-tint);
+  border-color: var(--danger-border);
+}
+
+.dash-badge--warning {
+  background: var(--warning-light);
+  color: var(--warning);
+  border-color: var(--warning-border);
+}
+
+/* Scope badge — marks all-time cards while a date filter is active */
+.dash-scope-badge {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* CSS bar lists (inventory conditions / withdrawal types) */
+.dash-bar-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dash-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Activity feed — 2 columns on wide screens */
+.dash-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 520px) {
+  .dash-action-grid,
+  .dash-activity-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 

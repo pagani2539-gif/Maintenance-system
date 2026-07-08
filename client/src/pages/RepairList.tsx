@@ -4,6 +4,7 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
 import { Input, TextArea } from '../components/ui/Input';
 import { formatDateTimeThai, parseDate } from '../utils/formatDate';
@@ -37,6 +38,7 @@ import TableToolbar from '../components/tables/TableToolbar';
 import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
 import { exportToCsv } from '../utils/csvExporter';
+import { getApiErrorMessage } from '../utils/apiError';
 
 const RepairList: React.FC = () => {
   const { notify, confirm } = useNotification();
@@ -137,12 +139,12 @@ const RepairList: React.FC = () => {
         repair_note: modalData.note,
         note: modalData.note
       });
-      notify(status === 'เสร็จสิ้น' ? '🎉 บันทึกการซ่อมเสร็จสิ้นเรียบร้อยแล้ว!' : `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`);
+      notify(status === 'เสร็จสิ้น' ? 'บันทึกการซ่อมเสร็จสิ้นเรียบร้อยแล้ว' : `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`);
       setShowModal(null);
       setModalData({ technician: '', note: '' });
       fetchData();
-    } catch {
-      notify('เกิดข้อผิดพลาดในการอัปเดตสถานะ', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'อัปเดตสถานะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     }
   };
 
@@ -157,8 +159,8 @@ const RepairList: React.FC = () => {
         await repairApi.delete(id);
         notify('ลบรายการสำเร็จ');
         fetchData();
-      } catch {
-        notify('เกิดข้อผิดพลาดในการลบข้อมูล', 'error');
+      } catch (err) {
+        notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
       }
     }
   };
@@ -385,6 +387,7 @@ const RepairList: React.FC = () => {
   return (
     <div className="repair-board" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+        <BackButton />
         <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2.5rem' }}>
           <div className="page-title">
             <h2>กระดานติดตามสถานะงานซ่อม</h2>
@@ -440,6 +443,11 @@ const RepairList: React.FC = () => {
           columns={columns}
           data={paginatedData}
           state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
+          totalCount={repairs?.length ?? 0}
+          emptyState={{
+            noData: { message: 'ยังไม่มีรายการแจ้งซ่อมในระบบ', hint: 'กด "แจ้งซ่อมใหม่" เพื่อสร้างใบงานแรก' },
+            noResults: { message: 'ไม่พบงานซ่อมที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+          }}
           actions={actions}
           onRetry={fetchData}
           drawerTitle={(row) => `ใบงานซ่อม ${row.ticket_no}`}

@@ -11,7 +11,8 @@ const INSTANCE_STATUS = {
   WITHDRAWN: 'Withdrawn',
   UNDER_REPAIR: 'Under Repair',
   CLAIMING: 'Claiming',
-  DAMAGED: 'Damaged'
+  DAMAGED: 'Damaged',
+  WITH_TECHNICIAN: 'With Technician' // custody: held in a technician's personal spare kit
 };
 
 module.exports = {

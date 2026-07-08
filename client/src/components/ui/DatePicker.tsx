@@ -125,7 +125,8 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
         }}>
           {/* Calendar Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <button 
+            <button
+              type="button"
               onClick={handlePrevMonth}
               style={{
                 background: 'var(--bg-app)',
@@ -142,7 +143,8 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
             <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem' }}>
               {monthsThai[currentMonth.getMonth()]} {currentMonth.getFullYear() + 543}
             </div>
-            <button 
+            <button
+              type="button"
               onClick={handleNextMonth}
               style={{
                 background: 'var(--bg-app)',

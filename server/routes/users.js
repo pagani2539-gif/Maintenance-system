@@ -7,7 +7,6 @@ const { requireFull } = require('../middlewares/auth');
 router.get('/', requireFull, usersController.list);
 router.post('/', requireFull, usersController.create);
 router.get('/audit-logs', requireFull, usersController.getAuditLogs);
-router.get('/:id', requireFull, usersController.getById);
 router.put('/:id', requireFull, usersController.update);
 router.delete('/:id', requireFull, usersController.remove);
 

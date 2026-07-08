@@ -1,27 +1,24 @@
-const db = require('../database/init');
+const { query } = require('../database/db');
 
-const logAudit = (entityType, entityId, action, oldData, newData, userName) => {
-  return new Promise((resolve, reject) => {
-    const oldDataStr = oldData ? JSON.stringify(oldData) : null;
-    const newDataStr = newData ? JSON.stringify(newData) : null;
-    db.run(`
+const logAudit = async (entityType, entityId, action, oldData, newData, userName) => {
+  try {
+    const result = await query(`
       INSERT INTO audit_logs (entity_type, entity_id, action, old_data, new_data, user_name)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
     `, [
       entityType,
       entityId,
       action,
-      oldDataStr,
-      newDataStr,
+      oldData ? JSON.stringify(oldData) : null,
+      newData ? JSON.stringify(newData) : null,
       userName || 'System/Admin'
-    ], function(err) {
-      if (err) {
-        console.error('Failed to write audit log:', err.message);
-        return reject(err);
-      }
-      resolve(this.lastID);
-    });
-  });
+    ]);
+    return result.rows[0].id;
+  } catch (err) {
+    console.error('Failed to write audit log:', err.message);
+    throw err;
+  }
 };
 
 module.exports = {

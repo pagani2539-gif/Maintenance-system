@@ -49,6 +49,7 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const inputId = React.useId();
 
   useEffect(() => {
     inventoryApi.getLifecycleReport().then(setInstances).catch((err: unknown) => {
@@ -138,11 +139,6 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
               }}>
                 ซ่อมมาแล้ว {selectedItem.repair_count} ครั้ง
               </span>
-              {selectedItem.is_expired_warranty && (
-                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: '#b91c1c', background: '#fee2e2' }}>
-                  พ้นประกันแล้ว
-                </span>
-              )}
             </div>
           </div>
           <button
@@ -163,9 +159,10 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
 
   return (
     <div className="form-group" style={{ gridColumn: '1 / -1', position: 'relative' }}>
-      <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>{label}</label>
+      <label htmlFor={inputId} style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>{label}</label>
       <div style={{ position: 'relative' }}>
         <input
+          id={inputId}
           type="text"
           placeholder={stationItems.length ? 'คลิกหรือพิมพ์ S/N / ชื่ออุปกรณ์เพื่อค้นหาและเลือก...' : 'ไม่พบอุปกรณ์ที่ติดตั้งอยู่ที่ด่านนี้'}
           value={query}

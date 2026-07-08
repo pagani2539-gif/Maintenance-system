@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Input } from '../components/ui/Input';
 import FormSection from '../components/ui/FormSection';
 import { useNotification } from '../components/Layout';
@@ -35,6 +36,7 @@ const DEFAULT_REGULAR_PERMISSIONS: Permissions = {
     stations: false,
     companies: false,
     users: false,
+    stock_counts: false,
   },
 };
 
@@ -245,6 +247,7 @@ const UserManagement: React.FC = () => {
 
   return (
     <div style={{ padding: '2rem 2.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <BackButton />
       <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div className="page-title">
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

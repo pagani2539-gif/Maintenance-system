@@ -2,7 +2,7 @@ import React from 'react';
 import { UPLOAD_URL } from '../../api';
 import type { Company, CompanyLogo } from '../../types';
 import { pdfTheme, docLabels, type DocType } from './pdfTheme';
-import { Wrench, ShieldCheck, Package, RotateCcw } from 'lucide-react';
+import { Wrench, ShieldCheck, Package, RotateCcw, ShoppingCart } from 'lucide-react';
 
 interface Props {
   docType: DocType;
@@ -63,25 +63,25 @@ export const PdfHeader: React.FC<Props> = ({ docType, docNumber, docDate, compan
       }}>
         {/* ─── Left Column: Company Info (Detailed or Mini) ─── */}
         {!shouldShowCompany ? (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontFamily: pdfTheme.fonts.body }}>
+          <div style={{ display: 'flex', gap: '11px', alignItems: 'center', fontFamily: pdfTheme.fonts.body }}>
             <div style={{
-              width: '38px',
-              height: '38px',
+              width: '54px',
+              height: '54px',
               flexShrink: 0,
-              borderRadius: '50%',
-              background: getSoftTint(docType),
-              border: `1.5px solid ${accentColor}`,
+              borderRadius: pdfTheme.radius.lg,
+              background: `linear-gradient(135deg, ${accentColor} 0%, ${pdfTheme.colors.primary} 100%)`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              {docType === 'repair' && <Wrench size={16} color={accentColor} />}
-              {docType === 'claim' && <ShieldCheck size={16} color={accentColor} />}
-              {docType === 'withdrawal' && <Package size={16} color={accentColor} />}
-              {docType === 'return' && <RotateCcw size={16} color={accentColor} />}
+              {docType === 'repair' && <Wrench size={26} color="#ffffff" strokeWidth={2.2} />}
+              {docType === 'claim' && <ShieldCheck size={26} color="#ffffff" strokeWidth={2.2} />}
+              {docType === 'withdrawal' && <Package size={26} color="#ffffff" strokeWidth={2.2} />}
+              {docType === 'return' && <RotateCcw size={26} color="#ffffff" strokeWidth={2.2} />}
+              {docType === 'purchase' && <ShoppingCart size={26} color="#ffffff" strokeWidth={2.2} />}
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <div style={{
                 fontSize: `${pdfTheme.size.h2}px`,
                 fontWeight: 800,
@@ -95,18 +95,21 @@ export const PdfHeader: React.FC<Props> = ({ docType, docNumber, docDate, compan
                 fontSize: `${pdfTheme.size.micro}px`,
                 color: pdfTheme.colors.textMuted,
                 fontWeight: 600,
-                marginTop: '1px',
-                letterSpacing: '0.03em',
+                marginTop: '2px',
+                letterSpacing: '0.05em',
               }}>
                 REPAIR & INVENTORY MANAGEMENT SYSTEM
               </div>
               <div style={{
+                marginTop: '4px',
+                paddingTop: '3px',
+                borderTop: `1px solid ${pdfTheme.colors.border}`,
                 fontSize: '7.5px',
                 color: pdfTheme.colors.textLight,
-                marginTop: '1px',
-                fontStyle: 'italic',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
               }}>
-                INTERNAL OPERATIONAL SLIP · เอกสารบันทึกการทำงานภายในระบบ
+                เอกสารทางการของระบบ · OFFICIAL SYSTEM DOCUMENT
               </div>
             </div>
           </div>

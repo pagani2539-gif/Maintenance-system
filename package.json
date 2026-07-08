@@ -1,8 +1,5 @@
 {
   "scripts": {
     "production:check": "node scripts/production_check.js"
-  },
-  "dependencies": {
-    "sqlite3": "^6.0.1"
   }
 }

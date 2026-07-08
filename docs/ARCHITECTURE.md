@@ -7,12 +7,12 @@ This document describes the high-level architecture of the Repair & Equipment Re
 The system follows a classic **Client-Server** architecture:
 
 - **Frontend (Client)**: A Single Page Application (SPA) that handles the UI/UX, user interactions, and local state management. It communicates with the backend via RESTful APIs.
-- **Backend (Server)**: A REST API that handles business logic, database operations (SQLite), and file storage (uploads).
+- **Backend (Server)**: A REST API that handles business logic, database operations (PostgreSQL), and file storage (uploads).
 
 ```mermaid
 graph LR
   Client(React Frontend) -- REST API --> Server(Node.js Express)
-  Server -- SQL Queries --> DB[(SQLite Database)]
+  Server -- SQL Queries --> DB[(PostgreSQL Database)]
   Server -- FS Operations --> Uploads[Uploads Folder]
 ```
 
@@ -20,13 +20,13 @@ graph LR
 
 1. **User Interaction**: User performs an action on the UI (e.g., submitting a repair form).
 2. **API Request**: The React client uses `axios` (via custom `useApi` hook) to send a request to the server.
-3. **Logic & DB**: The server validates the request, performs necessary logic, and updates the SQLite database.
+3. **Logic & DB**: The server validates the request, performs necessary logic, and updates the PostgreSQL database.
 4. **Response**: The server sends a JSON response back to the client.
 5. **UI Update**: The React client updates its state and re-renders the UI to reflect the changes.
 
 ## Database Schema
 
-The system uses SQLite. The primary tables are:
+The system uses PostgreSQL. The primary tables are:
 
 - **`repairs`**: Core table for tracking repair tickets.
 - **`repair_logs`**: Audit trail for actions taken on repair tickets.
@@ -66,7 +66,7 @@ The API is organized by resource:
 │   └── utils/          # Helper functions (Formatting, PDF generation)
 /server
 ├── controllers/        # Request handlers & logic
-├── database/           # SQLite initialization and connection
+├── database/           # PostgreSQL connection, migrations, and backup/restore
 ├── middlewares/        # Express middlewares (Error handling, Uploads)
 ├── routes/             # API route definitions
 └── uploads/            # Storage for uploaded images

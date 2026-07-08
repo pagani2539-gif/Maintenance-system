@@ -1,8 +1,10 @@
-const db = require('../database/init');
+const { query: dbQuery, withTransaction } = require('../database/db');
 const { logAudit } = require('../utils/auditLogger');
 
-// Helper to log a transaction
-const logTransaction = (data, callback) => {
+// Helper to log a transaction. Accepts an optional `executor` (a pg Pool or a
+// checked-out transaction client) so callers running inside withTransaction()
+// can pass their client and have this insert participate in the same transaction.
+const logTransaction = async (data, executor = { query: dbQuery }) => {
   const {
     inventory_id,
     instance_id = null,
@@ -21,229 +23,146 @@ const logTransaction = (data, callback) => {
     return_image = null
   } = data;
 
-  const insertTx = (resolvedLocation) => {
-    db.run(`
-      INSERT INTO inventory_transactions (
-        inventory_id, instance_id, transaction_type,
-        quantity_added, quantity_withdrawn, quantity_borrowed, quantity_returned,
-        project_name, location, station_id, contract_id, user_name, note, withdrawal_id, return_image
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
+  let resolvedLocation = location;
+  if (station_id && !location) {
+    const { rows } = await executor.query('SELECT name FROM stations WHERE id = $1', [station_id]);
+    resolvedLocation = rows[0] ? rows[0].name : null;
+  }
+
+  const { rows } = await executor.query(`
+    INSERT INTO inventory_transactions (
       inventory_id, instance_id, transaction_type,
       quantity_added, quantity_withdrawn, quantity_borrowed, quantity_returned,
-      project_name, resolvedLocation, station_id, contract_id, user_name, note, withdrawal_id, return_image
-    ], function(err) {
-      if (!err) {
-        logAudit('inventory_transaction', this.lastID, 'inventory movement', null, data, user_name || 'System').catch(e => console.error(e));
-      }
-      if (callback) callback(err, this.lastID);
-    });
-  };
+      project_name, location, station_id, contract_id, user_name, note, withdrawal_id, return_image
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    RETURNING id
+  `, [
+    inventory_id, instance_id, transaction_type,
+    quantity_added, quantity_withdrawn, quantity_borrowed, quantity_returned,
+    project_name, resolvedLocation, station_id, contract_id, user_name, note, withdrawal_id, return_image
+  ]);
 
-  if (station_id && !location) {
-    db.get('SELECT name FROM stations WHERE id = ?', [station_id], (err, row) => {
-      insertTx(row ? row.name : null);
-    });
-  } else {
-    insertTx(location);
-  }
+  const newId = rows[0].id;
+  logAudit('inventory_transaction', newId, 'inventory movement', null, data, user_name || 'System').catch(e => console.error(e));
+  return newId;
 };
 
-exports.getAllTransactions = (req, res) => {
-  const { inventory_id, station_id, withdrawal_id, pending_only } = req.query;
-  let query = `
-    SELECT *
-    FROM transactions_view
-  `;
-  const params = [];
-  let conditions = [];
-  if (inventory_id) {
-    conditions.push(`inventory_id = ?`);
-    params.push(inventory_id);
-  }
-  if (station_id) {
-    conditions.push(`station_id = ?`);
-    params.push(station_id);
-  }
-  if (withdrawal_id) {
-    conditions.push(`withdrawal_id = ?`);
-    params.push(withdrawal_id);
-  }
-  if (pending_only === 'true') {
-    conditions.push(`(status IS NULL OR status != 'RETURNED') AND (transaction_type = 'BORROW' OR (transaction_type = 'WITHDRAW' AND withdrawal_type IN ('ทดสอบ', 'สำรองใช้งาน', 'ยืมใช้งาน', 'ยืม')))`);
-  }
-  if (conditions.length > 0) {
-    query += ` WHERE ` + conditions.join(' AND ');
-  }
-  query += ` ORDER BY created_at DESC, id DESC`;
+exports.getAllTransactions = async (req, res) => {
+  try {
+    const { inventory_id, station_id, withdrawal_id, pending_only } = req.query;
+    let sql = `SELECT * FROM transactions_view`;
+    const params = [];
+    let conditions = [];
+    if (inventory_id) {
+      params.push(inventory_id);
+      conditions.push(`inventory_id = $${params.length}`);
+    }
+    if (station_id) {
+      params.push(station_id);
+      conditions.push(`station_id = $${params.length}`);
+    }
+    if (withdrawal_id) {
+      params.push(withdrawal_id);
+      conditions.push(`withdrawal_id = $${params.length}`);
+    }
+    if (pending_only === 'true') {
+      conditions.push(`(status IS NULL OR status != 'RETURNED') AND (transaction_type = 'BORROW' OR (transaction_type = 'WITHDRAW' AND withdrawal_type IN ('ทดสอบ', 'สำรองใช้งาน', 'ยืมใช้งาน', 'ยืม')))`);
+    }
+    if (conditions.length > 0) {
+      sql += ` WHERE ` + conditions.join(' AND ');
+    }
+    sql += ` ORDER BY created_at DESC, id DESC`;
 
-  db.all(query, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+    const { rows } = await dbQuery(sql, params);
     res.json(rows);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.addStock = (req, res) => {
-  const { inventory_id, quantity, note, serial_numbers } = req.body; // serial_numbers is an array of strings
-  const user_name = req.user.full_name;
-
-  db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
-
-    // 1. Update main inventory quantity
-    db.run('UPDATE inventory SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-      [quantity, inventory_id], (err) => {
-      if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-
-      // 2. If serial numbers provided, create instances
-      if (serial_numbers && serial_numbers.length > 0) {
-        let processed = 0;
-        let failed = false;
-        serial_numbers.forEach(sn => {
-          db.run(`INSERT INTO inventory_instances (inventory_id, serial_number, status) VALUES (?, ?, 'In Stock')`,
-            [inventory_id, sn], (err) => {
-            if (failed) return;
-            if (err) {
-              failed = true;
-              db.run('ROLLBACK');
-              return res.status(500).json({ error: err.message });
-            }
-            processed++;
-            if (processed === serial_numbers.length) {
-              // 3. Log the transaction
-              logTransaction({
-                inventory_id,
-                transaction_type: 'ADD_STOCK',
-                quantity_added: quantity,
-                user_name,
-                note: note || `Added ${quantity} units (with S/N)`
-              }, (err) => {
-                if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-                db.run('COMMIT');
-                res.json({ message: 'นำเข้าสต็อกเรียบร้อย' });
-              });
-            }
-          });
-        });
-      } else {
-        // Bulk add
-        logTransaction({
-          inventory_id,
-          transaction_type: 'ADD_STOCK',
-          quantity_added: quantity,
-          user_name,
-          note
-        }, (err) => {
-          if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-          db.run('COMMIT');
-          res.json({ message: 'นำเข้าสต็อกเรียบร้อย' });
-        });
-      }
-    });
-  });
-};
-
-
-exports.returnItem = (req, res) => {
+exports.returnItem = async (req, res) => {
   const { inventory_id, instance_id, quantity, condition, note, transaction_id } = req.body;
   const user_name = req.user.full_name;
+  const return_image = req.file ? req.file.filename : null;
 
-  db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
+  try {
+    await withTransaction(async (client) => {
+      let withdrawal_id = null;
+      let original_station_id = null;
+      let original_project_name = null;
+      let original_location = null;
 
-    let withdrawal_id = null;
-    let original_station_id = null;
-    let original_project_name = null;
-    let original_location = null;
-
-    const return_image = req.file ? req.file.filename : null;
-
-    // 1. If transaction_id provided, mark original as RETURNED
-    const finalizeReturn = () => {
-      // 2. Update inventory
-      db.run('UPDATE inventory SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [quantity, inventory_id], (err) => {
-        if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-
-        // 3. Update instance status if provided
-        if (instance_id) {
-          db.run(`UPDATE inventory_instances SET status = 'In Stock', condition = ?, current_location = 'Warehouse', station_id = NULL WHERE id = ?`,
-            [condition || 'Good', instance_id], (err) => {
-            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-
-            // 4. Log transaction (inherit station_id/project from original so it appears in station history)
-            logTransaction({
-              inventory_id, instance_id, transaction_type: 'RETURN',
-              quantity_returned: quantity, user_name, note: note || `Returned in ${condition} condition`,
-              withdrawal_id, return_image,
-              station_id: original_station_id,
-              project_name: original_project_name,
-              location: original_location
-            }, (err) => {
-              if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-              db.run('COMMIT');
-              res.json({ message: 'บันทึกการคืนเรียบร้อย' });
-            });
-          });
-        } else {
-          // Bulk return
-          logTransaction({
-            inventory_id, transaction_type: 'RETURN',
-            quantity_returned: quantity, user_name, note,
-            withdrawal_id, return_image,
-            station_id: original_station_id,
-            project_name: original_project_name,
-            location: original_location
-          }, (err) => {
-            if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-            db.run('COMMIT');
-            res.json({ message: 'บันทึกการคืนเรียบร้อย' });
-          });
-        }
-      });
-    };
-
-    if (transaction_id) {
-      db.get('SELECT withdrawal_id, station_id, project_name, location FROM inventory_transactions WHERE id = ?', [transaction_id], (err, row) => {
-        if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
+      // 1. If transaction_id provided, mark original as RETURNED
+      if (transaction_id) {
+        const { rows } = await client.query(
+          'SELECT withdrawal_id, station_id, project_name, location FROM inventory_transactions WHERE id = $1',
+          [transaction_id]
+        );
+        const row = rows[0];
         if (row) {
           withdrawal_id = row.withdrawal_id;
           original_station_id = row.station_id;
           original_project_name = row.project_name;
           original_location = row.location;
         }
-        db.run(`UPDATE inventory_transactions SET status = 'RETURNED' WHERE id = ? AND transaction_type IN ('BORROW', 'WITHDRAW')`, [transaction_id], (err) => {
-          if (err) { db.run('ROLLBACK'); return res.status(500).json({ error: err.message }); }
-          finalizeReturn();
-        });
-      });
-    } else {
-      finalizeReturn();
-    }
-  });
+        await client.query(
+          `UPDATE inventory_transactions SET status = 'RETURNED' WHERE id = $1 AND transaction_type IN ('BORROW', 'WITHDRAW')`,
+          [transaction_id]
+        );
+      }
+
+      // 2. Update inventory
+      await client.query('UPDATE inventory SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2', [quantity, inventory_id]);
+
+      // 3. Update instance status if provided
+      if (instance_id) {
+        await client.query(
+          `UPDATE inventory_instances SET status = 'In Stock', condition = $1, current_location = 'Warehouse', station_id = NULL WHERE id = $2`,
+          [condition || 'Good', instance_id]
+        );
+      }
+
+      // 4. Log transaction (inherit station_id/project from original so it appears in station history)
+      await logTransaction({
+        inventory_id, instance_id: instance_id || null, transaction_type: 'RETURN',
+        quantity_returned: quantity, user_name, note: note || (instance_id ? `Returned in ${condition} condition` : undefined),
+        withdrawal_id, return_image,
+        station_id: original_station_id,
+        project_name: original_project_name,
+        location: original_location
+      }, client);
+    });
+
+    res.json({ message: 'บันทึกการคืนเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.getLatestTransaction = (req, res) => {
-  const query = `
-    SELECT t.id, t.transaction_type, t.quantity_added, t.quantity_withdrawn, t.quantity_borrowed, t.quantity_returned,
-           i.name as product_name, t.user_name
-    FROM inventory_transactions t
-    JOIN inventory i ON t.inventory_id = i.id
-    ORDER BY t.id DESC LIMIT 1
-  `;
-  db.get(query, [], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(row || null);
-  });
+exports.getLatestTransaction = async (req, res) => {
+  try {
+    const { rows } = await dbQuery(`
+      SELECT t.id, t.transaction_type, t.quantity_added, t.quantity_withdrawn, t.quantity_borrowed, t.quantity_returned,
+             i.name as product_name, t.user_name
+      FROM inventory_transactions t
+      JOIN inventory i ON t.inventory_id = i.id
+      ORDER BY t.id DESC LIMIT 1
+    `);
+    res.json(rows[0] || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.deleteTransaction = (req, res) => {
+exports.deleteTransaction = async (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM inventory_transactions WHERE id = ?', [id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการลบ' });
+  try {
+    const result = await dbQuery('DELETE FROM inventory_transactions WHERE id = $1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการลบ' });
     res.json({ message: 'ลบรายการเรียบร้อยแล้ว' });
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 exports.logTransaction = logTransaction; // Export for use in other controllers

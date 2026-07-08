@@ -2,16 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { withdrawalApi, transactionApi } from '../api';
 import { useNotification } from '../components/Layout';
+import { getApiErrorMessage } from '../utils/apiError';
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Skeleton } from '../components/ui/Skeleton';
 import Select from '../components/ui/Select';
 import { formatDateTimeThai } from '../utils/formatDate';
-import { 
-  ArrowLeft, 
-  FileText, 
+import {
+  FileText,
   Calendar, 
   User, 
   Package, 
@@ -108,15 +109,14 @@ const WithdrawalDetail: React.FC = () => {
       }
 
       await transactionApi.return(formData);
-      notify('🎉 บันทึกการคืนอุปกรณ์เรียบร้อยแล้ว');
+      notify('บันทึกการคืนอุปกรณ์เรียบร้อยแล้ว');
       closeReturnModal();
       if (id) {
         fetchWithdrawal(id);
         fetchTransactions(id);
       }
     } catch (err) {
-      const error = err as Error;
-      notify(error.message || 'เกิดข้อผิดพลาดในการบันทึกการคืน', 'error');
+      notify(getApiErrorMessage(err, 'บันทึกการคืนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setReturning(false);
     }
@@ -174,7 +174,7 @@ const WithdrawalDetail: React.FC = () => {
     if (!id) return;
     const isConfirmed = await confirm({
       title: 'ยืนยันการลบประวัติการเบิก',
-      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนสต็อกอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ',
+      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนสต็อกอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ\nการลบประวัตินี้ไม่สามารถย้อนกลับได้',
       variant: 'danger'
     });
     if (!isConfirmed) return;
@@ -182,8 +182,8 @@ const WithdrawalDetail: React.FC = () => {
       await withdrawalApi.delete(id);
       notify('ลบประวัติและคืนสต็อกเรียบร้อยแล้ว');
       navigate('/withdrawal');
-    } catch {
-      notify('เกิดข้อผิดพลาดในการลบข้อมูล', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     }
   };
 
@@ -240,11 +240,11 @@ const WithdrawalDetail: React.FC = () => {
         templateId="pdf-withdrawal-template"
         docTitle={`ใบเบิก - WD-${String(withdrawal.id).padStart(6, '0')}`}
         onBeforePrint={handleBeforePrint}
-        renderTemplate={(companyId, logoId) => (
+        renderTemplate={(company, logo) => (
           <PrintWithdrawalTemplate
             withdrawal={withdrawal}
-            companyId={companyId}
-            logoId={logoId}
+            company={company}
+            logo={logo}
           />
         )}
       />
@@ -263,9 +263,7 @@ const WithdrawalDetail: React.FC = () => {
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button className="btn btn-outline" style={{ border: 'none', padding: '10px' }} onClick={() => navigate(-1)}>
-              <ArrowLeft size={20} />
-            </button>
+            <BackButton />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
                 <Package size={14} /> บันทึกการเบิกพัสดุ

@@ -1,4 +1,4 @@
-const db = require('../database/init');
+const { query, withTransaction, closePool } = require('../database/db');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -7,171 +7,153 @@ const bcrypt = require('bcryptjs');
 // Companies (multi)
 // ============================================================
 
-exports.getCompanies = (req, res) => {
-  db.all('SELECT * FROM companies ORDER BY is_default DESC, id ASC', [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+exports.getCompanies = async (req, res) => {
+  try {
+    const { rows } = await query('SELECT * FROM companies ORDER BY is_default DESC, id ASC');
     res.json(rows || []);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.getCompanyById = (req, res) => {
+exports.getCompanyById = async (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM companies WHERE id = ?', [id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'ไม่พบบริษัท' });
-    res.json(row);
-  });
+  try {
+    const { rows } = await query('SELECT * FROM companies WHERE id = $1', [id]);
+    if (!rows[0]) return res.status(404).json({ error: 'ไม่พบบริษัท' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.createCompany = (req, res) => {
+exports.createCompany = async (req, res) => {
   const { name_th, name_en, name_short, address, phone, email, tax_id, website } = req.body;
   if (!name_th || !name_th.trim()) {
     return res.status(400).json({ error: 'กรุณาระบุชื่อบริษัท (ภาษาไทย)' });
   }
 
-  db.get('SELECT COUNT(*) as cnt FROM companies', [], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const { rows: cntRows } = await query('SELECT COUNT(*) as cnt FROM companies');
+    const isDefault = Number(cntRows[0].cnt) === 0 ? 1 : 0;
 
-    const isDefault = row && row.cnt === 0 ? 1 : 0;
-
-    db.run(
+    const { rows } = await query(
       `INSERT INTO companies (name_th, name_en, name_short, address, phone, email, tax_id, website, is_default)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name_th.trim(),
-        name_en || '',
-        name_short || '',
-        address || '',
-        phone || '',
-        email || '',
-        tax_id || '',
-        website || '',
-        isDefault,
-      ],
-      function (err2) {
-        if (err2) return res.status(500).json({ error: err2.message });
-        res.status(201).json({ id: this.lastID, message: 'เพิ่มบริษัทเรียบร้อย' });
-      }
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id`,
+      [name_th.trim(), name_en || '', name_short || '', address || '', phone || '', email || '', tax_id || '', website || '', isDefault]
     );
-  });
+    res.status(201).json({ id: rows[0].id, message: 'เพิ่มบริษัทเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.updateCompany = (req, res) => {
+exports.updateCompany = async (req, res) => {
   const { id } = req.params;
   const { name_th, name_en, name_short, address, phone, email, tax_id, website } = req.body;
   if (!name_th || !name_th.trim()) {
     return res.status(400).json({ error: 'กรุณาระบุชื่อบริษัท (ภาษาไทย)' });
   }
 
-  db.run(
-    `UPDATE companies SET
-       name_th = ?, name_en = ?, name_short = ?, address = ?, phone = ?, email = ?,
-       tax_id = ?, website = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?`,
-    [
-      name_th.trim(),
-      name_en || '',
-      name_short || '',
-      address || '',
-      phone || '',
-      email || '',
-      tax_id || '',
-      website || '',
-      id,
-    ],
-    function (err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบบริษัท' });
-      res.json({ message: 'บันทึกข้อมูลบริษัทเรียบร้อย' });
-    }
-  );
+  try {
+    const result = await query(
+      `UPDATE companies SET
+         name_th = $1, name_en = $2, name_short = $3, address = $4, phone = $5, email = $6,
+         tax_id = $7, website = $8, updated_at = NOW()
+       WHERE id = $9`,
+      [name_th.trim(), name_en || '', name_short || '', address || '', phone || '', email || '', tax_id || '', website || '', id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'ไม่พบบริษัท' });
+    res.json({ message: 'บันทึกข้อมูลบริษัทเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.deleteCompany = (req, res) => {
+exports.deleteCompany = async (req, res) => {
   const { id } = req.params;
 
-  db.get('SELECT COUNT(*) as cnt FROM companies', [], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (row && row.cnt <= 1) {
+  try {
+    const { rows: cntRows } = await query('SELECT COUNT(*) as cnt FROM companies');
+    if (Number(cntRows[0].cnt) <= 1) {
       return res.status(400).json({ error: 'ต้องมีบริษัทอย่างน้อย 1 อันในระบบ' });
     }
 
-    db.get('SELECT is_default FROM companies WHERE id = ?', [id], (err2, target) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      if (!target) return res.status(404).json({ error: 'ไม่พบบริษัท' });
+    const { rows: targetRows } = await query('SELECT is_default FROM companies WHERE id = $1', [id]);
+    const target = targetRows[0];
+    if (!target) return res.status(404).json({ error: 'ไม่พบบริษัท' });
 
-      // Delete logo files belonging to this company
-      db.all('SELECT file_path FROM company_logos WHERE company_id = ?', [id], (err3, logos) => {
-        if (!err3 && logos) {
-          logos.forEach((logo) => {
-            const fullPath = path.join(__dirname, '..', 'uploads', logo.file_path);
-            fs.unlink(fullPath, (unlinkErr) => {
-              if (unlinkErr) console.warn('Failed to delete logo file:', unlinkErr.message);
-            });
-          });
-        }
-
-        // Delete logos rows + company row
-        db.run('DELETE FROM company_logos WHERE company_id = ?', [id], () => {
-          db.run('DELETE FROM companies WHERE id = ?', [id], (err4) => {
-            if (err4) return res.status(500).json({ error: err4.message });
-
-            // If we deleted the default, promote another company
-            if (target.is_default) {
-              db.get('SELECT id FROM companies ORDER BY id ASC LIMIT 1', [], (err5, nextRow) => {
-                if (!err5 && nextRow) {
-                  db.run('UPDATE companies SET is_default = 1 WHERE id = ?', [nextRow.id]);
-                }
-                res.json({ message: 'ลบบริษัทเรียบร้อย' });
-              });
-            } else {
-              res.json({ message: 'ลบบริษัทเรียบร้อย' });
-            }
-          });
-        });
+    // Delete logo files belonging to this company
+    const { rows: logos } = await query('SELECT file_path FROM company_logos WHERE company_id = $1', [id]);
+    logos.forEach((logo) => {
+      const fullPath = path.join(__dirname, '..', 'uploads', logo.file_path);
+      fs.unlink(fullPath, (unlinkErr) => {
+        if (unlinkErr) console.warn('Failed to delete logo file:', unlinkErr.message);
       });
     });
-  });
+
+    // Delete logos rows + company row
+    await query('DELETE FROM company_logos WHERE company_id = $1', [id]);
+    await query('DELETE FROM companies WHERE id = $1', [id]);
+
+    // If we deleted the default, promote another company
+    if (target.is_default) {
+      const { rows: nextRows } = await query('SELECT id FROM companies ORDER BY id ASC LIMIT 1');
+      if (nextRows[0]) {
+        await query('UPDATE companies SET is_default = 1 WHERE id = $1', [nextRows[0].id]);
+      }
+    }
+
+    res.json({ message: 'ลบบริษัทเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.setDefaultCompany = (req, res) => {
+exports.setDefaultCompany = async (req, res) => {
   const { id } = req.params;
 
-  db.serialize(() => {
-    db.run('UPDATE companies SET is_default = 0', [], (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-
-      db.run('UPDATE companies SET is_default = 1 WHERE id = ?', [id], function (err2) {
-        if (err2) return res.status(500).json({ error: err2.message });
-        if (this.changes === 0) return res.status(404).json({ error: 'ไม่พบบริษัท' });
-        res.json({ message: 'ตั้งเป็นบริษัทหลักเรียบร้อย' });
-      });
+  try {
+    await withTransaction(async (client) => {
+      await client.query('UPDATE companies SET is_default = 0');
+      const result = await client.query('UPDATE companies SET is_default = 1 WHERE id = $1', [id]);
+      if (result.rowCount === 0) {
+        const err = new Error('ไม่พบบริษัท');
+        err.status = 404;
+        throw err;
+      }
     });
-  });
+    res.json({ message: 'ตั้งเป็นบริษัทหลักเรียบร้อย' });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 };
 
 // ============================================================
 // Logos (scoped by company)
 // ============================================================
 
-exports.getLogos = (req, res) => {
+exports.getLogos = async (req, res) => {
   const { company_id } = req.query;
-  let sql = 'SELECT * FROM company_logos';
-  const params = [];
+  try {
+    let sql = 'SELECT * FROM company_logos';
+    const params = [];
 
-  if (company_id) {
-    sql += ' WHERE company_id = ? OR company_id IS NULL';
-    params.push(company_id);
-  }
-  sql += ' ORDER BY is_default DESC, uploaded_at DESC';
+    if (company_id) {
+      params.push(company_id);
+      sql += ' WHERE company_id = $1 OR company_id IS NULL';
+    }
+    sql += ' ORDER BY is_default DESC, uploaded_at DESC';
 
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+    const { rows } = await query(sql, params);
     res.json(rows || []);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.uploadLogo = (req, res) => {
+exports.uploadLogo = async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์รูปภาพ' });
 
   const { label, company_id } = req.body;
@@ -179,104 +161,100 @@ exports.uploadLogo = (req, res) => {
   const logoLabel = (label && label.trim()) || `โลโก้ ${new Date().toLocaleDateString('th-TH')}`;
   const companyId = company_id ? parseInt(company_id, 10) : null;
 
-  // Determine is_default: first logo for this company → default for that company
-  const checkSql = companyId
-    ? 'SELECT COUNT(*) as cnt FROM company_logos WHERE company_id = ?'
-    : 'SELECT COUNT(*) as cnt FROM company_logos WHERE company_id IS NULL';
-  const checkParams = companyId ? [companyId] : [];
+  try {
+    // Determine is_default: first logo for this company → default for that company
+    const checkSql = companyId
+      ? 'SELECT COUNT(*) as cnt FROM company_logos WHERE company_id = $1'
+      : 'SELECT COUNT(*) as cnt FROM company_logos WHERE company_id IS NULL';
+    const checkParams = companyId ? [companyId] : [];
 
-  db.get(checkSql, checkParams, (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+    const { rows: cntRows } = await query(checkSql, checkParams);
+    const isDefault = Number(cntRows[0].cnt) === 0 ? 1 : 0;
 
-    const isDefault = row && row.cnt === 0 ? 1 : 0;
-
-    db.run(
-      `INSERT INTO company_logos (label, file_path, is_default, company_id) VALUES (?, ?, ?, ?)`,
-      [logoLabel, filePath, isDefault, companyId],
-      function (err2) {
-        if (err2) return res.status(500).json({ error: err2.message });
-        res.status(201).json({
-          id: this.lastID,
-          label: logoLabel,
-          file_path: filePath,
-          is_default: isDefault,
-          company_id: companyId,
-          message: 'อัปโหลดโลโก้เรียบร้อย',
-        });
-      }
+    const { rows } = await query(
+      `INSERT INTO company_logos (label, file_path, is_default, company_id) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [logoLabel, filePath, isDefault, companyId]
     );
-  });
+
+    res.status(201).json({
+      id: rows[0].id,
+      label: logoLabel,
+      file_path: filePath,
+      is_default: isDefault,
+      company_id: companyId,
+      message: 'อัปโหลดโลโก้เรียบร้อย',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.setDefaultLogo = (req, res) => {
+exports.setDefaultLogo = async (req, res) => {
   const { id } = req.params;
 
-  // Default is scoped per company
-  db.get('SELECT company_id FROM company_logos WHERE id = ?', [id], (err, target) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const { rows: targetRows } = await query('SELECT company_id FROM company_logos WHERE id = $1', [id]);
+    const target = targetRows[0];
     if (!target) return res.status(404).json({ error: 'ไม่พบโลโก้ที่ระบุ' });
 
+    // Default is scoped per company
     const resetSql = target.company_id
-      ? 'UPDATE company_logos SET is_default = 0 WHERE company_id = ?'
+      ? 'UPDATE company_logos SET is_default = 0 WHERE company_id = $1'
       : 'UPDATE company_logos SET is_default = 0 WHERE company_id IS NULL';
     const resetParams = target.company_id ? [target.company_id] : [];
 
-    db.serialize(() => {
-      db.run(resetSql, resetParams, (err2) => {
-        if (err2) return res.status(500).json({ error: err2.message });
-
-        db.run('UPDATE company_logos SET is_default = 1 WHERE id = ?', [id], function (err3) {
-          if (err3) return res.status(500).json({ error: err3.message });
-          res.json({ message: 'ตั้งเป็นโลโก้หลักเรียบร้อย' });
-        });
-      });
+    await withTransaction(async (client) => {
+      await client.query(resetSql, resetParams);
+      await client.query('UPDATE company_logos SET is_default = 1 WHERE id = $1', [id]);
     });
-  });
+
+    res.json({ message: 'ตั้งเป็นโลโก้หลักเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.deleteLogo = (req, res) => {
+exports.deleteLogo = async (req, res) => {
   const { id } = req.params;
 
-  db.get('SELECT file_path, is_default, company_id FROM company_logos WHERE id = ?', [id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const { rows } = await query('SELECT file_path, is_default, company_id FROM company_logos WHERE id = $1', [id]);
+    const row = rows[0];
     if (!row) return res.status(404).json({ error: 'ไม่พบโลโก้ที่ระบุ' });
 
-    db.run('DELETE FROM company_logos WHERE id = ?', [id], (err2) => {
-      if (err2) return res.status(500).json({ error: err2.message });
+    await query('DELETE FROM company_logos WHERE id = $1', [id]);
 
-      const fullPath = path.join(__dirname, '..', 'uploads', row.file_path);
-      fs.unlink(fullPath, (unlinkErr) => {
-        if (unlinkErr) console.warn('Failed to delete logo file:', unlinkErr.message);
-      });
-
-      // Promote another logo from the same company to default (if we deleted the default)
-      if (row.is_default) {
-        const promoteSql = row.company_id
-          ? 'SELECT id FROM company_logos WHERE company_id = ? ORDER BY uploaded_at DESC LIMIT 1'
-          : 'SELECT id FROM company_logos WHERE company_id IS NULL ORDER BY uploaded_at DESC LIMIT 1';
-        const promoteParams = row.company_id ? [row.company_id] : [];
-
-        db.get(promoteSql, promoteParams, (err3, nextRow) => {
-          if (!err3 && nextRow) {
-            db.run('UPDATE company_logos SET is_default = 1 WHERE id = ?', [nextRow.id]);
-          }
-          res.json({ message: 'ลบโลโก้เรียบร้อย' });
-        });
-      } else {
-        res.json({ message: 'ลบโลโก้เรียบร้อย' });
-      }
+    const fullPath = path.join(__dirname, '..', 'uploads', row.file_path);
+    fs.unlink(fullPath, (unlinkErr) => {
+      if (unlinkErr) console.warn('Failed to delete logo file:', unlinkErr.message);
     });
-  });
+
+    // Promote another logo from the same company to default (if we deleted the default)
+    if (row.is_default) {
+      const promoteSql = row.company_id
+        ? 'SELECT id FROM company_logos WHERE company_id = $1 ORDER BY uploaded_at DESC LIMIT 1'
+        : 'SELECT id FROM company_logos WHERE company_id IS NULL ORDER BY uploaded_at DESC LIMIT 1';
+      const promoteParams = row.company_id ? [row.company_id] : [];
+
+      const { rows: nextRows } = await query(promoteSql, promoteParams);
+      if (nextRows[0]) {
+        await query('UPDATE company_logos SET is_default = 1 WHERE id = $1', [nextRows[0].id]);
+      }
+    }
+
+    res.json({ message: 'ลบโลโก้เรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 // ============================================================
 // System Settings (Key-Value)
 // ============================================================
 
-exports.getSystemSettings = (req, res) => {
-  db.all('SELECT key, value FROM system_settings', [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    
+exports.getSystemSettings = async (req, res) => {
+  try {
+    const { rows } = await query('SELECT key, value FROM system_settings');
     const settings = {};
     (rows || []).forEach(r => {
       if (r.key.includes('token') && (!req.user || !req.user.is_full)) {
@@ -286,63 +264,51 @@ exports.getSystemSettings = (req, res) => {
       }
     });
     res.json(settings);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-exports.updateSystemSettings = (req, res) => {
+exports.updateSystemSettings = async (req, res) => {
   const settings = req.body || {};
   const keys = Object.keys(settings);
-  
+
   if (keys.length === 0) {
     return res.json({ message: 'ไม่มีข้อมูลตั้งค่าที่ถูกอัปเดต' });
   }
 
-  db.serialize(() => {
-    db.run('BEGIN TRANSACTION');
-    
-    let errorOccurred = false;
-    let completedCount = 0;
-    
-    keys.forEach(key => {
-      db.run(
-        `INSERT INTO system_settings (key, value, updated_at)
-         VALUES (?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
-        [key, settings[key]],
-        (err) => {
-          if (errorOccurred) return;
-          if (err) {
-            errorOccurred = true;
-            db.run('ROLLBACK');
-            return res.status(500).json({ error: err.message });
-          }
-
-          completedCount++;
-          if (completedCount === keys.length && !errorOccurred) {
-            db.run('COMMIT');
-            res.json({ message: 'บันทึกการตั้งค่าระบบเรียบร้อย' });
-          }
-        }
-      );
+  try {
+    await withTransaction(async (client) => {
+      for (const key of keys) {
+        await client.query(
+          `INSERT INTO system_settings (key, value, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = NOW()`,
+          [key, settings[key]]
+        );
+      }
     });
-  });
+    res.json({ message: 'บันทึกการตั้งค่าระบบเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 // ============================================================
-// Database Backup & Restore Manager
+// Database Backup & Restore Manager (PostgreSQL: pg_dump / pg_restore)
 // ============================================================
-const BACKUP_DIR = path.join(__dirname, '..', 'database', 'backups');
+const { runBackup, runRestore, BACKUP_DIR } = require('../database/backupPg');
 
 exports.getBackups = (req, res) => {
   if (!fs.existsSync(BACKUP_DIR)) {
     return res.json([]);
   }
-  
+
   fs.readdir(BACKUP_DIR, (err, files) => {
     if (err) return res.status(500).json({ error: err.message });
-    
+
     const backups = files
-      .filter(f => f.startsWith('backup_') && f.endsWith('.db'))
+      .filter(f => f.startsWith('backup_') && f.endsWith('.dump'))
       .map(f => {
         const filePath = path.join(BACKUP_DIR, f);
         const stats = fs.statSync(filePath);
@@ -353,18 +319,17 @@ exports.getBackups = (req, res) => {
         };
       })
       .sort((a, b) => b.created_at - a.created_at);
-      
+
     res.json(backups);
   });
 };
 
 exports.createBackup = (req, res) => {
-  const { runBackup } = require('../database/backup');
-  runBackup(db)
+  runBackup()
     .then(filePath => {
-      res.status(201).json({ 
+      res.status(201).json({
         message: 'สำรองข้อมูลฐานข้อมูลสำเร็จ',
-        filename: path.basename(filePath) 
+        filename: path.basename(filePath)
       });
     })
     .catch(err => {
@@ -374,15 +339,15 @@ exports.createBackup = (req, res) => {
 
 exports.deleteBackup = (req, res) => {
   const { filename } = req.params;
-  if (!filename || filename.includes('..') || !filename.endsWith('.db') || !filename.startsWith('backup_')) {
+  if (!filename || filename.includes('..') || !filename.endsWith('.dump') || !filename.startsWith('backup_')) {
     return res.status(400).json({ error: 'ชื่อไฟล์ไม่ถูกต้อง' });
   }
-  
+
   const filePath = path.join(BACKUP_DIR, filename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'ไม่พบไฟล์สำรองข้อมูล' });
   }
-  
+
   fs.unlink(filePath, (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'ลบไฟล์สำรองข้อมูลเรียบร้อย' });
@@ -391,22 +356,22 @@ exports.deleteBackup = (req, res) => {
 
 exports.downloadBackup = (req, res) => {
   const { filename } = req.params;
-  if (!filename || filename.includes('..') || !filename.endsWith('.db') || !filename.startsWith('backup_')) {
+  if (!filename || filename.includes('..') || !filename.endsWith('.dump') || !filename.startsWith('backup_')) {
     return res.status(400).json({ error: 'ชื่อไฟล์ไม่ถูกต้อง' });
   }
-  
+
   const filePath = path.join(BACKUP_DIR, filename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'ไม่พบไฟล์สำรองข้อมูล' });
   }
-  
+
   res.download(filePath, filename);
 };
 
-exports.restoreBackup = (req, res) => {
+exports.restoreBackup = async (req, res) => {
   const { filename, password, confirm_text } = req.body;
-  
-  if (!filename || filename.includes('..') || !filename.endsWith('.db') || !filename.startsWith('backup_')) {
+
+  if (!filename || filename.includes('..') || !filename.endsWith('.dump') || !filename.startsWith('backup_')) {
     return res.status(400).json({ error: 'ชื่อไฟล์ไม่ถูกต้อง' });
   }
   if (!password || !password.trim()) {
@@ -415,52 +380,36 @@ exports.restoreBackup = (req, res) => {
   if (confirm_text !== 'RESTORE') {
     return res.status(400).json({ error: 'กรุณาพิมพ์คำว่า RESTORE เพื่อยืนยัน' });
   }
-  
+
   const backupPath = path.join(BACKUP_DIR, filename);
   if (!fs.existsSync(backupPath)) {
     return res.status(404).json({ error: 'ไม่พบไฟล์สำรองข้อมูล' });
   }
-  
-  db.get('SELECT password_hash FROM users WHERE id = ?', [req.user.id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+
+  try {
+    const { rows } = await query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    const row = rows[0];
     if (!row) return res.status(401).json({ error: 'ไม่พบบัญชีผู้ใช้' });
-    
-    bcrypt.compare(password, row.password_hash, (cmpErr, ok) => {
-      if (cmpErr) return res.status(500).json({ error: cmpErr.message });
-      if (!ok) return res.status(401).json({ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
-      
-      console.log(`Starting Database Restore from: ${backupPath}`);
-      const dbFileName = process.env.NODE_ENV === 'test' ? 'repair_system_test.db' : 'repair_system.db';
-      const dbFile = path.join(__dirname, '..', 'database', dbFileName);
-      
-      // Close active database before copying
-      db.close((closeErr) => {
-        if (closeErr) {
-          console.error('Failed to close DB for restore:', closeErr.message);
-          return res.status(500).json({ error: 'ไม่สามารถปิดการเชื่อมต่อฐานข้อมูลได้: ' + closeErr.message });
-        }
-        
-        fs.copyFile(backupPath, dbFile, (copyErr) => {
-          if (copyErr) {
-            // The shared db connection is already closed and cannot be re-injected
-            // into modules that hold a reference — restart so init.js reopens it.
-            // The original db file is untouched when copyFile fails.
-            console.error('Failed to restore db file:', copyErr.message);
-            res.status(500).json({ error: 'ไม่สามารถกู้คืนฐานข้อมูลได้: ' + copyErr.message + ' ระบบกำลังรีสตาร์ทเซิร์ฟเวอร์' });
-            setTimeout(() => {
-              process.exit(1);
-            }, 1000);
-            return;
-          }
-          
-          console.log('Database restored successfully. Restarting server to apply changes...');
-          res.json({ message: 'กู้คืนฐานข้อมูลสำเร็จแล้ว ระบบกำลังรีสตาร์ทเซิร์ฟเวอร์ใน 1 วินาที...' });
-          
-          setTimeout(() => {
-            process.exit(0);
-          }, 1000);
-        });
-      });
-    });
-  });
+
+    const ok = await bcrypt.compare(password, row.password_hash);
+    if (!ok) return res.status(401).json({ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' });
+
+    // v1 restore strategy: run pg_restore, then exit and let PM2 restart the
+    // process so every module gets a fresh connection pool. A live pool
+    // reconnect without restart is a possible future refinement, but this
+    // matches the previously known-good "restore then restart" behavior and
+    // is the lower-risk choice for the first Postgres-backed restore path.
+    await runRestore(backupPath);
+
+    console.log('Database restored successfully. Restarting server to apply changes...');
+    res.json({ message: 'กู้คืนฐานข้อมูลสำเร็จแล้ว ระบบกำลังรีสตาร์ทเซิร์ฟเวอร์ใน 1 วินาที...' });
+
+    setTimeout(async () => {
+      try { await closePool(); } catch { /* ignore — process is exiting anyway */ }
+      process.exit(0);
+    }, 1000);
+  } catch (err) {
+    console.error('Restore failed:', err.message);
+    res.status(500).json({ error: 'ไม่สามารถกู้คืนฐานข้อมูลได้: ' + err.message });
+  }
 };

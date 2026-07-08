@@ -5,7 +5,7 @@
 ## รายละเอียดทางเทคนิค
 - **Runtime**: Node.js
 - **Framework**: Express.js
-- **Database**: SQLite3
+- **Database**: PostgreSQL (ผ่าน `pg`)
 - **File Upload**: Multer
 
 ## ขั้นตอนการติดตั้ง (Installation)
@@ -21,15 +21,9 @@
     ```
 
 3.  **เตรียมฐานข้อมูล**:
-    - ตรวจสอบไฟล์ใน `database/init.js` เพื่อดูโครงสร้างตาราง
-    - รันคำสั่งเริ่มต้น (ถ้ายังไม่มีไฟล์ `.db`):
-      ```bash
-      node database/init.js
-      ```
-    - หากมีการอัปเดตระบบ ให้รันไฟล์ migration (ถ้ามี):
-      ```bash
-      node ../scripts/migrate.js
-      ```
+    - ต้องมี PostgreSQL ติดตั้งและรันอยู่ พร้อม role/database สำหรับแอป (ดู `DEPLOY.md` ขั้นตอนที่ 0)
+    - ตั้งค่า `DATABASE_URL` ใน `.env` ให้ชี้ไปที่ database นั้น
+    - ไม่ต้องรันคำสั่งสร้างตารางเอง — migration ใน `database/migrations-pg/` จะรันอัตโนมัติทุกครั้งที่ Server สตาร์ท
 
 4.  **เริ่มการทำงาน (Start Server)**:
     - สำหรับโหมดพัฒนา (Development):

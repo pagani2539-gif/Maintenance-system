@@ -3,22 +3,30 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { LogIn, Wrench, User as UserIcon, Lock, AlertCircle } from 'lucide-react';
+import { LogIn, Wrench, User as UserIcon, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface LocationState {
   from?: { pathname: string };
 }
 
+const LAST_USERNAME_KEY = 'maintenance_last_username';
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => localStorage.getItem(LAST_USERNAME_KEY) || '');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const from = (location.state as LocationState | null)?.from?.pathname || '/';
+
+  const handlePasswordKeyEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLockOn(e.getModifierState?.('CapsLock') ?? false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +38,7 @@ const Login: React.FC = () => {
     setLoading(true);
     try {
       const user = await login(username.trim(), password);
+      localStorage.setItem(LAST_USERNAME_KEY, username.trim());
       if (user.force_password_change) {
         navigate('/change-password', { replace: true });
       } else {
@@ -37,8 +46,12 @@ const Login: React.FC = () => {
       }
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const message = (err as any)?.response?.data?.error || 'เข้าสู่ระบบไม่สำเร็จ';
-      setError(message);
+      const axiosErr = err as any;
+      if (axiosErr?.response) {
+        setError(axiosErr.response.data?.error || 'เข้าสู่ระบบไม่สำเร็จ');
+      } else {
+        setError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบว่าเซิร์ฟเวอร์กำลังทำงานอยู่ หรือลองรีเฟรชหน้านี้ใหม่');
+      }
     } finally {
       setLoading(false);
     }
@@ -69,11 +82,6 @@ const Login: React.FC = () => {
           66% { transform: translate(60px, -40px) scale(1.1); }
           100% { transform: translate(0px, 0px) scale(1); }
         }
-        @keyframes float-blob-3 {
-          0% { transform: translate(0px, 0px) scale(1); }
-          50% { transform: translate(30px, 30px) scale(1.05); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
         @keyframes login-fade-in {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
@@ -88,7 +96,11 @@ const Login: React.FC = () => {
         .bg-blob {
           position: absolute;
           border-radius: 50%;
-          filter: blur(120px);
+          /* Was blur(120px) with a 3rd blob: heavy compositing cost (blur
+             radius roughly scales quadratically) made this the slowest
+             render in the whole app. Dropped to 2 blobs at a lighter blur
+             for a similar glow with a fraction of the GPU cost. */
+          filter: blur(60px);
           pointer-events: none;
           z-index: 0;
         }
@@ -110,15 +122,6 @@ const Login: React.FC = () => {
           opacity: 0.12;
           animation: float-blob-2 15s infinite ease-in-out;
         }
-        .bg-blob-3 {
-          bottom: 25%;
-          left: 35%;
-          width: 280px;
-          height: 280px;
-          background: #3b82f6;
-          opacity: 0.08;
-          animation: float-blob-3 10s infinite ease-in-out;
-        }
         [data-theme='dark'] .bg-blob-1 {
           background: #0284c7;
           opacity: 0.08;
@@ -127,16 +130,11 @@ const Login: React.FC = () => {
           background: #0369a1;
           opacity: 0.08;
         }
-        [data-theme='dark'] .bg-blob-3 {
-          background: #1e3a8a;
-          opacity: 0.05;
-        }
       `}</style>
 
       {/* Floating Blobs */}
       <div className="bg-blob bg-blob-1" />
       <div className="bg-blob bg-blob-2" />
-      <div className="bg-blob bg-blob-3" />
 
       {/* Main Glassmorphic Form Card */}
       <div 
@@ -228,17 +226,60 @@ const Login: React.FC = () => {
               marginBottom: '6px', 
               color: 'var(--text-main)',
             }}>
-              <Lock size={14} color="var(--primary)" /> 
+              <Lock size={14} color="var(--primary)" />
               <span>รหัสผ่าน</span>
             </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="กรอกรหัสผ่านของคุณ"
-              autoComplete="current-password"
-              style={{ width: '100%' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyUp={handlePasswordKeyEvent}
+                onKeyDown={handlePasswordKeyEvent}
+                placeholder="กรอกรหัสผ่านของคุณ"
+                autoComplete="current-password"
+                style={{ width: '100%', paddingRight: '44px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                style={{
+                  position: 'absolute',
+                  right: '0px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  // 44x44 tap target (WCAG 2.5.5); absolute-positioned so it
+                  // doesn't shift the field layout. Icon stays visually centered.
+                  width: '44px',
+                  height: '44px',
+                  padding: '0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {capsLockOn && (
+              <span style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginTop: '6px',
+                fontSize: '0.76rem',
+                fontWeight: 600,
+                color: 'var(--warning, #d97706)',
+              }}>
+                <AlertCircle size={12} /> Caps Lock เปิดอยู่
+              </span>
+            )}
           </div>
 
           {error && (

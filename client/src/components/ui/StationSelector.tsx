@@ -18,6 +18,11 @@ interface StationSelectorProps {
   }) => void;
   required?: boolean;
   showArea?: boolean;
+  /** Accessible name for the search input; pages render their own visual
+   * <label> above this component (not wired via htmlFor, since the input
+   * lives inside this child component), so screen readers need this to
+   * announce what the field is for. */
+  ariaLabel?: string;
 }
 
 // provincesByRegion / allThailandProvinces / getRegionFromProvince / getProvincesForRegion
@@ -30,7 +35,8 @@ const StationSelector: React.FC<StationSelectorProps> = ({
   selectedAreaId,
   onChange,
   required = false,
-  showArea = false
+  showArea = false,
+  ariaLabel = 'ค้นหาด่าน/สถานี'
 }) => {
   const { notify } = useNotification();
   const [stations, setStations] = useState<Station[]>([]);
@@ -421,6 +427,8 @@ const StationSelector: React.FC<StationSelectorProps> = ({
               <input
                 type="text"
                 placeholder={`พิมพ์ค้นหาด่าน/สถานี (เช่น แม่ใจ, ทล.1)... ${required ? '*' : ''}`}
+                aria-label={ariaLabel}
+                aria-required={required || undefined}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);

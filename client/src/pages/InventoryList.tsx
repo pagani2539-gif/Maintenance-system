@@ -4,6 +4,7 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
 import { Input, TextArea } from '../components/ui/Input';
 import { formatDateTimeThai } from '../utils/formatDate';
@@ -34,7 +35,9 @@ import {
 } from 'lucide-react';
 import { exportToCsv } from '../utils/csvExporter';
 import { parseInventoryFile, type ParsedInventoryRow } from '../utils/excelImporter';
+import { getApiErrorMessage } from '../utils/apiError';
 import { compressImage } from '../utils/imageCompressor';
+import { getStockStatus, STOCK_STATUS_OPTIONS } from '../utils/stockStatus';
 import BaseDataTable from '../components/tables/BaseDataTable';
 import TableToolbar from '../components/tables/TableToolbar';
 import TablePagination from '../components/tables/TablePagination';
@@ -49,8 +52,7 @@ const InventoryList: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [formData, setFormData] = useState({
-    name: '', model: '', description: '', quantity: 0, min_stock: 10, requires_sn: 1, storage_location: '',
-    unit_price: 0, warranty_months: 36
+    name: '', model: '', description: '', quantity: 0, min_stock: 10, requires_sn: 1, storage_location: ''
   });
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -122,14 +124,8 @@ const InventoryList: React.FC = () => {
         const matches = item.name.toLowerCase().includes(s) || (item.model && item.model.toLowerCase().includes(s)) || (item.description && item.description.toLowerCase().includes(s)) || (item.storage_location && item.storage_location.toLowerCase().includes(s));
         if (!matches) return false;
       }
-      const quantity = item.quantity;
       if (urlState.filters.stockStatus && urlState.filters.stockStatus !== 'All') {
-        const status = urlState.filters.stockStatus;
-        if (status === 'หมดสต๊อก' && quantity >= 1) return false;
-        if (status === 'วิกฤต' && (quantity < 1 || quantity >= 10)) return false;
-        if (status === 'ใกล้หมด' && (quantity < 10 || quantity >= 20)) return false;
-        if (status === 'พร้อมใช้งาน' && quantity < 40) return false;
-        if (status === 'ปกติ' && (quantity < 20 || quantity >= 40)) return false;
+        if (getStockStatus(item.quantity, item.min_stock) !== urlState.filters.stockStatus) return false;
       }
       return true;
     }).sort((a, b) => b.id - a.id);
@@ -149,9 +145,7 @@ const InventoryList: React.FC = () => {
         quantity: item.quantity,
         min_stock: item.min_stock,
         requires_sn: item.requires_sn,
-        storage_location: item.storage_location || '',
-        unit_price: item.unit_price || 0,
-        warranty_months: item.warranty_months || 36
+        storage_location: item.storage_location || ''
       });
       setImagePreview(item.image_path ? `${UPLOAD_URL}/uploads/${item.image_path}` : null);
     } else {
@@ -163,9 +157,7 @@ const InventoryList: React.FC = () => {
         quantity: 0,
         min_stock: 10,
         requires_sn: 1,
-        storage_location: '',
-        unit_price: 0,
-        warranty_months: 36
+        storage_location: ''
       });
       setImagePreview(null);
     }
@@ -182,8 +174,6 @@ const InventoryList: React.FC = () => {
     payload.append('min_stock', String(Math.max(0, Number(formData.min_stock) || 0)));
     payload.append('requires_sn', String(formData.requires_sn));
     payload.append('storage_location', formData.storage_location.trim());
-    payload.append('unit_price', String(Math.max(0, Number(formData.unit_price) || 0)));
-    payload.append('warranty_months', String(Math.max(0, Number(formData.warranty_months) || 0)));
 
     if (selectedImage) {
       payload.append('image', selectedImage);
@@ -220,8 +210,7 @@ const InventoryList: React.FC = () => {
       await fetchData();
       refreshUnreadCounts();
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      notify(err.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+      notify(getApiErrorMessage(error, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     } finally {
       setSaving(false);
     }
@@ -279,8 +268,7 @@ const InventoryList: React.FC = () => {
       await fetchData();
       refreshUnreadCounts();
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      notify(err.response?.data?.message || 'เกิดข้อผิดพลาดในการนำเข้า', 'error');
+      notify(getApiErrorMessage(error, 'นำเข้าไม่สำเร็จ กรุณาตรวจสอบไฟล์แล้วลองใหม่'), 'error');
       setImportModal(prev => ({ ...prev, importing: false }));
     }
   };
@@ -346,21 +334,26 @@ const InventoryList: React.FC = () => {
     }
   };
 
-  const getStockStatusBadge = (quantity: number) => {
+  const getStockStatusBadge = (quantity: number, minStock: number) => {
     const badgeStyle = (bg: string, color: string, border: string): React.CSSProperties => ({
-      backgroundColor: bg, color: color, border: `1px solid ${border}`, padding: '4px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', width: '90px', justifyContent: 'center'
+      backgroundColor: bg, color: color, border: `1px solid ${border}`, padding: '4px 12px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 700, lineHeight: 1.4, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', minWidth: '88px', maxWidth: '100%', justifyContent: 'center'
     });
-    if (quantity < 1) return <span style={badgeStyle('#fee2e2', '#ef4444', '#fecaca')}>หมดสต๊อก</span>;
-    if (quantity < 10) return <span style={badgeStyle('#fee2e2', '#ef4444', '#fecaca')}>วิกฤต</span>;
-    if (quantity < 20) return <span style={badgeStyle('#fef3c7', '#d97706', '#fde68a')}>ใกล้หมด</span>;
-    if (quantity >= 40) return <span style={badgeStyle('#d1fae5', '#10b981', '#a7f3d0')}>พร้อมใช้งาน</span>;
-    return <span style={badgeStyle('#e0f7fa', '#29b6f6', '#b2ebf2')}>ปกติ</span>;
+    const status = getStockStatus(quantity, minStock);
+    switch (status) {
+      case 'หมดสต๊อก':
+      case 'วิกฤต':
+        return <span style={badgeStyle('#fee2e2', '#ef4444', '#fecaca')}>{status}</span>;
+      case 'ใกล้หมด':
+        return <span style={badgeStyle('#fef3c7', '#d97706', '#fde68a')}>{status}</span>;
+      case 'พร้อมใช้งาน':
+        return <span style={badgeStyle('#d1fae5', '#10b981', '#a7f3d0')}>{status}</span>;
+    }
   };
 
   const getStockAccent = (quantity: number, minStock: number): string => {
-    if (quantity < 1) return 'var(--danger)';
-    if (quantity < minStock) return 'var(--danger)';
-    if (quantity < minStock * 2) return 'var(--warning)';
+    const status = getStockStatus(quantity, minStock);
+    if (status === 'หมดสต๊อก' || status === 'วิกฤต') return 'var(--danger)';
+    if (status === 'ใกล้หมด') return 'var(--warning)';
     return 'var(--success)';
   };
 
@@ -378,7 +371,7 @@ const InventoryList: React.FC = () => {
       render: (val, row) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
           <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
-          {row.model && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{row.model}</span>}
+          {row.model && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{row.model}</span>}
         </div>
       )
     },
@@ -392,11 +385,11 @@ const InventoryList: React.FC = () => {
       id: 'sn_required', header: 'การติดตาม', accessor: 'requires_sn', priority: 2, width: '110px', align: 'center',
       render: (val) => (
         val === 1 ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 800 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 800 }}>
             <Tag size={11} /> S/N
           </span>
         ) : (
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>ไม่ติดตาม</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>ไม่ติดตาม</span>
         )
       )
     },
@@ -411,9 +404,9 @@ const InventoryList: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '4px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                 <span style={{ fontSize: '1.15rem', fontWeight: 800, color: accent, lineHeight: 1 }}>{val}</span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>ชิ้น</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>ชิ้น</span>
               </div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)' }}>min: {min}</span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>min: {min}</span>
             </div>
             <div className="qty-progress-track">
               <div className="qty-progress-fill" style={{ transform: `scaleX(${ratio / 100})`, background: accent }} />
@@ -423,8 +416,8 @@ const InventoryList: React.FC = () => {
       }
     },
     {
-      id: 'status', header: 'สถานะ', accessor: 'quantity', priority: 1, width: '110px', align: 'center',
-      render: (val) => getStockStatusBadge(val)
+      id: 'status', header: 'สถานะ', accessor: 'quantity', priority: 1, width: '130px', align: 'center',
+      render: (val, row) => getStockStatusBadge(val, row.min_stock)
     },
     {
       id: 'updated', header: 'อัปเดตล่าสุด', accessor: 'updated_at', priority: 3, width: '130px',
@@ -466,7 +459,7 @@ const InventoryList: React.FC = () => {
           <div>
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{item.name}</h3>
             <p style={{ margin: '4px 0', color: 'var(--text-muted)' }}>{item.model || 'ไม่ระบุรุ่น'}</p>
-            {getStockStatusBadge(item.quantity)}
+            {getStockStatusBadge(item.quantity, item.min_stock)}
           </div>
         </div>
 
@@ -475,7 +468,6 @@ const InventoryList: React.FC = () => {
           <Card style={{ padding: '1rem', backgroundColor: 'var(--bg-app)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
               <div><strong>ที่เก็บ:</strong> {item.storage_location || '-'}</div>
-              <div><strong>ระยะเวลาประกัน:</strong> {item.warranty_months !== undefined ? `${item.warranty_months} เดือน` : '—'}</div>
               <div><strong>จำนวนคงเหลือ:</strong> {item.quantity} ชิ้น (แจ้งเตือนที่ {item.min_stock} ชิ้น)</div>
               <div><strong>ประเภทการติดตาม:</strong> {item.requires_sn ? 'ต้องระบุหมายเลขเครื่อง (S/N)' : 'ไม่ระบุหมายเลขเครื่อง (S/N)'}</div>
               <div><strong>คำอธิบาย:</strong> {item.description || '-'}</div>
@@ -537,6 +529,7 @@ const InventoryList: React.FC = () => {
   return (
     <div className="inventory-page" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+        <BackButton />
         <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2rem' }}>
           <div className="page-title"><h2>จัดการอุปกรณ์และสต็อก</h2><p>เพิ่ม แก้ไข และติดตามจำนวนอุปกรณ์คงเหลือในระบบ</p></div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -556,19 +549,20 @@ const InventoryList: React.FC = () => {
 
       <div className="stats-grid boot-animate stagger-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         {stats && [
-          { label: 'อุปกรณ์ทั้งหมด', val: stats.total_items, icon: Boxes, status: 'All' },
-          { label: 'หมดสต๊อก', val: stats.critical, icon: XCircle, status: 'หมดสต๊อก' },
-          { label: 'ใกล้หมด', val: stats.warning, icon: Zap, status: 'ใกล้หมด' },
-          { label: 'พร้อมใช้งาน', val: stats.optimal, icon: Check, status: 'พร้อมใช้งาน' }
+          { label: 'อุปกรณ์ทั้งหมด', val: stats.total_items, icon: Boxes, status: 'All', color: 'var(--primary)' },
+          { label: 'หมดสต๊อก', val: stats.out_of_stock, icon: XCircle, status: 'หมดสต๊อก', color: 'var(--danger)' },
+          { label: 'วิกฤต', val: stats.critical, icon: AlertTriangle, status: 'วิกฤต', color: 'var(--danger)' },
+          { label: 'ใกล้หมด', val: stats.warning, icon: Zap, status: 'ใกล้หมด', color: 'var(--warning)' },
+          { label: 'พร้อมใช้งาน', val: stats.optimal, icon: Check, status: 'พร้อมใช้งาน', color: 'var(--success)' }
         ].map((s, i) => {
           let breatheClass = '';
           if (s.val && s.val > 0) {
-            if (s.status === 'หมดสต๊อก') breatheClass = 'led-breathe-danger';
+            if (s.status === 'หมดสต๊อก' || s.status === 'วิกฤต') breatheClass = 'led-breathe-danger';
             else if (s.status === 'ใกล้หมด') breatheClass = 'led-breathe-warning';
           }
           return (
             <Card key={i} className={breatheClass} onClick={() => setTableState({ filters: { stockStatus: s.status }, page: 1 })} style={{ cursor: 'pointer', borderColor: urlState.filters.stockStatus === s.status ? 'var(--primary)' : undefined }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><div className="stat-icon-wrapper" style={{ color: i === 0 ? 'var(--primary)' : i === 1 ? 'var(--danger)' : i === 2 ? 'var(--warning)' : i === 3 ? 'var(--success)' : undefined }}><s.icon size={22} /></div><div><div className="stat-value">{s.val || 0}</div><div className="stat-label">{s.label}</div></div></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><div className="stat-icon-wrapper" style={{ color: s.color }}><s.icon size={22} /></div><div><div className="stat-value">{s.val || 0}</div><div className="stat-label">{s.label}</div></div></div>
             </Card>
           );
         })}
@@ -578,7 +572,7 @@ const InventoryList: React.FC = () => {
         <TableToolbar
           searchValue={urlState.search}
           onSearchChange={(val) => setTableState({ search: val, page: 1 })}
-          filters={[{ id: 'stockStatus', label: 'สถานะ', type: 'select', options: [{ label: 'พร้อมใช้งาน', value: 'พร้อมใช้งาน' }, { label: 'ปกติ', value: 'ปกติ' }, { label: 'ใกล้หมด', value: 'ใกล้หมด' }, { label: 'วิกฤต', value: 'วิกฤต' }, { label: 'หมดสต๊อก', value: 'หมดสต๊อก' }] }]}
+          filters={[{ id: 'stockStatus', label: 'สถานะ', type: 'select', options: STOCK_STATUS_OPTIONS.map(v => ({ label: v, value: v })) }]}
           activeFilters={urlState.filters}
           onFilterChange={(f) => setTableState({ filters: f, page: 1 })}
           onReset={() => setTableState({ search: '', filters: {}, page: 1 })}
@@ -589,6 +583,11 @@ const InventoryList: React.FC = () => {
           columns={columns}
           data={paginatedData}
           state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
+          totalCount={items?.length ?? 0}
+          emptyState={{
+            noData: { message: 'ยังไม่มีอุปกรณ์ในคลัง', hint: 'กด "เพิ่มอุปกรณ์ใหม่" หรือ "นำเข้า Excel" เพื่อเริ่มต้น' },
+            noResults: { message: 'ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
+          }}
           actions={actions}
           onRetry={fetchData}
           drawerTitle={(item) => item.name}
@@ -597,7 +596,7 @@ const InventoryList: React.FC = () => {
           mobileConfig={{
             title: (r) => r.name,
             subtitle: (r) => `${r.model || '-'} · ${r.storage_location || 'ไม่ระบุที่เก็บ'}`,
-            statusBadge: (r) => getStockStatusBadge(r.quantity)
+            statusBadge: (r) => getStockStatusBadge(r.quantity, r.min_stock)
           }}
           onRowClick={(item) => setSelectedHistoryItemId(item.id)}
         />
@@ -655,7 +654,7 @@ const InventoryList: React.FC = () => {
                         <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>
                           คลิกเพื่อเลือกรูปอุปกรณ์
                         </div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                           รองรับไฟล์ JPG, PNG
                         </div>
                       </div>
@@ -709,16 +708,6 @@ const InventoryList: React.FC = () => {
                   </label>
                 </div>
               </div>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <Input
-                  label="ระยะเวลาประกัน (เดือน)"
-                  type="number"
-                  min={0}
-                  value={formData.warranty_months}
-                  onChange={e => setFormData({ ...formData, warranty_months: Number(e.target.value) })}
-                  disabled={saving}
-                />
-              </div>
               <TextArea
                 label="รายละเอียดเพิ่มเติม"
                 value={formData.description}
@@ -762,7 +751,7 @@ const InventoryList: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-app)', zIndex: 1 }}>
                   <tr>
-                    {['ชื่ออุปกรณ์', 'รุ่น/แบรนด์', 'ที่เก็บ', 'จำนวน', 'ขั้นต่ำ', 'S/N', 'ประกัน (เดือน)'].map(h => (
+                    {['ชื่ออุปกรณ์', 'รุ่น/แบรนด์', 'ที่เก็บ', 'จำนวน', 'ขั้นต่ำ', 'S/N'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 800, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -776,7 +765,6 @@ const InventoryList: React.FC = () => {
                       <td style={{ padding: '8px 12px' }}>{row.quantity}</td>
                       <td style={{ padding: '8px 12px' }}>{row.min_stock}</td>
                       <td style={{ padding: '8px 12px' }}>{row.requires_sn ? 'ใช่' : 'ไม่'}</td>
-                      <td style={{ padding: '8px 12px' }}>{row.warranty_months !== undefined ? `${row.warranty_months} ด.` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

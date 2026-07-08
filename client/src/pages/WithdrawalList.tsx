@@ -4,6 +4,7 @@ import { useNotification } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { Button } from '../components/ui/Button';
+import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
 import { formatDateTimeThai } from '../utils/formatDate';
 import {
@@ -19,6 +20,7 @@ import {
   Package,
   Tag,
   AlertTriangle,
+  Wrench,
   X,
   Download
 } from 'lucide-react';
@@ -34,6 +36,7 @@ import BaseDataTable from '../components/tables/BaseDataTable';
 import TableToolbar from '../components/tables/TableToolbar';
 import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
+import { getApiErrorMessage } from '../utils/apiError';
 
 const WithdrawalList: React.FC = () => {
   const { notify, confirm } = useNotification();
@@ -134,6 +137,16 @@ const WithdrawalList: React.FC = () => {
     return Array.from(types).map(t => ({ label: t, value: t }));
   }, [withdrawals]);
 
+  const stats = useMemo(() => {
+    const list = withdrawals || [];
+    return {
+      total: list.length,
+      install: list.filter(w => w.type === 'ติดตั้งใหม่').length,
+      repair: list.filter(w => w.type === 'ซ่อมแซม').length,
+      missingSn: list.filter(w => (w.items_missing_sn || 0) > 0).length
+    };
+  }, [withdrawals]);
+
   const handlePrint = useCallback(async (wId: number) => {
     setIsPrintLoading(wId);
     try {
@@ -159,7 +172,7 @@ const WithdrawalList: React.FC = () => {
   const handleDelete = async (id: number) => {
     const isConfirmed = await confirm({
       title: 'ยืนยันการลบประวัติการเบิก',
-      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนสต็อกอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ',
+      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนสต็อกอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ\nการลบประวัตินี้ไม่สามารถย้อนกลับได้',
       variant: 'danger'
     });
     if (!isConfirmed) return;
@@ -167,8 +180,8 @@ const WithdrawalList: React.FC = () => {
       await withdrawalApi.delete(id);
       notify('ลบประวัติและคืนสต็อกเรียบร้อยแล้ว');
       fetchWithdrawals();
-    } catch {
-      notify('เกิดข้อผิดพลาดในการลบข้อมูล', 'error');
+    } catch (err) {
+      notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
     }
   };
 
@@ -566,6 +579,7 @@ const WithdrawalList: React.FC = () => {
   return (
     <div className="withdrawal-list-page" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+        <BackButton />
         <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2.5rem' }}>
           <div className="page-title">
             <h2>ประวัติการเบิกอุปกรณ์</h2>
@@ -579,6 +593,33 @@ const WithdrawalList: React.FC = () => {
               </Button>
             </Link>
           </div>
+        </div>
+
+        <div className="stats-grid boot-animate stagger-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          {[
+            { id: 'all', label: 'ใบเบิกทั้งหมด', val: stats.total, icon: Boxes, color: 'var(--primary)', type: undefined, snStatus: undefined },
+            { id: 'install', label: 'ติดตั้งใหม่', val: stats.install, icon: Tag, color: 'var(--primary)', type: 'ติดตั้งใหม่', snStatus: undefined },
+            { id: 'repair', label: 'ซ่อมแซม', val: stats.repair, icon: Wrench, color: 'var(--warning)', type: 'ซ่อมแซม', snStatus: undefined },
+            { id: 'missing_sn', label: 'รอระบุ S/N', val: stats.missingSn, icon: AlertTriangle, color: 'var(--danger)', type: undefined, snStatus: 'missing' }
+          ].map((s) => (
+            <Card
+              key={s.id}
+              className={s.id === 'missing_sn' && s.val > 0 ? 'led-breathe-danger' : ''}
+              onClick={() => setTableState({ filters: s.id === 'all' ? {} : { type: s.type, sn_status: s.snStatus }, page: 1 })}
+              style={{
+                cursor: 'pointer',
+                borderColor: (s.id === 'all' && !urlState.filters.type && !urlState.filters.sn_status)
+                  || urlState.filters.type === s.type
+                  || (s.snStatus && urlState.filters.sn_status === s.snStatus)
+                  ? 'var(--primary)' : undefined
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div className="stat-icon-wrapper" style={{ color: s.color }}><s.icon size={24} /></div>
+                <div><div className="stat-value">{s.val}</div><div className="stat-label">{s.label}</div></div>
+              </div>
+            </Card>
+          ))}
         </div>
 
         <div className="boot-animate stagger-1">
@@ -599,6 +640,11 @@ const WithdrawalList: React.FC = () => {
               loading,
               error: error?.message || null,
               empty: !loading && paginatedData.length === 0
+            }}
+            totalCount={withdrawals?.length ?? 0}
+            emptyState={{
+              noData: { message: 'ยังไม่มีรายการเบิกในระบบ', hint: 'กด "ทำการเบิกใหม่" เพื่อสร้างใบเบิกแรก' },
+              noResults: { message: 'ไม่พบใบเบิกที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
             }}
             actions={actions}
             onRetry={fetchWithdrawals}
@@ -636,11 +682,11 @@ const WithdrawalList: React.FC = () => {
           templateId="pdf-withdrawal-template"
           docTitle={`ใบเบิกอุปกรณ์ - WD-${printingWithdrawal.id.toString().padStart(6, '0')}`}
           onBeforePrint={handleBeforePrint}
-          renderTemplate={(companyId, logoId) => (
+          renderTemplate={(company, logo) => (
             <PrintWithdrawalTemplate
               withdrawal={printingWithdrawal}
-              companyId={companyId}
-              logoId={logoId}
+              company={company}
+              logo={logo}
             />
           )}
         />

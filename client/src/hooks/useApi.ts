@@ -22,11 +22,15 @@ export function useApi<T, Args extends unknown[] = unknown[]>(
         setData(result);
         return result;
       } catch (err: unknown) {
-        const errorObj = err instanceof Error ? err : new Error(
-          typeof err === 'object' && err !== null && 'response' in err
-            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message || (err as { message?: string }).message
-            : 'API request failed'
-        );
+        const resData = typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { data?: { message?: string; error?: string } } }).response?.data
+          : undefined;
+        const backendMsg = resData?.message || resData?.error;
+        const errorObj = backendMsg
+          ? new Error(backendMsg)
+          : err instanceof Error
+            ? err
+            : new Error('API request failed');
         setError(errorObj);
         throw errorObj;
       } finally {

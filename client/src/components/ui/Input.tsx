@@ -86,10 +86,15 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const generatedId = React.useId();
   const inputId = id || generatedId;
+  const labelId = `${inputId}-label`;
+  const listboxId = `${inputId}-listbox`;
+  const getOptionId = (index: number) => `${inputId}-option-${index}`;
 
   // Extract options from children if children are passed (e.g. <option>)
   const parsedOptions = React.useMemo(() => {
@@ -175,16 +180,83 @@ export const Select: React.FC<SelectProps> = ({
       return parsedOptions;
     }
     const query = searchText.toLowerCase();
-    return parsedOptions.filter(opt => 
-      opt.label.toLowerCase().includes(query) || 
+    return parsedOptions.filter(opt =>
+      opt.label.toLowerCase().includes(query) ||
       opt.value.toString().toLowerCase().includes(query)
     );
   }, [parsedOptions, searchText, isOpen, isSearchable]);
 
+  // Keep the keyboard-highlighted row in range whenever the list changes
+  // (opening the dropdown, typing a search query) so arrow keys always land
+  // on a real option instead of a stale index. Adjusted during render rather
+  // than in an effect (React's "adjusting state when a prop changes"
+  // pattern) so it doesn't trigger an extra commit-then-effect render.
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  const [prevSearchText, setPrevSearchText] = useState(searchText);
+  if (isOpen !== prevIsOpen || searchText !== prevSearchText) {
+    setPrevIsOpen(isOpen);
+    setPrevSearchText(searchText);
+    if (isOpen) {
+      const selectedIdx = filteredOptions.findIndex(opt => opt.value?.toString() === value?.toString());
+      setActiveIndex(selectedIdx >= 0 ? selectedIdx : 0);
+    }
+  }
+
+  const moveActive = (delta: number) => {
+    if (filteredOptions.length === 0) return;
+    setActiveIndex(prev => {
+      let next = prev;
+      for (let step = 0; step < filteredOptions.length; step++) {
+        next = (next + delta + filteredOptions.length) % filteredOptions.length;
+        if (!filteredOptions[next]?.disabled) break;
+      }
+      return next;
+    });
+  };
+
+  // Full keyboard support for the combobox trigger: Enter/Space opens or
+  // confirms, arrows move the highlight, Escape closes. Previously this
+  // dropdown had no keyboard handling at all, so it could only be opened
+  // and chosen from with a mouse.
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (!isOpen) {
+          handleOpen();
+        } else {
+          const opt = filteredOptions[activeIndex];
+          if (opt && !opt.disabled) handleSelect(opt.value, opt.label);
+        }
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!isOpen) handleOpen(); else moveActive(1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (!isOpen) handleOpen(); else moveActive(-1);
+        break;
+      case 'Escape':
+        if (isOpen) {
+          e.preventDefault();
+          setIsOpen(false);
+        }
+        break;
+      case 'Tab':
+        setIsOpen(false);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div className="form-group" style={{ ...style }}>
       {label && (
-        <label htmlFor={inputId}>
+        <label id={labelId} htmlFor={inputId}>
           {label} {required && <span style={{ color: 'var(--danger)' }}>*</span>}
         </label>
       )}
@@ -210,7 +282,16 @@ export const Select: React.FC<SelectProps> = ({
               value={isOpen ? searchText : (displayLabel === 'ทั้งหมด' ? 'ทั้งหมด' : displayLabel)}
               onChange={handleInputChange}
               onFocus={handleOpen}
+              onKeyDown={handleTriggerKeyDown}
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-haspopup="listbox"
+              aria-controls={listboxId}
+              aria-activedescendant={isOpen && filteredOptions[activeIndex] ? getOptionId(activeIndex) : undefined}
+              aria-labelledby={label ? labelId : undefined}
+              autoComplete="off"
               placeholder={placeholder || 'เลือกหรือพิมพ์ค้นหา...'}
+              className="select-trigger"
               style={{
                 width: '100%',
                 padding: '12px 36px 12px 16px',
@@ -223,15 +304,24 @@ export const Select: React.FC<SelectProps> = ({
                 color: 'var(--text-main)',
                 opacity: disabled ? 0.6 : 1,
                 boxSizing: 'border-box',
-                outline: 'none',
                 transition: 'border-color 0.2s',
                 ...triggerStyle
               }}
             />
           ) : (
             <div
+              ref={triggerRef}
               id={inputId}
               onClick={() => !disabled && setIsOpen(!isOpen)}
+              onKeyDown={handleTriggerKeyDown}
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-haspopup="listbox"
+              aria-controls={listboxId}
+              aria-activedescendant={isOpen && filteredOptions[activeIndex] ? getOptionId(activeIndex) : undefined}
+              aria-labelledby={label ? labelId : undefined}
+              tabIndex={disabled ? -1 : 0}
+              className="select-trigger"
               style={{
                 padding: '12px 16px',
                 background: 'var(--bg-card)',
@@ -264,6 +354,8 @@ export const Select: React.FC<SelectProps> = ({
                 handleOpen();
                 if (isSearchable) {
                   setTimeout(() => inputRef.current?.focus(), 50);
+                } else {
+                  setTimeout(() => triggerRef.current?.focus(), 50);
                 }
               }
             }}
@@ -279,7 +371,10 @@ export const Select: React.FC<SelectProps> = ({
         </div>
 
         {isOpen && (
-          <div 
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-labelledby={label ? labelId : undefined}
             style={{
               position: 'absolute',
               top: '110%',
@@ -304,15 +399,22 @@ export const Select: React.FC<SelectProps> = ({
             ) : (
               filteredOptions.map((opt, index) => {
                 const isSelected = opt.value?.toString() === value?.toString();
+                const isActive = index === activeIndex;
                 return (
                   <div
                     key={opt.value}
+                    id={getOptionId(index)}
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={opt.disabled || undefined}
                     onClick={() => !opt.disabled && handleSelect(opt.value, opt.label)}
+                    onMouseEnter={() => setActiveIndex(index)}
                     style={{
                       padding: '10px 16px',
                       cursor: opt.disabled ? 'not-allowed' : 'pointer',
                       fontSize: '0.85rem',
                       color: opt.disabled ? 'var(--text-muted)' : (isSelected ? 'var(--primary)' : 'var(--text-main)'),
+                      background: isActive ? 'var(--primary-light)' : 'transparent',
                       borderBottom: index === filteredOptions.length - 1 ? 'none' : '1px solid var(--border)',
                       transition: 'background 0.2s',
                       opacity: opt.disabled ? 0.5 : 1,

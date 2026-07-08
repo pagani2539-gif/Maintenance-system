@@ -31,6 +31,17 @@ interface BaseDataTableProps<T> {
   drawerTitle?: string | ((row: T) => string);
   renderDetailDrawer?: (row: T) => React.ReactNode;
   getRowAccent?: (row: T) => string | undefined;
+  /**
+   * Context-aware empty state. When provided, the table distinguishes between
+   * "no data exists yet" (noData — nudge the user to create the first record) and
+   * "data exists but the current search/filter matched nothing" (noResults).
+   * Pass `totalCount` (unfiltered row count) so the table can pick the right variant.
+   */
+  emptyState?: {
+    noData: { message: string; hint?: string };
+    noResults: { message: string; hint?: string };
+  };
+  totalCount?: number;
 }
 
 function BaseDataTable<T>({
@@ -47,11 +58,19 @@ function BaseDataTable<T>({
   minWidth = '1100px',
   drawerTitle = 'รายละเอียด',
   renderDetailDrawer,
-  getRowAccent
+  getRowAccent,
+  emptyState,
+  totalCount
 }: BaseDataTableProps<T>) {
   const breakpoint = useBreakpoint();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const renderEmptyState = () => {
+    if (!emptyState) return <TableEmptyState />;
+    const cfg = (totalCount ?? 0) === 0 ? emptyState.noData : emptyState.noResults;
+    return <TableEmptyState message={cfg.message} hint={cfg.hint} />;
+  };
 
   const visibleColumns = useMemo(() => {
     return columns.filter(col => {
@@ -88,10 +107,10 @@ function BaseDataTable<T>({
   if (breakpoint === 'mobile') {
     if (state.loading) return <TableSkeleton columns={1} rows={4} />;
     if (state.error) return <TableErrorState message={state.error} onRetry={onRetry} />;
-    if (state.empty) return <TableEmptyState />;
+    if (state.empty) return renderEmptyState();
     return (
       <>
-        <BaseCardList 
+        <BaseCardList
           data={data} 
           config={mobileConfig} 
           actions={actions} 
@@ -112,7 +131,7 @@ function BaseDataTable<T>({
 
   if (state.loading) return <TableSkeleton columns={visibleColumns.length} rows={6} />;
   if (state.error) return <TableErrorState message={state.error} onRetry={onRetry} />;
-  if (state.empty) return <TableEmptyState />;
+  if (state.empty) return renderEmptyState();
 
   const handleSort = (colId: string) => {
     if (!onSort) return;

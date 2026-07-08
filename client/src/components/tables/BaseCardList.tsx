@@ -65,7 +65,7 @@ function BaseCardList<T>({
                 onRowClick?.(row);
               }}
               icon={<Eye size={16} />}
-              style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}
+              style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', minHeight: '44px' }}
             >
               ดูรายละเอียด
             </Button>

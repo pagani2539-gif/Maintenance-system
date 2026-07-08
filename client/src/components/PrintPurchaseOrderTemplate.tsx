@@ -1,6 +1,5 @@
 import React from 'react';
-import type { PurchaseOrder, PurchaseOrderItem } from '../types';
-import { useCompanyData } from '../hooks/useCompanyData';
+import type { PurchaseOrder, PurchaseOrderItem, Company, CompanyLogo } from '../types';
 import { pdfTheme } from './pdf/pdfTheme';
 import PdfPage from './pdf/PdfPage';
 import PdfHeader from './pdf/PdfHeader';
@@ -12,8 +11,8 @@ import PdfSignatureBlock from './pdf/PdfSignatureBlock';
 interface Props {
   po: PurchaseOrder;
   isPreview?: boolean;
-  companyId?: number | null;
-  logoId?: number | null;
+  company?: Company | null;
+  logo?: CompanyLogo | null;
 }
 
 const parseDate = (dateStr?: string): Date => {
@@ -108,9 +107,7 @@ const chunkItems = (items: PurchaseOrderItem[]): PurchaseOrderItem[][] => {
   return pages;
 };
 
-const PrintPurchaseOrderTemplate: React.FC<Props> = ({ po, isPreview, companyId, logoId }) => {
-  const { company, logo } = useCompanyData(companyId ?? null, logoId ?? null);
-
+const PrintPurchaseOrderTemplate: React.FC<Props> = ({ po, isPreview, company = null, logo = null }) => {
   const docNumber = po.po_no || `PO-${String(po.id || 0).padStart(6, '0')}`;
   const docDate = formatDateThai(parseDate(po.created_at));
   const printedAt = formatDateTimeThai(new Date());

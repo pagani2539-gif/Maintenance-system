@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { UPLOAD_URL } from '../api';
-import { useCompanyData } from '../hooks/useCompanyData';
+import type { Company, CompanyLogo } from '../types';
 import { pdfTheme } from './pdf/pdfTheme';
 import PdfPage from './pdf/PdfPage';
 import PdfHeader from './pdf/PdfHeader';
@@ -13,8 +13,8 @@ import PdfSignatureBlock from './pdf/PdfSignatureBlock';
 interface Props {
   withdrawal: any;
   isPreview?: boolean;
-  companyId?: number | null;
-  logoId?: number | null;
+  company?: Company | null;
+  logo?: CompanyLogo | null;
 }
 
 interface NormalizedItem {
@@ -137,9 +137,7 @@ const chunkItems = (items: NormalizedItem[]): NormalizedItem[][] => {
   return pages;
 };
 
-const PrintWithdrawalTemplate: React.FC<Props> = ({ withdrawal, isPreview, companyId, logoId }) => {
-  const { company, logo } = useCompanyData(companyId ?? null, logoId ?? null);
-
+const PrintWithdrawalTemplate: React.FC<Props> = ({ withdrawal, isPreview, company = null, logo = null }) => {
   const docNumber = `WD-${String(withdrawal.id || 0).padStart(6, '0')}`;
   const docDate = formatDateThai(parseDate(withdrawal.created_at));
   const printedAt = formatDateTimeThai(new Date());

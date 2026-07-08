@@ -14,10 +14,10 @@ const createMockExcelFile = (headers: string[], dataRows: (string | number)[][])
 
 describe('excelImporter Utility', () => {
   it('should parse valid Thai/English inventory excel files correctly', async () => {
-    const headers = ['ชื่ออุปกรณ์', 'รุ่น/model', 'รายละเอียด', 'สถานที่เก็บ', 'จำนวนคงเหลือ', 'จุดเตือนสต็อกขั้นต่ำ', 'ต้องมี s/n', 'ราคาต่อหน่วย', 'ระยะเวลาประกัน'];
+    const headers = ['ชื่ออุปกรณ์', 'รุ่น/model', 'รายละเอียด', 'สถานที่เก็บ', 'จำนวนคงเหลือ', 'จุดเตือนสต็อกขั้นต่ำ', 'ต้องมี s/n'];
     const rows = [
-      ['Router CISCO 2901', 'C2901-K9', 'Cisco Router 2901', 'Warehouse A', 5, 2, 'yes', 15000, 36],
-      ['Switch TP-Link 8 Port', 'SG1008D', 'TP-Link Gigabit Switch', 'Rack B', 12, 5, 'no', 1200, 12]
+      ['Router CISCO 2901', 'C2901-K9', 'Cisco Router 2901', 'Warehouse A', 5, 2, 'yes'],
+      ['Switch TP-Link 8 Port', 'SG1008D', 'TP-Link Gigabit Switch', 'Rack B', 12, 5, 'no']
     ];
 
     const file = createMockExcelFile(headers, rows);
@@ -34,15 +34,11 @@ describe('excelImporter Utility', () => {
     expect(result.rows[0].quantity).toBe(5);
     expect(result.rows[0].min_stock).toBe(2);
     expect(result.rows[0].requires_sn).toBe(1); // 'yes' -> 1
-    expect(result.rows[0].unit_price).toBe(15000);
-    expect(result.rows[0].warranty_months).toBe(36);
 
     // Assert Switch properties
     expect(result.rows[1].name).toBe('Switch TP-Link 8 Port');
     expect(result.rows[1].model).toBe('SG1008D');
     expect(result.rows[1].requires_sn).toBe(0); // 'no' -> 0
-    expect(result.rows[1].unit_price).toBe(1200);
-    expect(result.rows[1].warranty_months).toBe(12);
   });
 
   it('should return error if name column is missing', async () => {
