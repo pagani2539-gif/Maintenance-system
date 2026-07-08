@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Wrench, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import Card from '../ui/Card';
-import { timeAgo, ScopeBadge } from './common';
+import { ScopeBadge } from './common';
+import { timeAgo } from './dashboardUtils';
 import type { DashboardData, RepairLog, InventoryTransaction } from '../../types';
 
 interface ActivityFeedProps {

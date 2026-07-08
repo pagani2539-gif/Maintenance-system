@@ -15,7 +15,8 @@ import {
 } from 'recharts';
 import Card from '../ui/Card';
 import Counter from '../ui/Counter';
-import { chartTooltipStyle, ScopeBadge } from './common';
+import { ScopeBadge } from './common';
+import { chartTooltipStyle } from './dashboardUtils';
 import type { DashboardData } from '../../types';
 
 interface RepairChartsProps {

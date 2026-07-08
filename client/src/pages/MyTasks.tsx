@@ -89,6 +89,7 @@ const MyTasks: React.FC = () => {
   }, [myName, notify]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional fetch-on-mount pattern
     fetchAll();
   }, [fetchAll]);
 

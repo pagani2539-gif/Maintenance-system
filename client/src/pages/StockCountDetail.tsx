@@ -65,6 +65,7 @@ const StockCountDetail: React.FC = () => {
   }, [id, notify]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional fetch-on-mount pattern
     fetchDetail();
   }, [fetchDetail]);
 

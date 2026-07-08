@@ -51,6 +51,7 @@ const StockCountList: React.FC = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional fetch-on-mount pattern
     fetchCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -12,7 +12,8 @@ import {
   Legend
 } from 'recharts';
 import Card from '../ui/Card';
-import { chartTooltipStyle, ScopeBadge } from './common';
+import { ScopeBadge } from './common';
+import { chartTooltipStyle } from './dashboardUtils';
 import type { DashboardData } from '../../types';
 
 interface InventoryChartsProps {

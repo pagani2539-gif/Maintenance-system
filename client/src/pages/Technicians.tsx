@@ -37,6 +37,7 @@ const Technicians: React.FC = () => {
   }, [notify]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional fetch-on-mount pattern
     load();
     userApi.list().then(setUsers).catch(() => { /* linking is optional */ });
   }, [load]);

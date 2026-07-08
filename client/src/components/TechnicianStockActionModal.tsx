@@ -71,6 +71,7 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
   }, [presetTechnicianId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clear form state when modal opens
     if (isOpen) resetAll();
   }, [isOpen, resetAll]);
 
@@ -84,6 +85,7 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
 
   // Load this technician's holdings (INSTALL / RETURN modes)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clear stale holdings before refetch
     if (!isOpen || mode === 'load' || !technicianId) { setHoldings(null); return; }
     technicianStockApi.getHoldings(technicianId)
       .then(setHoldings)
