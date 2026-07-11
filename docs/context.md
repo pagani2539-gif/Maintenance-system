@@ -37,10 +37,10 @@ Maintains a detailed audit trail of all inventory movement categories (Inbound, 
 
 ## Utility Context
 
-### PDF Generation
-The system utilizes a combination of `html2canvas` and `jspdf`.
-- **Logic**: It renders a hidden React component (the template), captures it as an image via `html2canvas`, and then inserts that image into a `jspdf` document. This ensures the PDF looks exactly like the designed UI template.
-- **Location**: `client/src/utils/pdfGenerator.ts` and associated template components in `client/src/components/`.
+### Document Printing
+The system renders hidden React print templates and opens the browser print dialog.
+- **Logic**: `PrintDialog` mounts the selected template, then `printElement` opens a print-ready document window. Users can print directly or save as PDF through the browser.
+- **Location**: `client/src/components/PrintDialog.tsx`, `client/src/utils/pdfGenerator.ts`, and associated template components in `client/src/components/`.
 
 ### File Management
 Uploaded images are stored in `server/uploads/` and served statically.

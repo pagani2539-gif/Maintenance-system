@@ -25,8 +25,8 @@ This document provides instructions and context for AI agents (like Gemini CLI) 
 ### 3. Testing & Validation
 - Run `npm run lint` in the `client` directory after making frontend changes.
 - Ensure the server starts without errors (`node index.js`) after backend modifications.
-- Verify that PDF generation still works after any changes to `utils/pdfGenerator.ts` or print templates.
+- Verify that document printing still works after any changes to `utils/pdfGenerator.ts` or print templates.
 
 ## Contextual Knowledge
-- The system uses a specific PDF generation pattern (React Template -> html2canvas -> jspdf). Be cautious when modifying CSS in print templates as it directly affects PDF output.
+- The system uses browser printing with React templates (`PrintDialog` -> `printElement` -> browser print dialog). Be cautious when modifying CSS in print templates as it directly affects printed output.
 - Database migrations run automatically on server startup from `server/database/migrations-pg/` (PostgreSQL). Check these before suggesting schema changes.

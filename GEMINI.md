@@ -22,7 +22,7 @@ The system follows a Client-Server model.
 - **Routing**: React Router 7
 - **Styling**: Vanilla CSS (Responsive)
 - **Visualization**: Recharts
-- **PDF Generation**: `jspdf` + `html2canvas` (renders hidden React templates)
+- **Document Printing**: React print templates rendered through the browser print dialog
 - **Icons**: Lucide React
 
 ### Backend
@@ -73,7 +73,7 @@ The system follows a Client-Server model.
   - Hooks/Utils: `camelCase`.
   - DB Columns: `snake_case`.
 - **Error Handling**: Use the centralized error handler in the backend (`server/middlewares/errorHandler.js`).
-- **PDF Generation**: Follow the established pattern: React Template -> `html2canvas` -> `jspdf`.
+- **Document Printing**: Use the shared React print templates with `PrintDialog` and the browser print dialog.
 - **Task Tracking**: Update `TASKS.md` when completing features or fixing bugs.
 - **Migrations**: Database schema changes should be handled via migration scripts (e.g., `server/database/migrations/`).
 

@@ -13,7 +13,7 @@ A comprehensive full-stack web application for managing device repairs, equipmen
 - **Routing**: React Router 7
 - **Data Visualization**: Recharts
 - **Icons**: Lucide React
-- **PDF Generation**: `jspdf` & `html2canvas` (Template-based rendering)
+- **Document Printing**: React print templates via the browser print dialog
 
 ### Backend
 - **Runtime**: Node.js & Express
