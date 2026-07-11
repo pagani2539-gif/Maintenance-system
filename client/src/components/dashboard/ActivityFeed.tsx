@@ -22,13 +22,22 @@ interface PulseEvent {
   color: string;
 }
 
+const formatRepairAction = (action: string): string => {
+  const normalized = String(action || '').trim();
+  if (!normalized) return 'มีการอัปเดตงาน';
+  // Some legacy log rows contain replacement characters instead of the Thai
+  // status text. Keep the activity useful without exposing unreadable output.
+  if (/\?{2,}/.test(normalized)) return 'อัปเดตสถานะงาน';
+  return normalized;
+};
+
 /** Zone 7 — กิจกรรมล่าสุด: รวม log งานซ่อม + ธุรกรรมสต็อกเป็นฟีดเดียว */
 const ActivityFeed: React.FC<ActivityFeedProps> = ({ recentLogs, recentTransactions, filterActive }) => {
   const operationalPulse = useMemo<PulseEvent[]>(() => {
     const repairEvents = (recentLogs || []).map((log: RepairLog & { ticket_no: string; device_name: string }) => ({
       id: `rep-${log.id}`,
       title: log.ticket_no,
-      subtitle: `${log.device_name} · ${log.action}`,
+      subtitle: `${log.device_name} · ${formatRepairAction(log.action)}`,
       user: log.user,
       time: log.created_at,
       icon: <Wrench size={14} />,

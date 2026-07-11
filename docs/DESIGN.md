@@ -95,20 +95,20 @@ The color palette centers on a primary sky-blue accent combined with clean neutr
 
 ## 3. Typography
 
-**Display Font:** Outfit (Latin headings)
+**Display Font:** Bai Jamjuree (headings, labels, numbers, and short Latin text)
 **Body Font:** Sarabun (Thai and Latin body text)
 
-The system pairs the geometric, tech-forward Outfit typeface for numbers, labels, and Latin headings, with the highly legible, formal Sarabun typeface for Thai descriptions, notes, and general table copy.
+The system pairs the structured, technical Bai Jamjuree typeface for headings, labels, numbers, and short Latin text with the highly legible, formal Sarabun typeface for Thai descriptions, notes, and general table copy.
 
 ### Hierarchy
-- **Display Heading** (Outfit, Bold, 2.25rem (36px), 1.2): Used for main dashboard titles and primary page-level headings.
-- **Section Title** (Outfit, Semi-Bold, 1.5rem (24px), 1.3): Used for cards headers, transaction segments, and major modal headers.
-- **Sub-header** (Outfit, Medium, 1.1rem (17.6px), 1.4): Used for secondary labels, KPI subheadings, and descriptive field groupings.
+- **Display Heading** (Bai Jamjuree, Bold, 2.25rem (36px), 1.2): Used for main dashboard titles and primary page-level headings.
+- **Section Title** (Bai Jamjuree, Semi-Bold, 1.5rem (24px), 1.3): Used for cards headers, transaction segments, and major modal headers.
+- **Sub-header** (Bai Jamjuree, Medium, 1.1rem (17.6px), 1.4): Used for secondary labels, KPI subheadings, and descriptive field groupings.
 - **Body Copy** (Sarabun, Regular, 0.95rem (15.2px), 1.6): Used for descriptive note fields, table text, and descriptive listings. Line lengths are constrained to ≤75ch for optimal reading.
-- **Interactive Label** (Outfit, Bold, 0.85rem (13.6px), 1.2, uppercase): Used for navigation links, secondary button headers, and status badges.
+- **Interactive Label** (Bai Jamjuree, Bold, 0.85rem (13.6px), 1.2): Used for navigation links, secondary button headers, and status badges.
 
 ### Named Rules
-**The Dual-Font Rule.** Any page displaying mixed language must prioritize Outfit for numbers/Latin terms and Sarabun for Thai body text to maintain aesthetic polish and high legibility.
+**The Dual-Font Rule.** Any page displaying mixed language must prioritize Bai Jamjuree for headings, numbers, and short Latin terms, while using Sarabun for Thai body text to maintain visual cohesion and high legibility.
 
 ## 4. Elevation
 
@@ -149,7 +149,7 @@ The system uses a subtle, layered depth model where surfaces are flat at rest an
 ### Do:
 - **Do** wrap notes and long text using `white-space: normal` and `word-break: break-word` inside tables to avoid truncation.
 - **Do** align numerical values and action headers to the right of data tables to maintain structured tracking.
-- **Do** use Outfit for Latin characters, numbers, and KPI stats, while using Sarabun for Thai translations and notes.
+- **Do** use Bai Jamjuree for headings, Latin characters, numbers, and KPI stats, while using Sarabun for Thai descriptions and notes.
 - **Do** use responsive grids with `repeat(auto-fit, minmax(280px, 1fr))` for fluid layouts without rigid media queries.
 
 ### Don't:

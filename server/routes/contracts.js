@@ -5,8 +5,8 @@ const { requirePermission } = require('../middlewares/auth');
 
 // Routes
 router.get('/', contractController.getAllContracts);
-router.post('/', contractController.createContract);
+router.post('/', requirePermission('manage.contracts'), contractController.createContract);
 router.delete('/:id', requirePermission('delete.contracts'), contractController.deleteContract);
-router.patch('/:id', contractController.updateContract);
+router.patch('/:id', requirePermission('manage.contracts'), contractController.updateContract);
 
 module.exports = router;

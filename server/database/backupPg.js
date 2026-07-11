@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 
 const BACKUP_DIR = path.join(__dirname, 'backups');
@@ -41,6 +42,8 @@ const timestampNow = () => {
   return `${year}${month}${date}_${hours}${minutes}${seconds}`;
 };
 
+const backupFileName = () => `backup_${timestampNow()}_${crypto.randomUUID().slice(0, 8)}.dump`;
+
 /**
  * Perform a database backup using pg_dump's custom format (-Fc): compressed,
  * and restorable with pg_restore (selective/parallel restore supported).
@@ -51,7 +54,7 @@ const runBackup = async () => {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
   }
 
-  const backupPath = path.join(BACKUP_DIR, `backup_${timestampNow()}.dump`);
+  const backupPath = path.join(BACKUP_DIR, backupFileName());
   console.log(`Starting database backup to: ${backupPath}`);
 
   try {
@@ -63,12 +66,47 @@ const runBackup = async () => {
   }
 
   try {
-    await cleanOldBackups();
+    await cleanOldBackups(BACKUP_DIR);
   } catch (cleanErr) {
     console.error('Old backups cleanup failed:', cleanErr.message);
   }
 
+  await copyBackupOffsite(backupPath);
+
   return backupPath;
+};
+
+/**
+ * Copies a verified backup to a mounted network share or cloud-synced folder.
+ * Set OFFSITE_BACKUP_DIR to enable it. A partial file is never promoted until
+ * the copy is complete and its byte count matches the local source file.
+ */
+const copyBackupOffsite = async (backupPath) => {
+  const configuredDir = process.env.OFFSITE_BACKUP_DIR;
+  if (!configuredDir) return;
+
+  const offsiteDir = path.resolve(configuredDir);
+  await fs.promises.mkdir(offsiteDir, { recursive: true });
+  const destination = path.join(offsiteDir, path.basename(backupPath));
+  const partialDestination = `${destination}.partial`;
+
+  try {
+    await fs.promises.copyFile(backupPath, partialDestination);
+    const [sourceStats, destinationStats] = await Promise.all([
+      fs.promises.stat(backupPath),
+      fs.promises.stat(partialDestination),
+    ]);
+    if (sourceStats.size !== destinationStats.size) {
+      throw new Error(`Offsite copy size mismatch (${sourceStats.size} != ${destinationStats.size})`);
+    }
+    await fs.promises.rename(partialDestination, destination);
+    await cleanOldBackups(offsiteDir);
+    console.log(`Offsite database backup completed successfully: ${destination}`);
+  } catch (err) {
+    await fs.promises.unlink(partialDestination).catch(() => {});
+    console.error('Offsite database backup failed:', err.message);
+    throw err;
+  }
 };
 
 /**
@@ -102,17 +140,17 @@ const runRestore = async (backupPath) => {
 /**
  * Delete older backup files to keep only the latest MAX_BACKUPS.
  */
-const cleanOldBackups = () => {
+const cleanOldBackups = (directory) => {
   return new Promise((resolve, reject) => {
-    fs.readdir(BACKUP_DIR, (err, files) => {
+    fs.readdir(directory, (err, files) => {
       if (err) return reject(err);
 
       const backupFiles = files
         .filter(f => f.startsWith('backup_') && f.endsWith('.dump'))
         .map(f => ({
           name: f,
-          path: path.join(BACKUP_DIR, f),
-          time: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs
+          path: path.join(directory, f),
+          time: fs.statSync(path.join(directory, f)).mtimeMs
         }))
         .sort((a, b) => b.time - a.time);
 

@@ -199,7 +199,7 @@ const WithdrawalList: React.FC = () => {
     switch (type) {
       case 'ติดตั้งใหม่': return 'var(--primary)';
       case 'ซ่อมแซม': return 'var(--warning)';
-      case 'สำรองใช้งาน': return '#d97706';
+      case 'สำรองใช้งาน': return 'var(--warning)';
       case 'ทดสอบ': return 'var(--success)';
       default: return 'var(--text-muted)';
     }

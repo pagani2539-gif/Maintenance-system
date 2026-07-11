@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { technicianApi, technicianStockApi } from '../api';
 import { useNotification } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
 import { useApi } from '../hooks/useApi';
 import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
@@ -84,6 +85,8 @@ const KitDrawer: React.FC<{ technicianId: number; fullName: string }> = ({ techn
 
 const TechnicianStockList: React.FC = () => {
   const { notify } = useNotification();
+  const { hasPermission } = useAuth();
+  const canManageTechnicianStock = hasPermission('manage.technicianStock');
   const { urlState, setTableState } = useTableUrlState(20);
 
   const { data: summary = [], loading, error, request: fetchSummary } = useApi(technicianStockApi.getKitSummary);
@@ -135,9 +138,9 @@ const TechnicianStockList: React.FC = () => {
   ];
 
   const actions: TableAction<TechnicianKitSummary>[] = [
-    { id: 'load', label: 'โหลดอะไหล่', icon: <Truck size={14} />, inline: true, onClick: (row) => setModal({ mode: 'load', technicianId: row.technician_id }) },
-    { id: 'install', label: 'ติดตั้ง/เปลี่ยน', icon: <PackageOpen size={14} />, inline: true, onClick: (row) => setModal({ mode: 'install', technicianId: row.technician_id }) },
-    { id: 'return', label: 'คืนคลัง', icon: <Undo2 size={14} />, inline: true, onClick: (row) => setModal({ mode: 'return', technicianId: row.technician_id }) },
+    { id: 'load', label: 'โหลดอะไหล่', icon: <Truck size={14} />, inline: true, onClick: (row) => setModal({ mode: 'load', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
+    { id: 'install', label: 'ติดตั้ง/เปลี่ยน', icon: <PackageOpen size={14} />, inline: true, onClick: (row) => setModal({ mode: 'install', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
+    { id: 'return', label: 'คืนคลัง', icon: <Undo2 size={14} />, inline: true, onClick: (row) => setModal({ mode: 'return', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
   ];
 
   const filteredData = useMemo(() => {
@@ -172,9 +175,11 @@ const TechnicianStockList: React.FC = () => {
             <p>ติดตามว่าช่างแต่ละคนถืออะไหล่สำรองอะไร เอาไปเปลี่ยนที่ไหนบ้าง</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <Button variant="outline" icon={<Truck size={18} />} onClick={() => setModal({ mode: 'load' })}>โหลดอะไหล่เข้าช่าง</Button>
-            <Button variant="warning" icon={<PackageOpen size={18} />} onClick={() => setModal({ mode: 'install' })}>ติดตั้ง / เปลี่ยน</Button>
-            <Button variant="outline" icon={<Undo2 size={18} />} onClick={() => setModal({ mode: 'return' })}>คืนคลัง</Button>
+            {canManageTechnicianStock && <>
+              <Button variant="outline" icon={<Truck size={18} />} onClick={() => setModal({ mode: 'load' })}>โหลดอะไหล่เข้าช่าง</Button>
+              <Button variant="primary" icon={<PackageOpen size={18} />} onClick={() => setModal({ mode: 'install' })}>ติดตั้ง / เปลี่ยน</Button>
+              <Button variant="outline" icon={<Undo2 size={18} />} onClick={() => setModal({ mode: 'return' })}>คืนคลัง</Button>
+            </>}
           </div>
         </div>
 
@@ -182,7 +187,7 @@ const TechnicianStockList: React.FC = () => {
           {[
             { key: 'all' as const, label: 'ช่างทั้งหมด', val: totals.techCount, icon: Wrench, color: 'var(--primary)' },
             { key: 'withItems' as const, label: 'ช่างที่ถืออะไหล่', val: totals.withItems, icon: User, color: 'var(--success)' },
-            { key: 'withItems' as const, label: 'ชิ้นที่อยู่ในมือช่าง', val: totals.units, icon: Boxes, color: 'var(--warning)' },
+            { key: 'withItems' as const, label: 'ชิ้นที่อยู่ในมือช่าง', val: totals.units, icon: Boxes, color: 'var(--primary)' },
           ].map((s, i) => (
             <Card
               key={i}

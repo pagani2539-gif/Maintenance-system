@@ -24,8 +24,8 @@ export const Input: React.FC<InputProps> = ({
           {label} {required && <span style={{ color: 'var(--danger)' }}>*</span>}
         </label>
       )}
-      <input id={inputId} className={`form-control ${className}`} required={required} {...props} />
-      {error && <span style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}>{error}</span>}
+      <input id={inputId} className={`form-control${error ? ' form-control--error' : ''} ${className}`} required={required} {...props} aria-invalid={error ? true : undefined} aria-describedby={error ? `${inputId}-error` : undefined} />
+      {error && <span id={`${inputId}-error`} className="form-field-error" role="alert">{error}</span>}
     </div>
   );
 };
@@ -52,8 +52,8 @@ export const TextArea: React.FC<TextAreaProps> = ({
           {label} {required && <span style={{ color: 'var(--danger)' }}>*</span>}
         </label>
       )}
-      <textarea id={inputId} className={`form-control ${className}`} required={required} {...props} />
-      {error && <span style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}>{error}</span>}
+      <textarea id={inputId} className={`form-control${error ? ' form-control--error' : ''} ${className}`} required={required} {...props} aria-invalid={error ? true : undefined} aria-describedby={error ? `${inputId}-error` : undefined} />
+      {error && <span id={`${inputId}-error`} className="form-field-error" role="alert">{error}</span>}
     </div>
   );
 };

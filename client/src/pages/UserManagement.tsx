@@ -30,13 +30,21 @@ const DEFAULT_REGULAR_PERMISSIONS: Permissions = {
     purchase_orders: false,
     transactions: false,
     stations: false,
+    contracts: false,
+    technicianStock: false,
   },
   manage: {
-    settings: false,
+    repairs: false,
+    claims: false,
+    inventory: false,
+    withdrawals: false,
+    transactions: false,
+    purchase_orders: false,
+    contracts: false,
     stations: false,
     companies: false,
-    users: false,
     stock_counts: false,
+    technicianStock: false,
   },
 };
 
@@ -48,6 +56,22 @@ const DELETE_LABELS: Array<{ key: keyof NonNullable<Permissions['delete']>; labe
   { key: 'purchase_orders', label: 'ลบใบสั่งซื้อ' },
   { key: 'transactions', label: 'ลบประวัติธุรกรรม' },
   { key: 'stations', label: 'ลบสถานี' },
+  { key: 'contracts', label: 'ลบสัญญา' },
+  { key: 'technicianStock', label: 'ลบรายการสต็อกช่าง' },
+];
+
+const MANAGE_LABELS: Array<{ key: keyof NonNullable<Permissions['manage']>; label: string }> = [
+  { key: 'repairs', label: 'จัดการงานซ่อม' },
+  { key: 'claims', label: 'จัดการงานเคลม' },
+  { key: 'inventory', label: 'จัดการคลังพัสดุ' },
+  { key: 'withdrawals', label: 'จัดการใบเบิก' },
+  { key: 'transactions', label: 'จัดการรับคืน' },
+  { key: 'purchase_orders', label: 'จัดการใบสั่งซื้อ' },
+  { key: 'contracts', label: 'จัดการสัญญา' },
+  { key: 'stations', label: 'จัดการสถานี' },
+  { key: 'companies', label: 'จัดการบริษัทและโลโก้' },
+  { key: 'stock_counts', label: 'จัดการตรวจนับสต็อก' },
+  { key: 'technicianStock', label: 'จัดการสต็อกช่าง' },
 ];
 
 interface UserFormState {
@@ -143,6 +167,32 @@ const UserManagement: React.FC = () => {
         delete: DELETE_LABELS.reduce(
           (acc, { key }) => ({ ...acc, [key]: value }),
           {} as Permissions['delete']
+        ),
+      },
+    }));
+  };
+
+  const toggleManagePerm = (key: keyof NonNullable<Permissions['manage']>) => {
+    setForm((prev) => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        manage: {
+          ...(prev.permissions.manage || {}),
+          [key]: !prev.permissions.manage?.[key],
+        },
+      },
+    }));
+  };
+
+  const setAllManagePerms = (value: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        manage: MANAGE_LABELS.reduce(
+          (acc, { key }) => ({ ...acc, [key]: value }),
+          {} as Permissions['manage']
         ),
       },
     }));
@@ -281,7 +331,7 @@ const UserManagement: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
                       width: '36px', height: '36px', borderRadius: '50%',
-                      background: u.is_full ? 'linear-gradient(135deg, var(--primary), #1e3a8a)' : 'var(--bg-app)',
+                      background: u.is_full ? 'var(--primary-action)' : 'var(--bg-subtle)',
                       color: u.is_full ? '#fff' : 'var(--text-muted)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontWeight: 800, fontSize: '0.9rem', border: u.is_full ? 'none' : '1px solid var(--border)',
@@ -308,11 +358,11 @@ const UserManagement: React.FC = () => {
                 </td>
                 <td style={td}>
                   {u.is_active ? (
-                    <span style={badge('#d1fae5', '#065f46')}>
+                    <span style={badge('var(--success-light)', 'var(--success)')}>
                       <Check size={11} /> ใช้งานอยู่
                     </span>
                   ) : (
-                    <span style={badge('#fee2e2', '#7f1d1d')}>
+                    <span style={badge('var(--danger-light)', 'var(--danger-on-tint)')}>
                       <X size={11} /> ปิดการใช้งาน
                     </span>
                   )}
@@ -433,6 +483,32 @@ const UserManagement: React.FC = () => {
                             type="checkbox"
                             checked={!!form.permissions.delete?.[key]}
                             onChange={() => toggleDeletePerm(key)}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '16px 0 8px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Shield size={14} color="var(--primary)" />
+                        สิทธิ์จัดการข้อมูล
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button type="button" onClick={() => setAllManagePerms(true)} style={chip}>ติ๊กทั้งหมด</button>
+                        <button type="button" onClick={() => setAllManagePerms(false)} style={chip}>ล้างทั้งหมด</button>
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px',
+                      padding: '10px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-app)',
+                    }}>
+                      {MANAGE_LABELS.map(({ key, label }) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.permissions.manage?.[key]}
+                            onChange={() => toggleManagePerm(key)}
                           />
                           {label}
                         </label>

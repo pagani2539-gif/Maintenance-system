@@ -62,7 +62,7 @@ const TransactionList: React.FC = () => {
     if (!cond) return null;
     const c = cond.toLowerCase();
     if (c.includes('good') || c === 'ปกติ') return { label: 'ปกติ', bg: 'var(--success-light)', color: 'var(--success)' };
-    if (c.includes('minor')) return { label: 'ชำรุดเล็กน้อย', bg: 'rgba(217,119,6,0.12)', color: '#d97706' };
+    if (c.includes('minor')) return { label: 'ชำรุดเล็กน้อย', bg: 'var(--warning-light)', color: 'var(--warning)' };
     if (c.includes('damaged') || c === 'ชำรุด') return { label: 'ชำรุด', bg: 'var(--warning-light)', color: 'var(--warning)' };
     if (c.includes('broken') || c.includes('เสีย')) return { label: 'เสีย', bg: 'var(--danger-light)', color: 'var(--danger)' };
     return { label: cond, bg: 'var(--bg-app)', color: 'var(--text-muted)' };
@@ -199,7 +199,7 @@ const TransactionList: React.FC = () => {
             fontSize: '0.78rem',
             fontWeight: 700,
             color: 'var(--primary)',
-            fontFamily: 'Outfit, monospace',
+            fontFamily: '"Bai Jamjuree", monospace',
             letterSpacing: '0.3px',
             maxWidth: '100%',
             overflow: 'hidden',
@@ -337,6 +337,7 @@ const TransactionList: React.FC = () => {
       variant: 'primary',
       onClick: (row) => setReturnModal({ isOpen: true, transaction: row }),
       hidden: (row) => {
+        if (!hasPermission('manage.transactions')) return true;
         if (row.status === 'RETURNED') return true;
         if (row.transaction_type === 'BORROW') return false;
         if (row.transaction_type === 'WITHDRAW') {
@@ -483,7 +484,7 @@ const TransactionList: React.FC = () => {
             <div><strong>ประเภทรายการ:</strong> {formatTxType(tx.transaction_type)} {tx.withdrawal_type ? `(${tx.withdrawal_type})` : ''}</div>
             <div><strong>อุปกรณ์:</strong> {tx.product_name}</div>
             <div><strong>รุ่น:</strong> {tx.product_model || '-'}</div>
-            <div><strong>S/N (หมายเลขเครื่อง):</strong> <code style={{ background: '#eee', padding: '2px 4px', borderRadius: '4px' }}>{tx.serial_number || 'ไม่ระบุ'}</code></div>
+            <div><strong>S/N (หมายเลขเครื่อง):</strong> <code style={{ background: 'var(--bg-subtle)', color: 'var(--text-main)', padding: '2px 4px', borderRadius: '4px' }}>{tx.serial_number || 'ไม่ระบุ'}</code></div>
             <div><strong>จำนวน:</strong> {tx.quantity_added || tx.quantity_withdrawn || tx.quantity_borrowed || tx.quantity_returned} ชิ้น</div>
             <div><strong>สภาพ:</strong> {conditionStyle(tx.condition)?.label || tx.condition || '-'}</div>
           </div>

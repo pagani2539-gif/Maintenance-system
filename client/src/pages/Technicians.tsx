@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { technicianApi, userApi } from '../api';
 import { useNotification } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import { Input } from '../components/ui/Input';
@@ -22,6 +23,8 @@ const emptyEdit: EditState = { full_name: '', code: '', phone: '', user_id: '', 
 
 const Technicians: React.FC = () => {
   const { notify } = useNotification();
+  const { hasPermission } = useAuth();
+  const canManageTechnicianStock = hasPermission('manage.technicianStock');
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +87,7 @@ const Technicians: React.FC = () => {
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Wrench size={24} /> จัดการรายชื่อช่าง</h2>
             <p>รายชื่อช่างที่ถืออะไหล่สำรองประจำตัว (ผูกกับบัญชีผู้ใช้ได้ถ้ามี)</p>
           </div>
-          <Button variant="primary" icon={<Plus size={18} />} onClick={openCreate}>เพิ่มช่าง</Button>
+          {canManageTechnicianStock && <Button variant="primary" icon={<Plus size={18} />} onClick={openCreate}>เพิ่มช่าง</Button>}
         </div>
 
         {loading ? (
@@ -112,7 +115,7 @@ const Technicians: React.FC = () => {
                       {t.user_username && <div style={{ fontSize: '0.72rem', color: 'var(--primary)', marginTop: '2px' }}>บัญชี: {t.user_username}</div>}
                     </div>
                   </div>
-                  <button className="btn btn-text" style={{ padding: '4px' }} onClick={() => openEdit(t)} title="แก้ไข"><Pencil size={16} /></button>
+                  {canManageTechnicianStock && <button className="btn btn-text" style={{ padding: '4px' }} onClick={() => openEdit(t)} title="แก้ไข"><Pencil size={16} /></button>}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>

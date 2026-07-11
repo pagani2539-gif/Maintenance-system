@@ -212,7 +212,7 @@ const StockCountDetail: React.FC = () => {
   }
 
   const statusMeta = detail.status === 'IN_PROGRESS'
-    ? { label: 'กำลังตรวจนับ', color: '#d97706', bg: 'var(--warning-light)', icon: <Hourglass size={13} /> }
+    ? { label: 'กำลังตรวจนับ', color: 'var(--warning)', bg: 'var(--warning-light)', icon: <Hourglass size={13} /> }
     : detail.status === 'COMPLETED'
       ? { label: 'เสร็จสิ้น', color: 'var(--success)', bg: 'var(--success-light)', icon: <CheckCircle2 size={13} /> }
       : { label: 'ยกเลิก', color: 'var(--text-muted)', bg: 'var(--bg-app)', icon: <Ban size={13} /> };
@@ -265,7 +265,7 @@ const StockCountDetail: React.FC = () => {
           {[
             { key: 'all' as FilterTab, label: 'รายการทั้งหมด', val: stats.total, icon: Boxes, color: 'var(--primary)', bg: 'var(--primary-light)' },
             { key: 'counted' as FilterTab, label: 'นับแล้ว', val: stats.counted, icon: ListChecks, color: 'var(--success)', bg: 'var(--success-light)' },
-            { key: 'uncounted' as FilterTab, label: 'ยังไม่ได้นับ', val: stats.remaining, icon: Hourglass, color: '#d97706', bg: 'var(--warning-light)' },
+            { key: 'uncounted' as FilterTab, label: 'ยังไม่ได้นับ', val: stats.remaining, icon: Hourglass, color: 'var(--warning)', bg: 'var(--warning-light)' },
             { key: 'variance' as FilterTab, label: 'พบยอดต่าง', val: stats.variance, icon: Scale, color: 'var(--danger)', bg: 'var(--danger-light)' },
           ].map((s, i) => (
             <Card
@@ -324,13 +324,13 @@ const StockCountDetail: React.FC = () => {
                   <th style={{ ...th, textAlign: 'center' }}>ส่วนต่าง</th>
                   <th style={th}>หมายเหตุ</th>
                   <th style={th}>ผู้นับ</th>
-                  {isOpen && <th style={{ ...th, width: '90px' }}></th>}
+                  {isOpen && canManage && <th style={{ ...th, width: '90px' }}></th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={isOpen ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <td colSpan={isOpen && canManage ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                       ไม่พบรายการที่ตรงกับเงื่อนไข
                     </td>
                   </tr>
@@ -352,7 +352,7 @@ const StockCountDetail: React.FC = () => {
                       <td style={{ ...td, fontSize: '0.8rem', color: 'var(--text-muted)' }}>{it.storage_location || '—'}</td>
                       <td style={{ ...td, textAlign: 'center', fontWeight: 800, fontSize: '0.95rem' }}>{it.expected_qty}</td>
                       <td style={{ ...td, textAlign: 'center' }}>
-                        {isOpen ? (
+                        {isOpen && canManage ? (
                           <input
                             type="number"
                             min={0}
@@ -381,7 +381,7 @@ const StockCountDetail: React.FC = () => {
                         )}
                       </td>
                       <td style={td}>
-                        {isOpen ? (
+                        {isOpen && canManage ? (
                           <input
                             className="form-control"
                             style={{ width: '100%', minWidth: '140px', fontSize: '0.8rem' }}
@@ -398,7 +398,7 @@ const StockCountDetail: React.FC = () => {
                         {it.counted_by || '—'}
                         {it.counted_at && <div style={{ fontSize: '0.7rem' }}>{formatDateTimeThai(it.counted_at)}</div>}
                       </td>
-                      {isOpen && (
+                      {isOpen && canManage && (
                         <td style={{ ...td, textAlign: 'center' }}>
                           <Button
                             variant={dirty ? 'primary' : 'outline'}
@@ -440,14 +440,14 @@ const StockCountDetail: React.FC = () => {
               {stats.remaining > 0 && (
                 <Card style={{ padding: '0.9rem 1rem', backgroundColor: 'var(--warning-light)', border: '1px solid var(--warning-border)' }}>
                   <div style={{ fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertTriangle size={16} color="#d97706" />
+                    <AlertTriangle size={16} color="var(--warning)" />
                     ยังมี {stats.remaining} รายการที่ไม่ได้นับ — รายการเหล่านี้จะถูกข้าม (ไม่ปรับยอด)
                   </div>
                 </Card>
               )}
 
               {pendingAdjustments.length === 0 ? (
-                <Card style={{ padding: '1rem', backgroundColor: 'var(--success-light)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                <Card style={{ padding: '1rem', backgroundColor: 'var(--success-light)', border: '1px solid var(--success-border)' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle2 size={16} /> ยอดที่นับตรงกับระบบทั้งหมด ไม่มีรายการต้องปรับยอด
                   </div>

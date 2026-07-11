@@ -384,13 +384,21 @@ export interface Permissions {
     purchase_orders?: boolean;
     transactions?: boolean;
     stations?: boolean;
+    contracts?: boolean;
+    technicianStock?: boolean;
   };
   manage?: {
-    settings?: boolean;
+    repairs?: boolean;
+    claims?: boolean;
+    inventory?: boolean;
+    withdrawals?: boolean;
+    transactions?: boolean;
+    purchase_orders?: boolean;
+    contracts?: boolean;
     stations?: boolean;
     companies?: boolean;
-    users?: boolean;
     stock_counts?: boolean;
+    technicianStock?: boolean;
   };
 }
 

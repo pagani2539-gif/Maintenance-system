@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
 import { Input, TextArea } from '../components/ui/Input';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { formatDateTimeThai } from '../utils/formatDate';
 import type { InventoryItem, InventoryTransaction } from '../types';
 import type { TableColumn, TableAction } from '../types/table.types';
@@ -47,6 +48,7 @@ import { ProvideSnModal } from '../components/ProvideSnModal';
 const InventoryList: React.FC = () => {
   const { notify, confirm, refreshUnreadCounts } = useNotification();
   const { hasPermission } = useAuth();
+  const canManageInventory = hasPermission('manage.inventory');
   const { urlState, setTableState } = useTableUrlState(20);
 
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -230,7 +232,7 @@ const InventoryList: React.FC = () => {
       item.requires_sn === 1 ? 'ใช่' : 'ไม่'
     ]);
     exportToCsv(`inventory_export_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`, headers, rows);
-    notify('ส่งออกข้อมูล Excel เรียบร้อยแล้ว');
+    notify('ส่งออกข้อมูล CSV เรียบร้อยแล้ว');
   };
 
   const handleDownloadTemplate = () => {
@@ -255,7 +257,7 @@ const InventoryList: React.FC = () => {
       }
       setImportModal({ open: true, rows, errors, importing: false });
     } catch {
-      notify('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์ (.xlsx, .xls, .csv)', 'error');
+      notify('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์ CSV', 'error');
     }
   };
 
@@ -335,18 +337,15 @@ const InventoryList: React.FC = () => {
   };
 
   const getStockStatusBadge = (quantity: number, minStock: number) => {
-    const badgeStyle = (bg: string, color: string, border: string): React.CSSProperties => ({
-      backgroundColor: bg, color: color, border: `1px solid ${border}`, padding: '4px 12px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 700, lineHeight: 1.4, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', minWidth: '88px', maxWidth: '100%', justifyContent: 'center'
-    });
     const status = getStockStatus(quantity, minStock);
     switch (status) {
       case 'หมดสต๊อก':
       case 'วิกฤต':
-        return <span style={badgeStyle('#fee2e2', '#ef4444', '#fecaca')}>{status}</span>;
+        return <StatusBadge tone="danger" dot>{status}</StatusBadge>;
       case 'ใกล้หมด':
-        return <span style={badgeStyle('#fef3c7', '#d97706', '#fde68a')}>{status}</span>;
+        return <StatusBadge tone="warning" dot>{status}</StatusBadge>;
       case 'พร้อมใช้งาน':
-        return <span style={badgeStyle('#d1fae5', '#10b981', '#a7f3d0')}>{status}</span>;
+        return <StatusBadge tone="success" dot>{status}</StatusBadge>;
     }
   };
 
@@ -438,7 +437,7 @@ const InventoryList: React.FC = () => {
   ];
 
   const actions: TableAction<InventoryItem>[] = [
-    { id: 'edit', label: 'แก้ไขข้อมูล', icon: <SquarePen size={14} />, onClick: (row) => handleOpenModal(row), inline: true },
+    { id: 'edit', label: 'แก้ไขข้อมูล', icon: <SquarePen size={14} />, onClick: (row) => handleOpenModal(row), inline: true, hidden: () => !canManageInventory },
     { id: 'sn', label: 'จัดการ S/N', icon: <Barcode size={14} />, onClick: (row) => handleOpenSnModal(row), inline: true },
     { id: 'delete', label: 'ลบอุปกรณ์', icon: <Trash2 size={14} />, variant: 'danger', onClick: (row) => handleDelete(row.id), hidden: () => !hasPermission('delete.inventory') }
   ];
@@ -520,11 +519,11 @@ const InventoryList: React.FC = () => {
         </section>
 
         <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', gap: '1rem' }}>
-          <Button variant="primary" style={{ flex: 1 }} onClick={() => handleOpenModal(item)} icon={<Pencil size={18} />}>แก้ไขอุปกรณ์</Button>
+          {canManageInventory && <Button variant="primary" style={{ flex: 1 }} onClick={() => handleOpenModal(item)} icon={<Pencil size={18} />}>แก้ไขอุปกรณ์</Button>}
         </div>
       </div>
     );
-  }, [historyData, loadingHistory, historyExpanded]);
+  }, [historyData, loadingHistory, historyExpanded, canManageInventory]);
 
   return (
     <div className="inventory-page" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
@@ -534,13 +533,13 @@ const InventoryList: React.FC = () => {
           <div className="page-title"><h2>จัดการอุปกรณ์และสต็อก</h2><p>เพิ่ม แก้ไข และติดตามจำนวนอุปกรณ์คงเหลือในระบบ</p></div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <Button variant="outline" icon={<FileSpreadsheet size={20} />} onClick={handleDownloadTemplate}>เทมเพลต</Button>
-            <Button variant="outline" icon={<Upload size={20} />} onClick={() => importInputRef.current?.click()}>นำเข้า Excel</Button>
-            <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก Excel</Button>
-            <Button variant="primary" icon={<Plus size={20} />} onClick={() => handleOpenModal()}>เพิ่มอุปกรณ์ใหม่</Button>
+            {canManageInventory && <Button variant="outline" icon={<Upload size={20} />} onClick={() => importInputRef.current?.click()}>นำเข้า CSV</Button>}
+            <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก CSV</Button>
+            {canManageInventory && <Button variant="primary" icon={<Plus size={20} />} onClick={() => handleOpenModal()}>เพิ่มอุปกรณ์ใหม่</Button>}
             <input
               ref={importInputRef}
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".csv,text/csv"
               style={{ display: 'none' }}
               onChange={handleImportFileChange}
             />
@@ -585,7 +584,7 @@ const InventoryList: React.FC = () => {
           state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
           totalCount={items?.length ?? 0}
           emptyState={{
-            noData: { message: 'ยังไม่มีอุปกรณ์ในคลัง', hint: 'กด "เพิ่มอุปกรณ์ใหม่" หรือ "นำเข้า Excel" เพื่อเริ่มต้น' },
+            noData: { message: 'ยังไม่มีอุปกรณ์ในคลัง', hint: 'กด "เพิ่มอุปกรณ์ใหม่" หรือ "นำเข้า CSV" เพื่อเริ่มต้น' },
             noResults: { message: 'ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
           }}
           actions={actions}
@@ -738,7 +737,7 @@ const InventoryList: React.FC = () => {
             </p>
 
             {importModal.errors.length > 0 && (
-              <div style={{ display: 'flex', gap: '8px', padding: '0.75rem 1rem', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.82rem', color: '#c2410c' }}>
+              <div style={{ display: 'flex', gap: '8px', padding: '0.75rem 1rem', background: 'var(--warning-light)', border: '1px solid var(--warning-border)', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.82rem', color: 'var(--warning)' }}>
                 <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {importModal.errors.slice(0, 5).map((err, i) => <span key={i}>{err}</span>)}

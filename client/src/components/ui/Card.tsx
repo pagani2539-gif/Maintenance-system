@@ -22,14 +22,14 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <div
-      className={`card ${className}`}
+      className={`card${isClickable ? ' card--interactive' : ''} ${className}`}
       onClick={onClick}
       style={{ ...clickableStyle, ...style }}
     >
       {title && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            {icon && <span style={{ display: 'inline-flex', color: 'var(--primary)' }}>{icon}</span>}
+        <div className="card__header">
+          <h3 className="card__title">
+            {icon && <span className="card__icon">{icon}</span>}
             {title}
           </h3>
         </div>

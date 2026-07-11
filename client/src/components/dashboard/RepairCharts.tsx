@@ -1,7 +1,6 @@
 import React from 'react';
 import { Inbox, HardDrive, Users, TrendingUp } from 'lucide-react';
 import {
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
@@ -17,6 +16,7 @@ import Card from '../ui/Card';
 import Counter from '../ui/Counter';
 import { ScopeBadge } from './common';
 import { chartTooltipStyle } from './dashboardUtils';
+import ChartFrame from './ChartFrame';
 import type { DashboardData } from '../../types';
 
 interface RepairChartsProps {
@@ -52,16 +52,16 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
       <Card className="dash-card boot-animate stagger-2 dash-span-4">
         <h3 className="dash-card-title" style={{ marginBottom: '1rem' }}>สัดส่วนสถานะงานซ่อม</h3>
         <div style={{ position: 'relative', height: '170px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+          <ChartFrame height={170}>{({ width, height }) => (
+            <PieChart width={width} height={height}>
               <Pie data={statusPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={70} paddingAngle={2} dataKey="value" animationBegin={100} animationDuration={600}>
                 {statusPieData.map((entry, index) => <Cell key={index} fill={entry.color} stroke="var(--bg-card)" strokeWidth={2} />)}
               </Pie>
               <Tooltip contentStyle={chartTooltipStyle} itemStyle={{ color: 'var(--text-main)' }} labelStyle={{ color: 'var(--text-muted)', fontWeight: 800 }} />
             </PieChart>
-          </ResponsiveContainer>
+          )}</ChartFrame>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'Outfit', lineHeight: 1 }}>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'Bai Jamjuree', lineHeight: 1 }}>
               <Counter end={kpis.total} />
             </div>
             <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '3px' }}>งานทั้งหมด</div>
@@ -88,22 +88,22 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
             <ScopeBadge show={filterActive} label="6 เดือนล่าสุด" />
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'Outfit', color: 'var(--primary)', lineHeight: 1 }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'Bai Jamjuree', color: 'var(--primary)', lineHeight: 1 }}>
               {latestTrend}
               <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', marginLeft: '4px' }}>เดือนนี้</span>
             </div>
           </div>
         </div>
         <div style={{ height: '210px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={trendData}>
+          <ChartFrame height={210}>{({ width, height }) => (
+            <BarChart width={width} height={height} data={trendData}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 700 }} dy={6} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 700 }} width={26} allowDecimals={false} />
               <Tooltip cursor={{ fill: 'var(--primary-light)' }} contentStyle={chartTooltipStyle} itemStyle={{ color: 'var(--text-main)' }} labelStyle={{ color: 'var(--text-muted)', fontWeight: 800 }} />
               <Bar dataKey="count" name="งานแจ้งซ่อม" fill="var(--primary)" barSize={20} radius={[4, 4, 0, 0]} animationDuration={600} />
             </BarChart>
-          </ResponsiveContainer>
+          )}</ChartFrame>
         </div>
       </Card>
 
@@ -141,8 +141,8 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
           <HardDrive size={18} color="var(--primary)" />
         </div>
         <div style={{ height: '200px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={mostBroken} layout="vertical" margin={{ left: -20 }}>
+          <ChartFrame height={200}>{({ width, height }) => (
+            <BarChart width={width} height={height} data={mostBroken} layout="vertical" margin={{ left: -20 }}>
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-main)', fontSize: 10, fontWeight: 700 }} width={90} />
               <Tooltip cursor={{ fill: 'var(--primary-light)' }} contentStyle={chartTooltipStyle} itemStyle={{ color: 'var(--text-main)' }} labelStyle={{ color: 'var(--text-muted)', fontWeight: 800 }} />
@@ -152,7 +152,7 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          )}</ChartFrame>
         </div>
       </Card>
 
@@ -166,8 +166,8 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
           <Users size={18} color="var(--primary)" />
         </div>
         <div style={{ height: '200px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={technicians} layout="vertical" margin={{ left: -20 }}>
+          <ChartFrame height={200}>{({ width, height }) => (
+            <BarChart width={width} height={height} data={technicians} layout="vertical" margin={{ left: -20 }}>
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-main)', fontSize: 10, fontWeight: 700 }} width={70} />
               <Tooltip cursor={{ fill: 'var(--primary-light)' }} contentStyle={chartTooltipStyle} itemStyle={{ color: 'var(--text-main)' }} labelStyle={{ color: 'var(--text-muted)', fontWeight: 800 }} />
@@ -175,7 +175,7 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
               <Bar dataKey="completed" stackId="a" fill="var(--success)" name="เสร็จแล้ว" radius={[0, 6, 6, 0]} barSize={14} animationDuration={700} />
               <Legend iconType="circle" wrapperStyle={{ paddingTop: '12px', fontSize: '10px', fontWeight: 700 }} />
             </BarChart>
-          </ResponsiveContainer>
+          )}</ChartFrame>
         </div>
       </Card>
     </>

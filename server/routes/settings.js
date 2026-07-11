@@ -2,21 +2,21 @@ const express = require('express');
 const router = express.Router();
 const settingsController = require('../controllers/settings');
 const { uploadCompanyLogo } = require('../middlewares/upload');
-const { requireAuth, requireFull } = require('../middlewares/auth');
+const { requireAuth, requireFull, requirePermission } = require('../middlewares/auth');
 
 // Companies
 router.get('/companies', settingsController.getCompanies);
-router.post('/companies', settingsController.createCompany);
+router.post('/companies', requirePermission('manage.companies'), settingsController.createCompany);
 router.get('/companies/:id', settingsController.getCompanyById);
-router.put('/companies/:id', settingsController.updateCompany);
-router.delete('/companies/:id', settingsController.deleteCompany);
-router.patch('/companies/:id/default', settingsController.setDefaultCompany);
+router.put('/companies/:id', requirePermission('manage.companies'), settingsController.updateCompany);
+router.delete('/companies/:id', requirePermission('manage.companies'), settingsController.deleteCompany);
+router.patch('/companies/:id/default', requirePermission('manage.companies'), settingsController.setDefaultCompany);
 
 // Logos
 router.get('/logos', settingsController.getLogos);
-router.post('/logos', uploadCompanyLogo, settingsController.uploadLogo);
-router.patch('/logos/:id/default', settingsController.setDefaultLogo);
-router.delete('/logos/:id', settingsController.deleteLogo);
+router.post('/logos', requirePermission('manage.companies'), uploadCompanyLogo, settingsController.uploadLogo);
+router.patch('/logos/:id/default', requirePermission('manage.companies'), settingsController.setDefaultLogo);
+router.delete('/logos/:id', requirePermission('manage.companies'), settingsController.deleteLogo);
 
 // System Settings (LINE Tokens, etc.)
 router.get('/system', requireAuth, settingsController.getSystemSettings);

@@ -39,7 +39,7 @@ const WithdrawalDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { notify, confirm } = useNotification();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const [snModal, setSnModal] = useState<{
     isOpen: boolean;
@@ -256,7 +256,7 @@ const WithdrawalDetail: React.FC = () => {
         zIndex: 20, 
         borderBottom: '1px solid var(--glass-border)',
         borderRadius: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: 'var(--bg-card)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         margin: '0 0 2.5rem 0'
@@ -443,7 +443,7 @@ const WithdrawalDetail: React.FC = () => {
                             )}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            {tx.status !== 'RETURNED' && (tx.transaction_type === 'WITHDRAW' || tx.transaction_type === 'BORROW') && (
+                            {hasPermission('manage.transactions') && tx.status !== 'RETURNED' && (tx.transaction_type === 'WITHDRAW' || tx.transaction_type === 'BORROW') && (
                               <button 
                                 className="btn btn-outline btn-sm"
                                 onClick={() => setReturnModal({ isOpen: true, transaction: tx })}

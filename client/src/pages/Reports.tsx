@@ -66,7 +66,7 @@ const REPORT_SECTIONS: Section[] = [
     cards: [
       {
         type: 'repairs',
-        accent: '#ef4444',
+        accent: 'var(--danger)',
         btnClass: 'btn-report-red',
         icon: <Wrench size={22} />,
         title: 'รายงานสรุปงานซ่อมบำรุง',
@@ -77,7 +77,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'claims',
-        accent: '#8b5cf6',
+        accent: 'var(--info)',
         btnClass: 'btn-report-violet',
         icon: <ShieldCheck size={22} />,
         title: 'รายงานสรุปงานเคลมประกัน',
@@ -88,7 +88,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'technician_workload',
-        accent: '#0ea5e9',
+        accent: 'var(--primary)',
         btnClass: 'btn-report-sky',
         icon: <UserCog size={22} />,
         title: 'รายงานสรุปภาระงานช่างซ่อม',
@@ -105,7 +105,7 @@ const REPORT_SECTIONS: Section[] = [
     cards: [
       {
         type: 'inventory_summary',
-        accent: '#3b82f6',
+        accent: 'var(--info)',
         btnClass: 'btn-report-blue',
         icon: <Boxes size={22} />,
         title: 'รายงานสรุปพัสดุคงคลังทั้งหมด',
@@ -116,7 +116,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'low_stock',
-        accent: '#f59e0b',
+        accent: 'var(--warning)',
         btnClass: 'btn-report-orange',
         icon: <Zap size={22} />,
         title: 'รายงานรายการพัสดุสต็อกต่ำ',
@@ -127,7 +127,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'transactions',
-        accent: '#14b8a6',
+        accent: 'var(--primary)',
         btnClass: 'btn-report-teal',
         icon: <ArrowLeftRight size={22} />,
         title: 'รายงานประวัติเคลื่อนไหวพัสดุ',
@@ -138,7 +138,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'stock_count',
-        accent: '#8b5cf6',
+        accent: 'var(--info)',
         btnClass: 'btn-report-violet',
         icon: <ClipboardCheck size={22} />,
         title: 'รายงานสรุปการตรวจนับสต็อก',
@@ -155,7 +155,7 @@ const REPORT_SECTIONS: Section[] = [
     cards: [
       {
         type: 'withdrawals',
-        accent: '#10b981',
+        accent: 'var(--success)',
         btnClass: 'btn-report-green',
         icon: <PackageCheck size={22} />,
         title: 'รายงานประวัติเบิกจ่ายพัสดุ',
@@ -166,7 +166,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'purchase_orders',
-        accent: '#6366f1',
+        accent: 'var(--info)',
         btnClass: 'btn-report-indigo',
         icon: <FileSignature size={22} />,
         title: 'รายงานประวัติจัดสั่งซื้อพัสดุ',
@@ -177,7 +177,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'technician_stock',
-        accent: '#f43f5e',
+        accent: 'var(--danger)',
         btnClass: 'btn-report-rose',
         icon: <Truck size={22} />,
         title: 'รายงานอะไหล่ในมือช่าง',
@@ -188,7 +188,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'pending_returns',
-        accent: '#f59e0b',
+        accent: 'var(--warning)',
         btnClass: 'btn-report-orange',
         icon: <Undo2 size={22} />,
         title: 'รายงานพัสดุยืม/เบิกค้างคืน',
@@ -205,7 +205,7 @@ const REPORT_SECTIONS: Section[] = [
     cards: [
       {
         type: 'asset_lifecycle',
-        accent: '#6366f1',
+        accent: 'var(--info)',
         btnClass: 'btn-report-indigo',
         icon: <Activity size={22} />,
         title: 'รายงานวงจรชีวิตสินทรัพย์',
@@ -216,7 +216,7 @@ const REPORT_SECTIONS: Section[] = [
       },
       {
         type: 'audit_log',
-        accent: '#0ea5e9',
+        accent: 'var(--primary)',
         btnClass: 'btn-report-sky',
         icon: <History size={22} />,
         title: 'รายงานบันทึกการใช้งานระบบ',
@@ -491,7 +491,7 @@ const Reports: React.FC = () => {
       <Card style={{ padding: '1.25rem 1.5rem', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.06)', color: '#3b82f6', padding: '8px', borderRadius: '8px' }}>
+            <div style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '8px', borderRadius: '8px' }}>
               <Calendar size={18} />
             </div>
             <div>

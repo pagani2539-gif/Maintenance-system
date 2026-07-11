@@ -32,7 +32,7 @@ import { useTableUrlState } from '../hooks/useTableUrlState';
 
 const PendingReturns: React.FC = () => {
   const { notify } = useNotification();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, hasPermission } = useAuth();
   const { urlState, setTableState } = useTableUrlState(20);
   const [returnModal, setReturnModal] = useState<{ isOpen: boolean; transaction: InventoryTransaction | null }>({
     isOpen: false,
@@ -186,7 +186,7 @@ const PendingReturns: React.FC = () => {
             fontSize: '0.78rem',
             fontWeight: 700,
             color: 'var(--primary)',
-            fontFamily: 'Outfit, monospace',
+            fontFamily: '"Bai Jamjuree", monospace',
             letterSpacing: '0.3px'
           }}>{val}</span>
         ) : (
@@ -283,7 +283,7 @@ const PendingReturns: React.FC = () => {
                   className="led-breathe-warning"
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    padding: '3px 8px', background: 'var(--warning-light)', color: '#d97706',
+                    padding: '3px 8px', background: 'var(--warning-light)', color: 'var(--warning)',
                     borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800, width: 'fit-content',
                     border: '1px solid var(--warning-border)'
                   }}
@@ -304,7 +304,7 @@ const PendingReturns: React.FC = () => {
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
                     padding: '3px 8px', background: 'var(--success-light)', color: 'var(--success)',
                     borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800, width: 'fit-content',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
+                    border: '1px solid var(--success-border)'
                   }}
                 >
                   เหลืออีก {diffDays} วัน
@@ -329,7 +329,7 @@ const PendingReturns: React.FC = () => {
                   display: 'inline-flex', alignItems: 'center', gap: '4px',
                   padding: '3px 8px',
                   background: isUrgent ? 'var(--warning-light)' : 'var(--bg-app)',
-                  color: isUrgent ? '#d97706' : 'var(--text-muted)',
+                  color: isUrgent ? 'var(--warning)' : 'var(--text-muted)',
                   borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800, width: 'fit-content',
                   border: isUrgent ? '1px solid var(--warning-border)' : '1px solid var(--border)'
                 }}
@@ -350,6 +350,7 @@ const PendingReturns: React.FC = () => {
       icon: <Undo2 size={14} />,
       variant: 'primary',
       onClick: (row) => setReturnModal({ isOpen: true, transaction: row }),
+      hidden: () => !hasPermission('manage.transactions'),
       inline: true
     }
   ];

@@ -275,21 +275,12 @@ const Dashboard: React.FC = () => {
             kpis={kpis}
             totalWithdrawals={totalWithdrawals}
             pendingPo={purchaseOrders.pending_po || 0}
+            pendingReturns={people.pendingReturnsCount || 0}
+            criticalStock={kpis.critical_stock || 0}
           />
 
-          {/* ============ Zone 4: งานซ่อมและการเคลม ============ */}
-          <DashSectionHeader icon={<Sliders size={17} />} title="งานซ่อมและการเคลม" subtitle="สถานะงานซ่อม แนวโน้ม และตั๋วเคลม" />
-          <RepairCharts
-            kpis={kpis}
-            monthlyTrend={analysis.monthlyTrend || []}
-            claimsKpis={claimsKpis}
-            mostBroken={analysis.mostBroken || []}
-            technicians={technicians || []}
-            filterActive={filterActive}
-          />
-
-          {/* ============ Zone 5: คลังพัสดุ ============ */}
-          <DashSectionHeader icon={<Boxes size={17} />} title="คลังพัสดุ" subtitle="ความเคลื่อนไหวสต็อก สภาพอุปกรณ์ และรายการที่ต้องจับตา" />
+          {/* Inventory is the primary operating domain. */}
+          <DashSectionHeader icon={<Boxes size={17} />} title="ศูนย์ควบคุมคลังพัสดุ" subtitle="ความเคลื่อนไหว สภาพอุปกรณ์ และรายการที่ต้องจับตา" />
           <InventoryCharts
             stockMovements={stockMovements || []}
             inventoryConditions={inventoryConditions || []}
@@ -299,13 +290,28 @@ const Dashboard: React.FC = () => {
             filterActive={filterActive}
           />
 
-          {/* ============ Zone 6: บุคลากรและการเบิกจ่าย ============ */}
-          <DashSectionHeader icon={<Users size={17} />} title="บุคลากรและการเบิกจ่าย" subtitle="ผู้รับผิดชอบด่านและผู้เบิกบ่อย" />
-          <PeopleSection
-            supervisors={supervisors || []}
-            topRecipients={people.topRecipients || []}
-            unassignedStationsCount={unassignedStationsCount || 0}
-          />
+          <details className="dashboard-disclosure">
+            <summary>ข้อมูลวิเคราะห์งานซ่อมและบุคลากร</summary>
+            <div className="dashboard-disclosure-content">
+              <div className="bento-grid" style={{ gap: '1rem' }}>
+                <DashSectionHeader icon={<Sliders size={17} />} title="งานซ่อมและการเคลม" subtitle="สถานะงานซ่อม แนวโน้ม และตั๋วเคลม" />
+                <RepairCharts
+                  kpis={kpis}
+                  monthlyTrend={analysis.monthlyTrend || []}
+                  claimsKpis={claimsKpis}
+                  mostBroken={analysis.mostBroken || []}
+                  technicians={technicians || []}
+                  filterActive={filterActive}
+                />
+                <DashSectionHeader icon={<Users size={17} />} title="บุคลากรและการเบิกจ่าย" subtitle="ผู้รับผิดชอบด่านและผู้เบิกบ่อย" />
+                <PeopleSection
+                  supervisors={supervisors || []}
+                  topRecipients={people.topRecipients || []}
+                  unassignedStationsCount={unassignedStationsCount || 0}
+                />
+              </div>
+            </div>
+          </details>
 
           {/* ============ Zone 7: กิจกรรมล่าสุด ============ */}
           <ActivityFeed

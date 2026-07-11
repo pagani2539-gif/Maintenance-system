@@ -98,11 +98,11 @@ const AuditLogs: React.FC = () => {
             return (
               <div key={c.key} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>• {c.key}:</span>
-                <span style={{ textDecoration: 'line-through', color: '#b91c1c', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem' }}>
+                <span style={{ textDecoration: 'line-through', color: 'var(--danger-on-tint)', background: 'var(--danger-light)', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem' }}>
                   {formatValue(c.oldVal)}
                 </span>
                 <ArrowRight size={10} style={{ color: 'var(--text-muted)' }} />
-                <span style={{ color: '#047857', background: '#d1fae5', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
+                <span style={{ color: 'var(--success)', background: 'var(--success-light)', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>
                   {formatValue(c.newVal)}
                 </span>
               </div>
@@ -123,12 +123,12 @@ const AuditLogs: React.FC = () => {
 
   const getEntityBadgeColor = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'repair': return { bg: '#eff6ff', fg: '#1d4ed8' };
-      case 'claim': return { bg: '#fff7ed', fg: '#c2410c' };
-      case 'inventory': return { bg: '#fdf2f8', fg: '#be185d' };
-      case 'withdrawal': return { bg: '#ecfdf5', fg: '#047857' };
-      case 'station': return { bg: '#f5f5f4', fg: '#44403c' };
-      default: return { bg: '#f4f4f5', fg: '#52525b' };
+      case 'repair': return { bg: 'var(--info-light)', fg: 'var(--info)' };
+      case 'claim': return { bg: 'var(--warning-light)', fg: 'var(--warning)' };
+      case 'inventory': return { bg: 'var(--primary-light)', fg: 'var(--primary)' };
+      case 'withdrawal': return { bg: 'var(--success-light)', fg: 'var(--success)' };
+      case 'station': return { bg: 'var(--bg-subtle)', fg: 'var(--text-muted)' };
+      default: return { bg: 'var(--bg-subtle)', fg: 'var(--text-muted)' };
     }
   };
 

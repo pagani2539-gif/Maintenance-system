@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import RepairList from './pages/RepairList';
@@ -7,9 +8,7 @@ import NewClaim from './pages/NewClaim';
 import ClaimList from './pages/ClaimList';
 import RepairDetail from './pages/RepairDetail';
 import InventoryList from './pages/InventoryList';
-import NewWithdrawal from './pages/NewWithdrawal';
 import WithdrawalList from './pages/WithdrawalList';
-import WithdrawalDetail from './pages/WithdrawalDetail';
 import TransactionList from './pages/TransactionList';
 import PendingReturns from './pages/PendingReturns';
 import MyTasks from './pages/MyTasks';
@@ -20,22 +19,28 @@ import PurchaseOrderList from './pages/PurchaseOrderList';
 import TechnicianStockList from './pages/TechnicianStockList';
 import TechnicianStockMovements from './pages/TechnicianStockMovements';
 import Technicians from './pages/Technicians';
-import Reports from './pages/Reports';
 import StationSearch from './pages/StationSearch';
-import Settings from './pages/Settings';
-import UserManagement from './pages/UserManagement';
 import Login from './pages/Login';
 import ChangePassword from './pages/ChangePassword';
-import AuditLogs from './pages/AuditLogs';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+
+// These routes carry PDF/export, scanner, report, or admin-only code. Loading
+// them on demand keeps the first authenticated screen lighter for technicians.
+const NewWithdrawal = lazy(() => import('./pages/NewWithdrawal'));
+const WithdrawalDetail = lazy(() => import('./pages/WithdrawalDetail'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 
 function App() {
   return (
     <ErrorBoundary>
       <Router>
         <AuthProvider>
+          <Suspense fallback={<div className="page-loading">กำลังโหลด…</div>}>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
@@ -99,6 +104,7 @@ function App() {
               />
             </Route>
           </Routes>
+          </Suspense>
         </AuthProvider>
       </Router>
     </ErrorBoundary>

@@ -5,11 +5,26 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
-require('./database/initPg'); // Connects the pg pool and runs Postgres migrations
+const { pool, ready: dbReady } = require('./database/initPg'); // Connects the pg pool and runs Postgres migrations
 
 const app = express();
 const PORT = process.env.PORT || 5221;
 const isProduction = process.env.NODE_ENV === 'production';
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "form-action 'self'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "connect-src 'self'",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+].join('; ');
+const INTERNAL_ERROR_MESSAGE = 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์ (Internal Server Error)';
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
@@ -32,9 +47,26 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Content-Security-Policy', contentSecurityPolicy);
+  res.setHeader('Permissions-Policy', 'camera=(self), geolocation=(), microphone=()');
   next();
 });
-app.use(express.json());
+app.use((req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    if (!isProduction || res.statusCode < 500) return sendJson(body);
+
+    const detail = body && typeof body === 'object' ? (body.error || body.message) : body;
+    console.error(`Sanitized ${res.statusCode} response for ${req.method} ${req.originalUrl}:`, detail);
+    const sanitized = body && typeof body === 'object' && !Array.isArray(body) ? { ...body } : {};
+    if ('error' in sanitized) sanitized.error = INTERNAL_ERROR_MESSAGE;
+    if ('message' in sanitized) sanitized.message = INTERNAL_ERROR_MESSAGE;
+    if (!('error' in sanitized) && !('message' in sanitized)) sanitized.error = INTERNAL_ERROR_MESSAGE;
+    return sendJson(sanitized);
+  };
+  next();
+});
+app.use(express.json({ limit: '2mb' }));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res) => {
@@ -67,6 +99,21 @@ const { requireAuth } = require('./middlewares/auth');
 
 // Public auth routes — must be mounted BEFORE the global auth guard
 app.use('/api/auth', authRoutes);
+
+// A minimal readiness endpoint for PM2, reverse proxies, and external monitors.
+// It intentionally exposes no database, version, or environment details.
+app.get('/api/health', async (_req, res) => {
+  try {
+    await dbReady;
+    await pool.query('SELECT 1');
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Health check failed:', err.message);
+    res.set('Cache-Control', 'no-store');
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
 
 // All other API routes require authentication
 app.use('/api/repairs', requireAuth, repairRoutes);
@@ -110,9 +157,16 @@ if (fs.existsSync(distPath)) {
 }
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
+  dbReady
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to run database migrations, server not started:', err);
+      process.exit(1);
+    });
 }
 
 module.exports = app;

@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, ShoppingBag, AlertCircle, PackageCheck } from 'lucide-react';
 import {
-  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
@@ -14,6 +13,7 @@ import {
 import Card from '../ui/Card';
 import { ScopeBadge } from './common';
 import { chartTooltipStyle } from './dashboardUtils';
+import ChartFrame from './ChartFrame';
 import type { DashboardData } from '../../types';
 
 interface InventoryChartsProps {
@@ -63,8 +63,8 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
           <ScopeBadge show={filterActive} label="6 เดือนล่าสุด" />
         </div>
         <div style={{ height: '260px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={stockMovements || []}>
+          <ChartFrame height={260}>{({ width, height }) => (
+            <LineChart width={width} height={height} data={stockMovements || []}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11, fontWeight: 700 }} dy={8} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11, fontWeight: 700 }} width={30} allowDecimals={false} />
@@ -75,7 +75,7 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
               <Line type="monotone" dataKey="borrowed" name="ยืม" stroke="var(--warning)" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} animationDuration={700} />
               <Line type="monotone" dataKey="returned" name="คืน" stroke="var(--success)" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} animationDuration={700} />
             </LineChart>
-          </ResponsiveContainer>
+          )}</ChartFrame>
         </div>
       </Card>
 

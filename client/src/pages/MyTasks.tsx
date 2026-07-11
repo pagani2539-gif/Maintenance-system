@@ -178,7 +178,7 @@ const MyTasks: React.FC = () => {
           {[
             { label: 'งานที่ฉันดูแลอยู่', val: stats.mineCount, icon: ListChecks, color: 'var(--primary)', bg: 'var(--primary-light)', section: 'task-section-mine' },
             { label: 'เกิน SLA (3 วัน)', val: stats.overdueCount, icon: AlertTriangle, color: 'var(--danger)', bg: 'var(--danger-light)', glow: stats.overdueCount > 0, section: 'task-section-mine' },
-            { label: 'ยังไม่มีคนรับ', val: stats.unassignedCount, icon: Inbox, color: '#d97706', bg: 'var(--warning-light)', section: 'task-section-unassigned' },
+            { label: 'ยังไม่มีคนรับ', val: stats.unassignedCount, icon: Inbox, color: 'var(--warning)', bg: 'var(--warning-light)', section: 'task-section-unassigned' },
             { label: 'ของค้างคืน (ของฉัน)', val: stats.returnsCount, icon: Undo2, color: 'var(--success)', bg: 'var(--success-light)', section: 'task-section-returns' },
           ].map((s, i) => (
             <Card key={i} className={s.glow ? 'led-breathe-danger' : ''} onClick={() => scrollToSection(s.section)} style={{ cursor: 'pointer' }}>
@@ -214,7 +214,7 @@ const MyTasks: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                          <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: 'Outfit, monospace' }}>{r.ticket_no}</Link>
+                          <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: '"Bai Jamjuree", monospace' }}>{r.ticket_no}</Link>
                           <span className={`badge badge-priority-${r.priority === 'วิกฤต' ? 'critical' : r.priority === 'ด่วนมาก' ? 'urgent' : r.priority === 'ด่วน' ? 'high' : 'normal'}`}>{r.priority}</span>
                           <span className={`badge badge-${r.status}`}>{r.status}</span>
                           {overdue && (
@@ -259,7 +259,7 @@ const MyTasks: React.FC = () => {
         {/* Section: unassigned */}
         <div id="task-section-unassigned" style={{ marginBottom: '2rem' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: 800, marginBottom: '1rem' }}>
-            <Inbox size={18} color="#d97706" /> งานที่ยังไม่มีคนรับ ({sortedUnassigned.length})
+            <Inbox size={18} color="var(--warning)" /> งานที่ยังไม่มีคนรับ ({sortedUnassigned.length})
           </h3>
           {sortedUnassigned.length === 0 ? (
             <Card style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -272,7 +272,7 @@ const MyTasks: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                        <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: 'Outfit, monospace' }}>{r.ticket_no}</Link>
+                        <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: '"Bai Jamjuree", monospace' }}>{r.ticket_no}</Link>
                         <span className={`badge badge-priority-${r.priority === 'วิกฤต' ? 'critical' : r.priority === 'ด่วนมาก' ? 'urgent' : r.priority === 'ด่วน' ? 'high' : 'normal'}`}>{r.priority}</span>
                         {r.type === 'claim' && <span className="badge badge-info">เคลม</span>}
                       </div>

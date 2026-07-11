@@ -14,29 +14,29 @@ import {
   LogOut,
   UserCog,
   Users,
-  Fingerprint,
   Sun,
   Moon,
   AlertTriangle,
   ChevronDown,
   User as UserIcon,
   // New Modern Icons
-  Gauge,
-  Milestone,
-  Sliders,
-  FilePlus2,
+  LayoutDashboard,
+  RadioTower,
+  ClipboardPlus,
   ShieldAlert,
   FileWarning,
   Boxes,
-  PackageCheck,
+  PackageMinus,
   FileClock,
-  Hourglass,
-  Receipt,
-  FileSignature,
-  TrendingUp,
+  PackageSearch,
+  ArrowLeftRight,
+  ScanBarcode,
+  ShoppingCart,
+  ChartNoAxesCombined,
   ClipboardCheck,
   ListChecks,
-  Truck
+  HardHat,
+  ShieldCheck
 } from 'lucide-react';
 import { repairApi, transactionApi, searchApi } from '../api';
 import type { GlobalSearchResults } from '../types';
@@ -656,10 +656,10 @@ const Layout: React.FC = () => {
           
           <nav style={{ flexGrow: 1 }}>
             <NavLink to="/" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <Gauge size={18} /> <span className="nav-text">ภาพรวมระบบ</span>
+              <LayoutDashboard size={18} /> <span className="nav-text">ภาพรวมระบบ</span>
             </NavLink>
             <NavLink to="/stations" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <Milestone size={18} /> <span className="nav-text">ค้นหาข้อมูลสถานี</span>
+              <RadioTower size={18} /> <span className="nav-text">ค้นหาข้อมูลสถานี</span>
             </NavLink>
             <NavLink to="/my-tasks" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <ListChecks size={18} /> <span className="nav-text">งานของฉัน</span>
@@ -670,13 +670,13 @@ const Layout: React.FC = () => {
 
             <div className="nav-label">งานซ่อมบำรุง</div>
             <NavLink to="/repairs" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <Sliders size={18} /> <span className="nav-text">ทะเบียนงานซ่อม</span>
+              <Wrench size={18} /> <span className="nav-text">ทะเบียนงานซ่อม</span>
               {unreadRepairCount > 0 && (
                 <span className="pulse-dot">{unreadRepairCount}</span>
               )}
             </NavLink>
             <NavLink to="/new" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <FilePlus2 size={18} /> <span className="nav-text">บันทึกแจ้งซ่อม</span>
+              <ClipboardPlus size={18} /> <span className="nav-text">บันทึกแจ้งซ่อม</span>
             </NavLink>
             
             <div className="nav-label">การเคลมพัสดุ</div>
@@ -692,24 +692,24 @@ const Layout: React.FC = () => {
             
             <div className="nav-label">คลังสินค้าและประวัติ</div>
             <NavLink to="/inventory" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>  
-              <Boxes size={18} /> <span className="nav-text">รายการพัสดุคงคลัง</span>
+              <PackageSearch size={18} /> <span className="nav-text">รายการพัสดุคงคลัง</span>
               {lowStockCount > 0 && (
                 <span className="pulse-dot">{lowStockCount}</span>
               )}
             </NavLink>
             <NavLink to="/transactions" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <Receipt size={18} /> <span className="nav-text">บัญชีคุมยอดพัสดุ</span>
+              <ArrowLeftRight size={18} /> <span className="nav-text">บัญชีคุมยอดพัสดุ</span>
             </NavLink>
             <NavLink to="/stock-counts" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <ClipboardCheck size={18} /> <span className="nav-text">ตรวจนับสต็อก</span>
+              <ScanBarcode size={18} /> <span className="nav-text">ตรวจนับสต็อก</span>
             </NavLink>
 
             <div className="nav-label">สต็อกขาเข้า (Inbound)</div>
             <NavLink to="/purchase-orders" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
-              <FileSignature size={18} /> <span className="nav-text">ใบจัดสั่งซื้อ (PO)</span>
+              <ShoppingCart size={18} /> <span className="nav-text">ใบจัดสั่งซื้อ (PO)</span>
             </NavLink>
             <NavLink to="/pending-returns" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
-              <Hourglass size={18} /> <span className="nav-text">ตรวจรับของคืนคลัง</span>
+              <ClipboardCheck size={18} /> <span className="nav-text">ตรวจรับของคืนคลัง</span>
               {pendingReturnsCount > 0 && (
                 <span className="pulse-dot">{pendingReturnsCount}</span>
               )}
@@ -717,13 +717,13 @@ const Layout: React.FC = () => {
 
             <div className="nav-label">สต็อกขาออก (Outbound)</div>
             <NavLink to="/withdrawal" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
-              <PackageCheck size={18} /> <span className="nav-text">ใบเบิกจ่ายพัสดุอุปกรณ์</span>
+              <PackageMinus size={18} /> <span className="nav-text">ใบเบิกจ่ายพัสดุอุปกรณ์</span>
             </NavLink>
             <NavLink to="/withdrawal-history" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <FileClock size={18} /> <span className="nav-text">ประวัติการเบิกจ่าย</span>
             </NavLink>
             <NavLink to="/technician-stock" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <Truck size={18} /> <span className="nav-text">อะไหล่สำรองประจำตัวช่าง</span>
+              <HardHat size={18} /> <span className="nav-text">อะไหล่สำรองประจำตัวช่าง</span>
             </NavLink>
             <NavLink to="/technician-stock/movements" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <FileClock size={18} /> <span className="nav-text">ประวัติการใช้อะไหล่สำรอง</span>
@@ -731,7 +731,7 @@ const Layout: React.FC = () => {
 
             <div className="nav-label">รายงานวิเคราะห์</div>
             <NavLink to="/reports" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <TrendingUp size={18} /> <span className="nav-text">รายงานและสถิติ</span>
+              <ChartNoAxesCombined size={18} /> <span className="nav-text">รายงานและสถิติ</span>
             </NavLink>
  
             {user?.is_full && (
@@ -744,10 +744,10 @@ const Layout: React.FC = () => {
                   <Users size={18} /> <span className="nav-text">จัดการผู้ใช้และสิทธิ์</span>
                 </NavLink>
                 <NavLink to="/technicians" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                  <Wrench size={18} /> <span className="nav-text">จัดการรายชื่อช่าง</span>
+                  <HardHat size={18} /> <span className="nav-text">จัดการรายชื่อช่าง</span>
                 </NavLink>
                 <NavLink to="/users/audit-logs" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                  <Fingerprint size={18} /> <span className="nav-text">ประวัติการใช้งาน (Audit)</span>
+                  <ShieldCheck size={18} /> <span className="nav-text">ประวัติการใช้งาน (Audit)</span>
                 </NavLink>
               </>
             )}

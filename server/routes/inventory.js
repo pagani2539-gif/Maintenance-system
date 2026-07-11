@@ -9,11 +9,11 @@ router.get('/lifecycle-report', inventoryController.getLifecycleReport);
 router.get('/', inventoryController.getAllItems);
 router.get('/:id/instances', inventoryController.getInstancesInStock);
 router.get('/instances/:instanceId/timeline', inventoryController.getInstanceTimeline);
-router.patch('/instances/:instanceId/condition', inventoryController.updateInstanceCondition);
-router.post('/:id/serial-numbers', inventoryController.addInventorySerialNumbers);
-router.post('/import', inventoryController.bulkImport);
-router.post('/', uploadInventoryImage, inventoryController.createItem);
-router.patch('/:id', uploadInventoryImage, inventoryController.updateItem);
+router.patch('/instances/:instanceId/condition', requirePermission('manage.inventory'), inventoryController.updateInstanceCondition);
+router.post('/:id/serial-numbers', requirePermission('manage.inventory'), inventoryController.addInventorySerialNumbers);
+router.post('/import', requirePermission('manage.inventory'), inventoryController.bulkImport);
+router.post('/', requirePermission('manage.inventory'), uploadInventoryImage, inventoryController.createItem);
+router.patch('/:id', requirePermission('manage.inventory'), uploadInventoryImage, inventoryController.updateItem);
 router.delete('/:id', requirePermission('delete.inventory'), inventoryController.deleteItem);
 
 module.exports = router;

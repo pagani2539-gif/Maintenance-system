@@ -80,8 +80,8 @@ const ChangePassword: React.FC = () => {
           to { opacity: 1; transform: translateY(0); }
         }
         @keyframes pulse-logo {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(41, 182, 246, 0.25); }
-          50% { box-shadow: 0 0 0 10px rgba(41, 182, 246, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.25); }
+          50% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
         }
         .login-card-container {
           animation: login-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -98,7 +98,7 @@ const ChangePassword: React.FC = () => {
           left: 10%;
           width: 320px;
           height: 320px;
-          background: #29b6f6;
+          background: #60a5fa;
           opacity: 0.14;
           animation: float-blob-1 12s infinite ease-in-out;
         }
@@ -107,7 +107,7 @@ const ChangePassword: React.FC = () => {
           right: 15%;
           width: 380px;
           height: 380px;
-          background: #0ea5e9;
+          background: #2563eb;
           opacity: 0.12;
           animation: float-blob-2 15s infinite ease-in-out;
         }
@@ -121,15 +121,15 @@ const ChangePassword: React.FC = () => {
           animation: float-blob-3 10s infinite ease-in-out;
         }
         [data-theme='dark'] .bg-blob-1 {
-          background: #0284c7;
+          background: #1d4ed8;
           opacity: 0.08;
         }
         [data-theme='dark'] .bg-blob-2 {
-          background: #0369a1;
+          background: #1e40af;
           opacity: 0.08;
         }
         [data-theme='dark'] .bg-blob-3 {
-          background: #1e3a8a;
+          background: #172554;
           opacity: 0.05;
         }
       `}</style>
@@ -169,7 +169,7 @@ const ChangePassword: React.FC = () => {
             background: 'var(--primary-light)',
             marginBottom: '16px',
             animation: 'pulse-logo 2.5s infinite',
-            border: '1px solid rgba(41, 182, 246, 0.15)',
+            border: '1px solid rgba(37, 99, 235, 0.18)',
           }}>
             <KeyRound size={26} color="var(--primary)" />
           </div>
@@ -179,7 +179,7 @@ const ChangePassword: React.FC = () => {
             fontWeight: 800,
             color: 'var(--text-main)',
             letterSpacing: '-0.02em',
-            fontFamily: '"Outfit", "Sarabun", sans-serif'
+            fontFamily: '"Bai Jamjuree", "Sarabun", sans-serif'
           }}>
             {isFirstLogin ? 'กรุณาตั้งรหัสผ่านใหม่' : 'เปลี่ยนรหัสผ่าน'}
           </h2>
@@ -189,7 +189,7 @@ const ChangePassword: React.FC = () => {
               fontSize: '0.82rem', 
               color: 'var(--text-muted)',
               fontWeight: 500,
-              fontFamily: '"Outfit", "Sarabun", sans-serif'
+              fontFamily: '"Bai Jamjuree", "Sarabun", sans-serif'
             }}>
               นี่คือการเข้าสู่ระบบครั้งแรก กรุณาเปลี่ยนรหัสผ่านเริ่มต้น
             </p>

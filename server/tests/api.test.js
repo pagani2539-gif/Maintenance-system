@@ -40,6 +40,15 @@ describe('API Basic Endpoints', () => {
     const res = await request(app).get('/api');
     expect(res.statusCode).toEqual(200);
     expect(res.body).toHaveProperty('message');
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+    expect(res.headers['permissions-policy']).toContain('camera=(self)');
+  });
+
+  it('should report database readiness without leaking details', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.statusCode).toEqual(200);
+    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.headers['cache-control']).toBe('no-store');
   });
 
   it('should get inventory items', async () => {

@@ -15,7 +15,7 @@ import { BackButton } from '../components/ui/BackButton';
 
 const TYPE_META: Record<TechnicianMovementType, { label: string; icon: React.ReactNode; bg: string; color: string }> = {
   LOAD: { label: 'โหลดเข้าช่าง', icon: <Truck size={12} />, bg: 'var(--primary-light)', color: 'var(--primary)' },
-  INSTALL: { label: 'ติดตั้ง/เปลี่ยน', icon: <PackageOpen size={12} />, bg: 'rgba(217, 119, 6, 0.12)', color: '#d97706' },
+  INSTALL: { label: 'ติดตั้ง/เปลี่ยน', icon: <PackageOpen size={12} />, bg: 'var(--primary-light)', color: 'var(--primary)' },
   RETURN: { label: 'คืนคลัง', icon: <Undo2 size={12} />, bg: 'var(--success-light)', color: 'var(--success)' },
   ADJUST: { label: 'ปรับยอด', icon: <SlidersHorizontal size={12} />, bg: 'var(--bg-app)', color: 'var(--text-muted)' },
 };

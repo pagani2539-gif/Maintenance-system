@@ -41,6 +41,10 @@
    # โฟลเดอร์ bin ของ PostgreSQL (สำหรับฟีเจอร์สำรอง/กู้คืนข้อมูล)
    PG_BIN_DIR=C:\Program Files\PostgreSQL\18\bin
 
+   # โฟลเดอร์สำรองที่อยู่นอกเครื่อง server เช่น network share หรือ cloud-sync drive
+   # ระบบจะ copy และตรวจสอบขนาดไฟล์ทุกครั้งที่ backup สำเร็จ
+   OFFSITE_BACKUP_DIR=\\backup-server\maintenance-system
+
    # เว้นว่างได้ถ้าเข้าผ่าน origin เดียวกับ Server (กรณีปกติ)
    CORS_ORIGIN=
 

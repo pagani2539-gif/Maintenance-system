@@ -41,6 +41,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 const ClaimList: React.FC = () => {
   const { notify, confirm } = useNotification();
   const { hasPermission } = useAuth();
+  const canManageClaims = hasPermission('manage.claims');
   const { urlState, setTableState } = useTableUrlState(20);
   
   const [showModal, setShowModal] = useState<{ id: number, type: 'receive' | 'complete' | 'hold' } | null>(null);
@@ -338,7 +339,7 @@ const ClaimList: React.FC = () => {
           <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--success)' }}>
             <CheckCircle2 size={18} /> บันทึกการเคลม
           </h4>
-          <div style={{ padding: '1.25rem', backgroundColor: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)', color: 'var(--success)', fontWeight: 500 }}>
+          <div style={{ padding: '1.25rem', backgroundColor: 'var(--success-light)', borderRadius: '12px', border: '1px solid var(--success-border)', color: 'var(--success)', fontWeight: 500 }}>
             {row.repair_note}
           </div>
         </section>
@@ -346,12 +347,12 @@ const ClaimList: React.FC = () => {
 
       <div style={{ marginTop: 'auto', paddingTop: '2rem', display: 'flex', gap: '1rem' }}>
         <Link to={`/claim-history/${row.id}`} style={{ flex: 1 }}><Button variant="primary" style={{ width: '100%' }}>เปิดหน้างานเคลม</Button></Link>
-        {row.status !== 'เสร็จสิ้น' && (
+        {canManageClaims && row.status !== 'เสร็จสิ้น' && (
           <Button variant="outline" style={{ flex: 1 }} onClick={() => setShowModal({ id: row.id, type: row.status === 'รอดำเนินการ' || row.status === 'รออะไหล่' ? 'receive' : 'complete' })}>อัปเดตสถานะ</Button>
         )}
       </div>
     </div>
-  ), []);
+  ), [canManageClaims]);
 
   return (
     <div className="repair-board" style={{ padding: '2rem 2.5rem', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
@@ -363,8 +364,8 @@ const ClaimList: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก Excel</Button>
-          <Link to="/claim"><Button variant="primary" icon={<Plus size={20} />}>แจ้งเคลมใหม่</Button></Link>
-          <Link to="/new"><Button variant="outline" icon={<Plus size={20} />}>แจ้งซ่อมใหม่</Button></Link>
+          {canManageClaims && <Link to="/claim"><Button variant="primary" icon={<Plus size={20} />}>แจ้งเคลมใหม่</Button></Link>}
+          {hasPermission('manage.repairs') && <Link to="/new"><Button variant="outline" icon={<Plus size={20} />}>แจ้งซ่อมใหม่</Button></Link>}
         </div>
       </div>
 

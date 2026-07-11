@@ -66,6 +66,8 @@ interface LastWithdrawalData {
   items_detail: WithdrawalItem[];
 }
 
+type WithdrawalFieldErrors = Partial<Record<'items' | 'projectName' | 'stationId' | 'customType' | 'quantities' | 'dueDate', string>>;
+
 const NewWithdrawal: React.FC = () => {
   const { notify, playNotificationSound } = useNotification();
   const { user } = useAuth();
@@ -85,6 +87,7 @@ const NewWithdrawal: React.FC = () => {
   const [note, setNote] = useState('');
   const [borrowDuration, setBorrowDuration] = useState<'7' | '15' | '30' | 'custom'>('7');
   const [customDueDate, setCustomDueDate] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<WithdrawalFieldErrors>({});
   
   const [loading, setLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -103,6 +106,30 @@ const NewWithdrawal: React.FC = () => {
 
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
+
+  const clearFieldError = (field: keyof WithdrawalFieldErrors) => {
+    setFieldErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateWithdrawal = (): WithdrawalFieldErrors => {
+    const errors: WithdrawalFieldErrors = {};
+    const returnableTypes = ['สำรองใช้งาน', 'ทดสอบ', 'ยืมใช้งาน'];
+
+    if (selectedItems.length === 0) errors.items = 'เลือกอุปกรณ์อย่างน้อย 1 รายการ';
+    if (!projectName.trim()) errors.projectName = 'ระบุชื่อโครงการหรืองานที่ใช้พัสดุ';
+    if (!stationId) errors.stationId = 'เลือกสถานที่หรือด่านปลายทาง';
+    if (selectedType === 'อื่นๆ...' && !customType.trim()) errors.customType = 'ระบุประเภทการเบิก';
+    if (selectedItems.some(item => item.quantity <= 0 || item.quantity > item.max_quantity)) errors.quantities = 'ตรวจสอบจำนวนพัสดุให้ไม่เกินคงเหลือ';
+    if (returnableTypes.includes(type.trim()) && borrowDuration === 'custom' && !customDueDate) errors.dueDate = 'เลือกวันกำหนดส่งคืน';
+
+    setFieldErrors(errors);
+    return errors;
+  };
 
   const searchParams = new URLSearchParams(locationSearch.search);
   const stationIdParam = searchParams.get('station_id');
@@ -180,6 +207,7 @@ const NewWithdrawal: React.FC = () => {
     }]);
     setIsDropdownOpen(false);
     setSearchTerm('');
+    clearFieldError('items');
   };
 
   const removeItem = (inventoryId: number) => {
@@ -200,6 +228,7 @@ const NewWithdrawal: React.FC = () => {
       }
       return si;
     }));
+    clearFieldError('quantities');
   };
 
   const updateItemSerial = (inventoryId: number, index: number, sn: string) => {
@@ -276,18 +305,23 @@ const NewWithdrawal: React.FC = () => {
     const trimmedType = type.trim();
     const trimmedNote = note.trim();
 
-    if (selectedItems.length === 0) {
-      notify('กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการ', 'error', 'ระบบคลังพัสดุ', 'inventory');
+    const errors = validateWithdrawal();
+    if (Object.keys(errors).length > 0) {
+      const firstField = (['items', 'projectName', 'stationId', 'customType', 'quantities', 'dueDate'] as const)
+        .find(field => errors[field]);
+      if (firstField) {
+        window.setTimeout(() => document.getElementById(`withdrawal-${firstField}`)?.focus(), 0);
+      }
+      notify('กรุณาตรวจสอบข้อมูลที่ระบบไฮไลต์ไว้', 'error', 'ระบบคลังพัสดุ', 'inventory');
       return;
     }
+
+    // validateWithdrawal above guarantees a station is selected; retain this
+    // guard so TypeScript and the API payload keep the invariant explicit.
+    if (!stationId) return;
 
     if (!trimmedRecipient) {
       notify('กรุณากรอกชื่อผู้เบิก / หน่วยงาน', 'error', 'ระบบคลังพัสดุ', 'inventory');
-      return;
-    }
-
-    if (!trimmedProjectName) {
-      notify('กรุณากรอกชื่อโครงการ / งาน', 'error', 'ระบบคลังพัสดุ', 'inventory');
       return;
     }
 
@@ -298,11 +332,6 @@ const NewWithdrawal: React.FC = () => {
 
     if (trimmedProjectName.length > 100) {
       notify('ชื่อโครงการยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
-      return;
-    }
-
-    if (!stationId) {
-      notify('กรุณาเลือกสถานที่/ด่านตรวจควบคุมน้ำหนัก', 'error', 'ระบบคลังพัสดุ', 'inventory');
       return;
     }
 
@@ -319,16 +348,6 @@ const NewWithdrawal: React.FC = () => {
 
     if (trimmedNote.length > 1000) {
       notify('หมายเหตุยาวเกินไป (ไม่เกิน 1000 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
-      return;
-    }
-
-    if (selectedItems.some(si => si.quantity <= 0)) {
-      notify('กรุณาระบุจำนวนอุปกรณ์ให้มากกว่า 0', 'error', 'ระบบคลังพัสดุ', 'inventory');
-      return;
-    }
-
-    if (selectedItems.some(si => si.quantity > si.max_quantity)) {
-      notify('จำนวนที่เบิกเกินจำนวนอุปกรณ์คงเหลือในคลัง', 'error', 'ระบบคลังพัสดุ', 'inventory');
       return;
     }
 
@@ -514,7 +533,13 @@ const NewWithdrawal: React.FC = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
+        {Object.keys(fieldErrors).length > 0 && (
+          <div className="form-validation-summary" role="alert">
+            <span aria-hidden="true">!</span>
+            <span>กรุณาตรวจสอบข้อมูลที่จำเป็น {Object.keys(fieldErrors).length} จุดก่อนบันทึกการเบิก</span>
+          </div>
+        )}
         <div className="withdrawal-layout">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
             {/* Item Selection Card */}
@@ -524,12 +549,14 @@ const NewWithdrawal: React.FC = () => {
 
                 {/* Custom Searchable Dropdown */}
                 <div ref={dropdownRef} style={{ position: 'relative', marginTop: '8px' }}>
-                  <div 
+                  <div
+                    id="withdrawal-items"
+                    tabIndex={-1}
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     style={{ 
                       padding: '12px 16px', 
                       background: 'var(--bg-card)', 
-                      border: '1px solid var(--border)', 
+                      border: fieldErrors.items ? '1px solid var(--danger)' : '1px solid var(--border)',
                       borderRadius: '12px',
                       cursor: 'pointer',
                       display: 'flex',
@@ -542,6 +569,7 @@ const NewWithdrawal: React.FC = () => {
                     <span>{isDropdownOpen ? 'กำลังค้นหา...' : '-- คลิกเพื่อค้นหาและเลือกอุปกรณ์ --'}</span>
                     <ChevronDown size={18} style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                   </div>
+                  {fieldErrors.items && <span className="form-field-error" role="alert">{fieldErrors.items}</span>}
 
                   {isDropdownOpen && (
                     <div style={{ 
@@ -618,7 +646,7 @@ const NewWithdrawal: React.FC = () => {
               </div>
 
               {selectedItems.length > 0 ? (
-                <div className="data-table-container" style={{ marginTop: '1.5rem' }}>
+                <div id="withdrawal-quantities" tabIndex={-1} className="data-table-container" style={{ marginTop: '1.5rem', borderColor: fieldErrors.quantities ? 'var(--danger)' : undefined }}>
                   <table className="data-table" style={{ minWidth: '750px' }}>
                     <thead>
                       <tr>
@@ -791,7 +819,7 @@ const NewWithdrawal: React.FC = () => {
                                   transition: 'all 0.2s'
                                 }}
                                 title={`เปิดใช้งานการติดตามด้วย S/N สำหรับอุปกรณ์นี้ (${si.quantity} ชิ้น)`}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary-light)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-app)'; }}
                               >
                                 <Plus size={14} /> เพิ่ม S/N เพื่อติดตาม
@@ -816,6 +844,7 @@ const NewWithdrawal: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                  {fieldErrors.quantities && <span className="form-field-error" role="alert">{fieldErrors.quantities}</span>}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '3rem', border: '1.5px dashed var(--border)', borderRadius: '12px', background: 'var(--bg-app)' }}>
@@ -850,13 +879,15 @@ const NewWithdrawal: React.FC = () => {
                   maxLength={100}
                   placeholder="ระบุชื่อโครงการ..."
                   value={projectName}
-                  onChange={e => setProjectName(e.target.value)}
+                  onChange={e => { setProjectName(e.target.value); clearFieldError('projectName'); }}
                   disabled={loading}
+                  id="withdrawal-projectName"
+                  error={fieldErrors.projectName}
                 />
               </FormSection>
 
               <FormSection title="สถานที่ & สัญญา" icon={<MapPin size={18} />} columns={1}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
+                <div id="withdrawal-stationId" className="form-group" style={{ marginBottom: 0 }} tabIndex={-1}>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
                     สถานที่ตั้งด่าน / จุดควบคุมน้ำหนักทางหลวง <span style={{ color: 'var(--danger)' }}>*</span>
                   </label>
@@ -867,8 +898,10 @@ const NewWithdrawal: React.FC = () => {
                     onChange={(data) => {
                       setStationId(data.stationId);
                       setLocation(data.stationName);
+                      clearFieldError('stationId');
                     }}
                   />
+                  {fieldErrors.stationId && <span className="form-field-error" role="alert">{fieldErrors.stationId}</span>}
                 </div>
 
                 <Input
@@ -942,6 +975,7 @@ const NewWithdrawal: React.FC = () => {
                               setType(customType);
                             }
                             setIsTypeDropdownOpen(false);
+                            clearFieldError('customType');
                           }}
                           style={{ 
                             padding: '10px 16px', 
@@ -971,14 +1005,17 @@ const NewWithdrawal: React.FC = () => {
                   onChange={e => {
                     setCustomType(e.target.value);
                     setType(e.target.value);
+                    clearFieldError('customType');
                   }}
                   disabled={loading}
+                  id="withdrawal-customType"
+                  error={fieldErrors.customType}
                 />
               )}
 
               {/* Due Date selection for returnable withdrawal types */}
               {['สำรองใช้งาน', 'ทดสอบ', 'ยืมใช้งาน'].includes(type) && (
-                <div className="form-group" style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(217, 119, 6, 0.05)', borderRadius: '12px', border: '1px solid rgba(217, 119, 6, 0.15)' }}>
+                <div className="form-group" style={{ marginTop: '1rem', padding: '1rem', background: 'var(--warning-light)', borderRadius: '12px', border: '1px solid var(--warning-border)' }}>
                   <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', marginBottom: '8px', color: 'var(--primary)' }}>
                     กำหนดวันส่งคืนอุปกรณ์
                   </label>
@@ -992,7 +1029,10 @@ const NewWithdrawal: React.FC = () => {
                       <button
                         key={preset.value}
                         type="button"
-                        onClick={() => setBorrowDuration(preset.value as '7' | '15' | '30' | 'custom')}
+                        onClick={() => {
+                          setBorrowDuration(preset.value as '7' | '15' | '30' | 'custom');
+                          if (preset.value !== 'custom') clearFieldError('dueDate');
+                        }}
                         style={{
                           flex: 1,
                           padding: '8px 12px',
@@ -1012,13 +1052,14 @@ const NewWithdrawal: React.FC = () => {
                     ))}
                   </div>
                   {borrowDuration === 'custom' && (
-                    <div style={{ marginTop: '8px' }}>
+                    <div id="withdrawal-dueDate" style={{ marginTop: '8px' }} tabIndex={-1}>
                       <DatePicker
                         value={customDueDate}
-                        onChange={(val) => setCustomDueDate(val)}
+                        onChange={(val) => { setCustomDueDate(val); clearFieldError('dueDate'); }}
                         placeholder="เลือกวันกำหนดส่งคืน"
                         style={{ width: '100%' }}
                       />
+                      {fieldErrors.dueDate && <span className="form-field-error" role="alert">{fieldErrors.dueDate}</span>}
                     </div>
                   )}
                 </div>
@@ -1066,7 +1107,7 @@ const NewWithdrawal: React.FC = () => {
       {/* Global CSS for dropdown hover */}
       <style>{`
         .dropdown-item-hover:hover {
-          background: rgba(59, 130, 246, 0.08) !important;
+          background: var(--primary-light) !important;
         }
       `}</style>
     </div>

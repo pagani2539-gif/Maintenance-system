@@ -85,11 +85,17 @@ const ActionQueue: React.FC<ActionQueueProps> = ({
       to: '/pending-returns'
     }));
     // เรียง: danger ก่อน warning แล้วไล่ตามระดับความเร่งด่วนมาก→น้อย
-    return list.sort((a, b) =>
-      a.severity === b.severity
-        ? b.urgency - a.urgency
-        : a.severity === 'danger' ? -1 : 1
-    );
+    const categoryPriority: Record<ActionItem['category'], number> = {
+      stock: 0,
+      return: 1,
+      sla: 2
+    };
+    return list.sort((a, b) => {
+      const categoryDiff = categoryPriority[a.category] - categoryPriority[b.category];
+      if (categoryDiff !== 0) return categoryDiff;
+      if (a.severity !== b.severity) return a.severity === 'danger' ? -1 : 1;
+      return b.urgency - a.urgency;
+    });
   }, [overdue, criticalItems, pendingReturns]);
 
   const visible = items.slice(0, MAX_ROWS);
@@ -102,9 +108,9 @@ const ActionQueue: React.FC<ActionQueueProps> = ({
   }, [items, visible]);
 
   const chips = [
-    { label: 'งานเกิน SLA', count: overdue?.length || 0, severity: 'danger' as const, icon: <AlertCircle size={17} />, to: '/repairs' },
     { label: 'สต็อกวิกฤต', count: criticalStockCount, severity: 'danger' as const, icon: <ShieldAlert size={17} />, to: '/inventory' },
     { label: 'ค้างคืน', count: pendingReturnsCount, severity: 'warning' as const, icon: <Hourglass size={17} />, to: '/pending-returns' },
+    { label: 'งานเกิน SLA', count: overdue?.length || 0, severity: 'danger' as const, icon: <AlertCircle size={17} />, to: '/repairs' },
     { label: 'ด่านไม่มีผู้ดูแล', count: unassignedStationsCount, severity: 'warning' as const, icon: <MapPin size={17} />, to: '/stations' }
   ];
 

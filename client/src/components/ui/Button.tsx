@@ -25,12 +25,13 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       className={`btn ${variantClass} ${sizeClass} ${className}`}
       disabled={isDisabled}
+      aria-busy={loading || undefined}
       {...props}
     >
       {loading ? (
-        <span className="spinner-sm" style={{ marginRight: '8px' }}></span>
+        <span className="spinner-sm btn__icon" aria-hidden="true"></span>
       ) : icon ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>
+        <span className="btn__icon" aria-hidden="true">{icon}</span>
       ) : null}
       {children}
     </button>

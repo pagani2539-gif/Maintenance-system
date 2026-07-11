@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
+import { StatusBadge, type StatusTone } from '../components/ui/StatusBadge';
 import { formatDateTimeThai } from '../utils/formatDate';
 import {
   Trash2,
@@ -39,6 +40,7 @@ import { useTableUrlState } from '../hooks/useTableUrlState';
 const PurchaseOrderList: React.FC = () => {
   const { notify, confirm } = useNotification();
   const { hasPermission } = useAuth();
+  const canManagePurchaseOrders = hasPermission('manage.purchase_orders');
   const { urlState, setTableState } = useTableUrlState(20);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState(false);
@@ -181,16 +183,14 @@ const PurchaseOrderList: React.FC = () => {
   const paginatedData = filteredData.slice(indexOfFirstItem, indexOfLastItem);
 
   const getStatusBadge = useCallback((status: string) => {
-    const badgeStyle = (bg: string, color: string, border: string): React.CSSProperties => ({
-      backgroundColor: bg, color: color, border: `1px solid ${border}`, padding: '4px 10px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', width: '90px', justifyContent: 'center'
-    });
+    const badge = (label: string, tone: StatusTone) => <StatusBadge tone={tone}>{label}</StatusBadge>;
     switch (status) {
-      case 'Draft': return <span style={badgeStyle('var(--bg-app)', 'var(--text-muted)', 'var(--border)')}>แบบร่าง</span>;
-      case 'Pending': return <span style={badgeStyle('var(--warning-light)', 'var(--warning)', 'var(--warning-border)')}>รออนุมัติ</span>;
-      case 'Approved': return <span style={badgeStyle('var(--info-light)', 'var(--info)', 'var(--info-border)')}>อนุมัติแล้ว</span>;
-      case 'Ordered': return <span style={badgeStyle('var(--primary-light)', 'var(--primary)', 'rgba(41, 182, 246, 0.4)')}>สั่งซื้อแล้ว</span>;
-      case 'Received': return <span style={badgeStyle('var(--success-light)', 'var(--success)', 'var(--success-border)')}>รับของแล้ว</span>;
-      case 'Cancelled': return <span style={badgeStyle('var(--danger-light)', 'var(--danger)', 'var(--danger-border)')}>ยกเลิก</span>;
+      case 'Draft': return badge('แบบร่าง', 'neutral');
+      case 'Pending': return badge('รออนุมัติ', 'warning');
+      case 'Approved': return badge('อนุมัติแล้ว', 'info');
+      case 'Ordered': return badge('สั่งซื้อแล้ว', 'primary');
+      case 'Received': return badge('รับของแล้ว', 'success');
+      case 'Cancelled': return badge('ยกเลิก', 'danger');
       default: return null;
     }
   }, []);
@@ -288,7 +288,7 @@ const PurchaseOrderList: React.FC = () => {
         setEditingPo(row);
         setIsNewPoModalOpen(true);
       },
-      hidden: (row) => row.status !== 'Draft',
+      hidden: (row) => !canManagePurchaseOrders || row.status !== 'Draft',
       inline: true
     },
     {
@@ -297,7 +297,7 @@ const PurchaseOrderList: React.FC = () => {
       icon: <Send size={14} />,
       variant: 'primary',
       onClick: (row) => handleUpdateStatus(row.id, 'Pending', 'ส่งขออนุมัติจัดซื้อเรียบร้อยแล้ว'),
-      hidden: (row) => row.status !== 'Draft',
+      hidden: (row) => !canManagePurchaseOrders || row.status !== 'Draft',
       inline: true
     },
     {
@@ -306,7 +306,7 @@ const PurchaseOrderList: React.FC = () => {
       icon: <CheckSquare size={14} />,
       variant: 'success',
       onClick: (row) => handleUpdateStatus(row.id, 'Approved', 'อนุมัติใบสั่งซื้อเรียบร้อยแล้ว'),
-      hidden: (row) => row.status !== 'Pending',
+      hidden: (row) => !canManagePurchaseOrders || row.status !== 'Pending',
       inline: true
     },
     {
@@ -315,7 +315,7 @@ const PurchaseOrderList: React.FC = () => {
       icon: <Send size={14} />,
       variant: 'primary',
       onClick: (row) => handleUpdateStatus(row.id, 'Ordered', 'บันทึกสถานะสั่งซื้อเรียบร้อยแล้ว'),
-      hidden: (row) => row.status !== 'Approved',
+      hidden: (row) => !canManagePurchaseOrders || row.status !== 'Approved',
       inline: true
     },
     {
@@ -324,7 +324,7 @@ const PurchaseOrderList: React.FC = () => {
       icon: <PackageCheck size={14} />,
       variant: 'primary',
       onClick: (row) => handleReceive(row.id),
-      hidden: (row) => row.status !== 'Ordered',
+      hidden: (row) => !canManagePurchaseOrders || row.status !== 'Ordered',
       inline: true
     },
     {
@@ -342,12 +342,13 @@ const PurchaseOrderList: React.FC = () => {
       handleReceive={handleReceive}
       handleUpdateStatus={handleUpdateStatus}
       getStatusBadge={getStatusBadge}
+      canManage={canManagePurchaseOrders}
       handleEdit={(selectedPo) => {
         setEditingPo(selectedPo);
         setIsNewPoModalOpen(true);
       }}
     />
-  ), [handleReceive, handleUpdateStatus, getStatusBadge]);
+  ), [canManagePurchaseOrders, handleReceive, handleUpdateStatus, getStatusBadge]);
 
   return (
     <div className="po-page fade-in" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
@@ -359,21 +360,21 @@ const PurchaseOrderList: React.FC = () => {
             <p>จัดการใบสั่งซื้อ ตรวจรับพัสดุ และสแกนสต็อกต่ำเพื่อสั่งซื้ออัตโนมัติ</p>
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <Button
+            {canManagePurchaseOrders && <Button
               variant="outline"
               icon={isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
               onClick={handleAutoGenerate}
               disabled={isGenerating}
             >
               {isGenerating ? 'กำลังสแกน...' : 'สแกนสต็อกต่ำ'}
-            </Button>
-            <Button
+            </Button>}
+            {canManagePurchaseOrders && <Button
               variant="primary"
               icon={<Plus size={16} />}
               onClick={() => setIsNewPoModalOpen(true)}
             >
               สร้างใบสั่งซื้อใหม่
-            </Button>
+            </Button>}
           </div>
         </div>
 
@@ -597,13 +598,15 @@ function PurchaseOrderDetailDrawerContent({
   handleReceive,
   handleUpdateStatus,
   getStatusBadge,
-  handleEdit
+  handleEdit,
+  canManage
 }: {
   po: PurchaseOrder;
   handleReceive: (id: number | string) => void;
   handleUpdateStatus: (id: number | string, newStatus: 'Draft' | 'Pending' | 'Approved' | 'Ordered' | 'Cancelled', successMsg: string) => Promise<void>;
   getStatusBadge: (status: string) => React.ReactNode;
   handleEdit: (po: PurchaseOrder) => void;
+  canManage: boolean;
 }) {
   const [poDetail, setPoDetail] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(false);
@@ -727,7 +730,7 @@ function PurchaseOrderDetailDrawerContent({
         </div>
       </section>
 
-      {currentPo.status === 'Draft' && (
+      {canManage && currentPo.status === 'Draft' && (
         <div style={{ marginTop: 'auto', paddingTop: '1rem', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'center', gap: '10px' }}>
           <Button variant="outline" size="sm" icon={<FileSignature size={16} />} onClick={() => handleEdit(currentPo)}>
             แก้ไข
@@ -737,7 +740,7 @@ function PurchaseOrderDetailDrawerContent({
           </Button>
         </div>
       )}
-      {currentPo.status === 'Pending' && (
+      {canManage && currentPo.status === 'Pending' && (
         <div style={{ marginTop: 'auto', paddingTop: '1rem', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'center', gap: '10px' }}>
           <Button variant="danger" size="sm" icon={<X size={16} />} onClick={() => handleUpdateStatus(currentPo.id, 'Draft', 'ส่งกลับไปเป็นแบบร่างเรียบร้อยแล้ว')}>
             ส่งกลับเพื่อแก้ไข
@@ -747,14 +750,14 @@ function PurchaseOrderDetailDrawerContent({
           </Button>
         </div>
       )}
-      {currentPo.status === 'Approved' && (
+      {canManage && currentPo.status === 'Approved' && (
         <div style={{ marginTop: 'auto', paddingTop: '1rem', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
           <Button variant="primary" size="sm" icon={<Send size={16} />} onClick={() => handleUpdateStatus(currentPo.id, 'Ordered', 'บันทึกสถานะสั่งซื้อเรียบร้อยแล้ว (รอส่งของ)')}>
             ยืนยันการส่งสั่งซื้อ (สั่งซื้อแล้ว)
           </Button>
         </div>
       )}
-      {currentPo.status === 'Ordered' && (
+      {canManage && currentPo.status === 'Ordered' && (
         <div style={{ marginTop: 'auto', paddingTop: '1rem', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
           <Button variant="success" size="sm" icon={<PackageCheck size={16} />} onClick={() => handleReceive(currentPo.id)}>
             ตรวจรับพัสดุเข้าคลัง

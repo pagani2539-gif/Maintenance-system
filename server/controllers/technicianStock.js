@@ -161,16 +161,21 @@ exports.loadStock = async (req, res) => {
         const qty = Number(item.quantity) || 0;
         if (qty <= 0) { const e = new Error('จำนวนต้องมากกว่า 0'); e.status = 400; throw e; }
 
-        const { rows: invRows } = await client.query(
-          'SELECT name, quantity FROM inventory WHERE id = $1', [item.inventory_id]);
-        const inv = invRows[0];
-        if (!inv || inv.quantity < qty) {
-          const e = new Error(inv ? `อุปกรณ์ "${inv.name}" ในคลังคงเหลือไม่เพียงพอ` : 'ไม่พบข้อมูลอุปกรณ์บางรายการ');
+        // Leaves the central warehouse shelf → atomically check-and-decrement
+        // inventory.quantity in one statement so two concurrent loads of the
+        // same low-stock item can't both pass a stale read and go negative.
+        const { rows: decRows } = await client.query(
+          `UPDATE inventory SET quantity = quantity - $1, updated_at = NOW()
+           WHERE id = $2 AND quantity >= $1
+           RETURNING name, quantity, min_stock`,
+          [qty, item.inventory_id]
+        );
+        if (decRows.length === 0) {
+          const { rows: nameRows } = await client.query('SELECT name FROM inventory WHERE id = $1', [item.inventory_id]);
+          const e = new Error(nameRows[0] ? `อุปกรณ์ "${nameRows[0].name}" ในคลังคงเหลือไม่เพียงพอ` : 'ไม่พบข้อมูลอุปกรณ์บางรายการ');
           e.status = 400; throw e;
         }
-
-        // Leaves the central warehouse shelf → decrement inventory.quantity.
-        await client.query('UPDATE inventory SET quantity = quantity - $1, updated_at = NOW() WHERE id = $2', [qty, item.inventory_id]);
+        const inv = decRows[0];
 
         const serials = cleanSerials(item.serial_numbers);
         if (serials.length > qty) { const e = new Error('จำนวน S/N มากกว่าจำนวนที่โหลด'); e.status = 400; throw e; }
@@ -215,9 +220,8 @@ exports.loadStock = async (req, res) => {
           });
         }
 
-        const { rows: chk } = await client.query('SELECT name, quantity, min_stock FROM inventory WHERE id = $1', [item.inventory_id]);
-        if (chk[0] && chk[0].quantity < chk[0].min_stock) {
-          lowStockAlerts.push(`\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nพัสดุ: ${chk[0].name}\nคงเหลือ: ${chk[0].quantity} ชิ้น (ขั้นต่ำ: ${chk[0].min_stock} ชิ้น)`);
+        if (inv.quantity < inv.min_stock) {
+          lowStockAlerts.push(`\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nพัสดุ: ${inv.name}\nคงเหลือ: ${inv.quantity} ชิ้น (ขั้นต่ำ: ${inv.min_stock} ชิ้น)`);
         }
       }
     });
@@ -399,6 +403,22 @@ exports.deleteMovement = async (req, res) => {
       const { rows } = await client.query('SELECT * FROM technician_stock_movements WHERE id = $1', [id]);
       const m = rows[0];
       if (!m) { const e = new Error('ไม่พบรายการที่ต้องการลบ'); e.status = 404; throw e; }
+
+      if (m.instance_id) {
+        // Only the latest movement for an instance may be reversed — undoing
+        // an older one while a newer movement has since moved it elsewhere
+        // would desync the instance's status/location from reality.
+        const { rows: latestRows } = await client.query(
+          `SELECT id FROM technician_stock_movements WHERE instance_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+          [m.instance_id]
+        );
+        if (latestRows[0] && String(latestRows[0].id) !== String(m.id)) {
+          const e = new Error('ไม่สามารถยกเลิกได้ เนื่องจากมีการเคลื่อนไหวใหม่กว่าสำหรับอุปกรณ์ชิ้นนี้แล้ว');
+          e.status = 409;
+          throw e;
+        }
+      }
+
       const absQty = Math.abs(Number(m.quantity) || 0);
 
       if (m.movement_type === 'LOAD') {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { stockCountApi } from '../api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { useNotification } from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_META: Record<StockCount['status'], { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  IN_PROGRESS: { label: 'กำลังตรวจนับ', color: '#d97706', bg: 'var(--warning-light)', icon: <Hourglass size={12} /> },
+  IN_PROGRESS: { label: 'กำลังตรวจนับ', color: 'var(--warning)', bg: 'var(--warning-light)', icon: <Hourglass size={12} /> },
   COMPLETED: { label: 'เสร็จสิ้น', color: 'var(--success)', bg: 'var(--success-light)', icon: <CheckCircle2 size={12} /> },
   CANCELLED: { label: 'ยกเลิก', color: 'var(--text-muted)', bg: 'var(--bg-app)', icon: <Ban size={12} /> },
 };
@@ -30,6 +31,8 @@ const STATUS_META: Record<StockCount['status'], { label: string; color: string; 
 const StockCountList: React.FC = () => {
   const navigate = useNavigate();
   const { notify } = useNotification();
+  const { hasPermission } = useAuth();
+  const canManageStockCounts = hasPermission('manage.stock_counts');
 
   const [counts, setCounts] = useState<StockCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +73,7 @@ const StockCountList: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageStockCounts) return;
     setCreating(true);
     try {
       const created = await stockCountApi.create({ note: note.trim() || undefined });
@@ -95,22 +99,22 @@ const StockCountList: React.FC = () => {
             <h2>ตรวจนับสต็อก (Stocktaking)</h2>
             <p>เปิดรอบตรวจนับ เทียบยอดของจริงกับยอดในระบบ และปรับยอดส่วนต่างพร้อมบันทึกประวัติ</p>
           </div>
-          {activeCount ? (
+          {canManageStockCounts && activeCount ? (
             <Button variant="warning" icon={<Hourglass size={16} />} onClick={() => navigate(`/stock-counts/${activeCount.id}`)}>
               นับต่อรอบ {activeCount.count_no}
             </Button>
-          ) : (
+          ) : canManageStockCounts ? (
             <Button variant="primary" icon={<PlusCircle size={16} />} onClick={() => setModalOpen(true)}>
               เปิดรอบตรวจนับใหม่
             </Button>
-          )}
+          ) : null}
         </div>
 
         {/* Stats */}
         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
           {[
             { key: 'All' as const, label: 'รอบตรวจนับทั้งหมด', val: stats.total, icon: ClipboardCheck, color: 'var(--primary)', bg: 'var(--primary-light)' },
-            { key: 'IN_PROGRESS' as const, label: 'กำลังดำเนินการ', val: stats.inProgress, icon: Hourglass, color: '#d97706', bg: 'var(--warning-light)' },
+            { key: 'IN_PROGRESS' as const, label: 'กำลังดำเนินการ', val: stats.inProgress, icon: Hourglass, color: 'var(--warning)', bg: 'var(--warning-light)' },
             { key: 'COMPLETED' as const, label: 'เสร็จสิ้นแล้ว', val: stats.completed, icon: CheckCircle2, color: 'var(--success)', bg: 'var(--success-light)' },
           ].map((s, i) => (
             <Card
@@ -180,7 +184,7 @@ const StockCountList: React.FC = () => {
                         className="dash-row-link"
                       >
                         <td style={td}>
-                          <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'Outfit, monospace' }}>{c.count_no}</span>
+                          <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: '"Bai Jamjuree", monospace' }}>{c.count_no}</span>
                           {c.note && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>{c.note}</div>}
                         </td>
                         <td style={td}>

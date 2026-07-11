@@ -9,7 +9,8 @@ export const exportToCsv = (fileName: string, headers: string[], rows: (string |
   const BOM = '\uFEFF';
   
   const escapeCsvCell = (val: string | number | null | undefined): string => {
-    const str = String(val === null || val === undefined ? '' : val).replace(/"/g, '""');
+    const raw = String(val === null || val === undefined ? '' : val);
+    const str = (raw.startsWith('=') || raw.startsWith('+') || raw.startsWith('-') || raw.startsWith('@') ? `'${raw}` : raw).replace(/"/g, '""');
     return str.includes(',') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
   };
 

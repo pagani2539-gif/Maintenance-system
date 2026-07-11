@@ -32,7 +32,7 @@ interface Props {
 
 const MODE_META: Record<TechnicianStockMode, { title: string; icon: React.ReactNode; cta: string; accent: string }> = {
   load: { title: 'โหลดอะไหล่เข้าช่าง', icon: <Truck size={22} />, cta: 'บันทึกการโหลด', accent: 'var(--primary)' },
-  install: { title: 'ติดตั้ง / เปลี่ยนอะไหล่ที่หน้างาน', icon: <PackageOpen size={22} />, cta: 'บันทึกการติดตั้ง', accent: 'var(--warning)' },
+  install: { title: 'ติดตั้ง / เปลี่ยนอะไหล่ที่หน้างาน', icon: <PackageOpen size={22} />, cta: 'บันทึกการติดตั้ง', accent: 'var(--primary)' },
   return: { title: 'คืนอะไหล่เข้าคลัง', icon: <Undo2 size={22} />, cta: 'บันทึกการคืน', accent: 'var(--success)' },
 };
 

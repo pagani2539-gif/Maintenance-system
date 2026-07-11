@@ -343,9 +343,11 @@ const RepairDetail: React.FC = () => {
           <button className="btn btn-primary" style={{ background: 'var(--text-main)' }} onClick={handlePrint}>
             <FileText size={18} /> <span className="hide-on-mobile">พิมพ์ใบงาน</span>
           </button>
-          <button className="btn btn-primary" onClick={() => setShowStatusModal(true)}>
-            <CheckCircle2 size={18} /> <span className="hide-on-mobile">อัปเดตสถานะ</span>
-          </button>
+          <PermissionGate require={repair.type === 'claim' ? 'manage.claims' : 'manage.repairs'}>
+            <button className="btn btn-primary" onClick={() => setShowStatusModal(true)}>
+              <CheckCircle2 size={18} /> <span className="hide-on-mobile">อัปเดตสถานะ</span>
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -372,9 +374,11 @@ const RepairDetail: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.95rem' }}><Settings size={16} color="var(--primary)"/> {parseDate(repair.updated_at).toLocaleString('th-TH')}</div>
             </div>
           </div>
-          <button className="btn btn-outline" style={{ borderRadius: '12px' }} onClick={() => setShowEditModal(true)}>
-             <Settings size={18} /> แก้ไขข้อมูล
-          </button>
+          <PermissionGate require={repair.type === 'claim' ? 'manage.claims' : 'manage.repairs'}>
+            <button className="btn btn-outline" style={{ borderRadius: '12px' }} onClick={() => setShowEditModal(true)}>
+               <Settings size={18} /> แก้ไขข้อมูล
+            </button>
+          </PermissionGate>
         </div>
 
         <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '8fr 4fr', gap: '2rem' }}>
@@ -465,17 +469,17 @@ const RepairDetail: React.FC = () => {
                         width: '20px', 
                         height: '20px', 
                         borderRadius: '50%', 
-                        backgroundColor: index === 0 ? 'var(--primary)' : '#cbd5e1', 
+                        backgroundColor: index === 0 ? 'var(--primary)' : 'var(--border-hover)',
                         zIndex: 1,
                         boxShadow: index === 0 ? '0 0 0 6px var(--primary-light)' : 'none',
                         border: '3px solid white'
                       }}></div>
-                      {index !== repair.logs.length - 1 && <div style={{ flexGrow: 1, width: '2px', backgroundColor: '#e2e8f0', margin: '6px 0' }}></div>}
+                      {index !== repair.logs.length - 1 && <div style={{ flexGrow: 1, width: '2px', backgroundColor: 'var(--border)', margin: '6px 0' }}></div>}
                     </div>
                     <div style={{ background: index === 0 ? 'var(--bg-app)' : 'transparent', padding: index === 0 ? '1.25rem' : '0', borderRadius: '16px', flex: 1, transition: 'all 0.3s' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <span style={{ fontWeight: 800, fontSize: '1.05rem', color: index === 0 ? 'var(--primary)' : 'var(--text-main)' }}>{log.action}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, background: 'rgba(0,0,0,0.04)', padding: '4px 10px', borderRadius: '99px' }}>{parseDate(log.created_at).toLocaleString('th-TH')}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, background: 'var(--bg-subtle)', padding: '4px 10px', borderRadius: '99px' }}>{parseDate(log.created_at).toLocaleString('th-TH')}</span>
                       </div>
                       <p style={{ fontSize: '1rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.6', fontWeight: 500 }}>{log.note}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 800 }}>
@@ -526,9 +530,11 @@ const RepairDetail: React.FC = () => {
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <Wrench size={20} color="var(--primary)" /> อะไหล่ที่เปลี่ยน
                 </h3>
-                <button className="btn btn-outline" style={{ padding: '6px', border: 'none' }} onClick={() => setShowDeviceModal(true)}>
-                  <PlusCircle size={20} />
-                </button>
+                <PermissionGate require={repair.type === 'claim' ? 'manage.claims' : 'manage.repairs'}>
+                  <button className="btn btn-outline" style={{ padding: '6px', border: 'none' }} onClick={() => setShowDeviceModal(true)}>
+                    <PlusCircle size={20} />
+                  </button>
+                </PermissionGate>
               </div>
               {repair.devices.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', background: 'var(--bg-app)', borderRadius: '20px' }}>

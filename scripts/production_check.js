@@ -46,6 +46,11 @@ async function main() {
     process.env.PG_BIN_DIR ? `pg_dump/pg_restore expected in ${process.env.PG_BIN_DIR}` : 'Set PG_BIN_DIR to the PostgreSQL bin folder (e.g. C:\\Program Files\\PostgreSQL\\18\\bin)'
   );
   addCheck('backup directory exists', exists('server/database/backups'), 'Database backup location');
+  addCheck(
+    'OFFSITE_BACKUP_DIR is set and accessible',
+    Boolean(process.env.OFFSITE_BACKUP_DIR) && fs.existsSync(process.env.OFFSITE_BACKUP_DIR),
+    process.env.OFFSITE_BACKUP_DIR || 'Set OFFSITE_BACKUP_DIR to a mounted network share or cloud-synced backup folder'
+  );
   addCheck('server dependencies installed', exists('server/node_modules'), 'Run npm.cmd install in server');
   addCheck('client dependencies installed', exists('client/node_modules'), 'Run npm.cmd install in client');
   addCheck('PM2 config exists', exists('ecosystem.config.cjs'), 'Use pm2 start ecosystem.config.cjs');

@@ -42,8 +42,10 @@ const loadEnv = () => {
   const envName = process.env.NODE_ENV || 'development';
   const serverRoot = path.join(__dirname, '..');
 
-  loadEnvFile(path.join(serverRoot, '.env'));
+  // Environment-specific file loads first so its values win; loadEnvFile's
+  // "only set if undefined" guard makes the base .env act as a fallback.
   loadEnvFile(path.join(serverRoot, `.env.${envName}`));
+  loadEnvFile(path.join(serverRoot, '.env'));
 };
 
 module.exports = loadEnv;

@@ -176,24 +176,29 @@ exports.completeCount = async (req, res) => {
 
         // Apply the variance relative to the *current* quantity (not the
         // snapshot) so stock movements made while counting are preserved.
+        // The old_quantity CTE captures the pre-update value so the audit
+        // log below can record what was actually applied after clamping,
+        // not the raw (possibly larger) snapshot-vs-count variance.
         const { rows: updated } = await client.query(
-          `UPDATE inventory SET quantity = GREATEST(0, quantity + $1), updated_at = NOW()
-           WHERE id = $2 RETURNING quantity`,
+          `WITH old AS (SELECT quantity AS old_quantity FROM inventory WHERE id = $2)
+           UPDATE inventory SET quantity = GREATEST(0, quantity + $1), updated_at = NOW()
+           WHERE id = $2 RETURNING quantity, (SELECT old_quantity FROM old) AS old_quantity`,
           [variance, it.inventory_id]
         );
+        const appliedDelta = updated[0].quantity - updated[0].old_quantity;
 
         const noteText = `ปรับยอดจากการตรวจนับ ${count.count_no}` + (it.note ? ` — ${it.note}` : '');
-        if (variance > 0) {
+        if (appliedDelta > 0) {
           await client.query(
             `INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_added, user_name, note)
              VALUES ($1, 'ADD_STOCK', $2, $3, $4)`,
-            [it.inventory_id, variance, it.counted_by || actor, noteText]
+            [it.inventory_id, appliedDelta, it.counted_by || actor, noteText]
           );
-        } else {
+        } else if (appliedDelta < 0) {
           await client.query(
             `INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_withdrawn, user_name, note, status)
              VALUES ($1, 'WITHDRAW', $2, $3, $4, 'ADJUSTED')`,
-            [it.inventory_id, Math.abs(variance), it.counted_by || actor, noteText]
+            [it.inventory_id, Math.abs(appliedDelta), it.counted_by || actor, noteText]
           );
         }
 

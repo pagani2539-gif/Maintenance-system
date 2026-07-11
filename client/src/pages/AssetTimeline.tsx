@@ -133,7 +133,7 @@ const AssetTimeline: React.FC = () => {
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 {instance.model && <span style={{ fontWeight: 600 }}>{instance.model}</span>}
                 {instance.serial_number && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700, color: 'var(--primary)', fontFamily: 'Outfit, monospace' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700, color: 'var(--primary)', fontFamily: '"Bai Jamjuree", monospace' }}>
                     <Hash size={13} /> {instance.serial_number}
                   </span>
                 )}

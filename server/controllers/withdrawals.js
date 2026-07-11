@@ -93,14 +93,22 @@ exports.createWithdrawal = async (req, res) => {
       const newWithdrawalId = rows[0].id;
 
       for (const item of items) {
-        // Check stock first
-        const { rows: invRows } = await client.query('SELECT name, quantity FROM inventory WHERE id = $1', [item.inventory_id]);
-        const invItem = invRows[0];
-        if (!invItem || invItem.quantity < item.quantity) {
-          const err = new Error(invItem ? `อุปกรณ์ "${invItem.name}" คงเหลือไม่เพียงพอ` : 'ไม่พบข้อมูลอุปกรณ์บางรายการ');
+        // Atomically check-and-decrement in one statement so two concurrent
+        // withdrawals of the same low-stock item can't both pass a stale
+        // read and drive quantity negative.
+        const { rows: decRows } = await client.query(
+          `UPDATE inventory SET quantity = quantity - $1, updated_at = NOW()
+           WHERE id = $2 AND quantity >= $1
+           RETURNING name, quantity, min_stock`,
+          [item.quantity, item.inventory_id]
+        );
+        if (decRows.length === 0) {
+          const { rows: nameRows } = await client.query('SELECT name FROM inventory WHERE id = $1', [item.inventory_id]);
+          const err = new Error(nameRows[0] ? `อุปกรณ์ "${nameRows[0].name}" คงเหลือไม่เพียงพอ` : 'ไม่พบข้อมูลอุปกรณ์บางรายการ');
           err.status = 400;
           throw err;
         }
+        const invCheck = decRows[0];
 
         // Insert withdrawal item with comma-separated serial numbers
         const serialNumbersStr = (item.serial_numbers && item.serial_numbers.length > 0)
@@ -112,14 +120,8 @@ exports.createWithdrawal = async (req, res) => {
           VALUES ($1, $2, $3, $4)
         `, [newWithdrawalId, item.inventory_id, item.quantity, serialNumbersStr]);
 
-        // Update inventory
-        await client.query('UPDATE inventory SET quantity = quantity - $1, updated_at = NOW() WHERE id = $2',
-          [item.quantity, item.inventory_id]);
-
         // Check if stock is now below min_stock
-        const { rows: checkRows } = await client.query('SELECT name, quantity, min_stock FROM inventory WHERE id = $1', [item.inventory_id]);
-        const invCheck = checkRows[0];
-        if (invCheck && invCheck.quantity < invCheck.min_stock) {
+        if (invCheck.quantity < invCheck.min_stock) {
           const stockAlertMsg = `\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nพัสดุ: ${invCheck.name}\nคงเหลือ: ${invCheck.quantity} ชิ้น (เกณฑ์ขั้นต่ำ: ${invCheck.min_stock} ชิ้น)`;
           sendLineNotify('stock', stockAlertMsg);
         }

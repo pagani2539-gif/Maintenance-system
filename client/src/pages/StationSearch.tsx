@@ -82,7 +82,7 @@ const CONDITION_OPTIONS = ['ปกติ', 'ชำรุด', 'ชำรุด�
 const CONDITION_META: Record<string, { icon: string; color: string; bg: string }> = {
   'ปกติ':          { icon: '✓', color: 'var(--success)', bg: 'var(--success-light)' },   // เขียว
   'ชำรุด':         { icon: '⚠', color: 'var(--warning)', bg: 'var(--warning-light)' },   // เหลือง
-  'ชำรุดรอเปลี่ยน': { icon: '🔁', color: '#ea580c', bg: 'rgba(234, 88, 12, 0.08)' },      // ส้ม
+  'ชำรุดรอเปลี่ยน': { icon: '🔁', color: 'var(--warning)', bg: 'var(--warning-light)' },
   'ปลดระวาง':      { icon: '⊘', color: 'var(--danger)', bg: 'var(--danger-light)' },     // แดง
 };
 
@@ -97,10 +97,10 @@ const INSTANCE_CONDITION_META: Record<string, { label: string; color: string; bg
 };
 
 const INSTANCE_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  'Under Repair': { label: 'ส่งซ่อม',   color: '#b45309', bg: '#fef3c7' },
-  'Claiming':     { label: 'กำลังเคลม', color: '#1d4ed8', bg: '#dbeafe' },
-  'Damaged':      { label: 'เสียหาย',   color: '#b91c1c', bg: '#fee2e2' },
-  'In Stock':     { label: 'ในคลัง',    color: '#475569', bg: '#f1f5f9' },
+  'Under Repair': { label: 'ส่งซ่อม',   color: 'var(--warning)', bg: 'var(--warning-light)' },
+  'Claiming':     { label: 'กำลังเคลม', color: 'var(--info)', bg: 'var(--info-light)' },
+  'Damaged':      { label: 'เสียหาย',   color: 'var(--danger-on-tint)', bg: 'var(--danger-light)' },
+  'In Stock':     { label: 'ในคลัง',    color: 'var(--text-muted)', bg: 'var(--bg-subtle)' },
 };
 
 interface DeployedInstance {
@@ -678,7 +678,7 @@ const StationSearch: React.FC = () => {
           <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>{st.name}</h3>
           <p style={{ margin: '4px 0 6px', color: 'var(--text-muted)', fontWeight: 700 }}>รหัสประจำสถานี: {st.code}</p>
           {st.created_at && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, background: 'rgba(255,255,255,0.5)', padding: '3px 10px', borderRadius: '6px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, background: 'var(--bg-subtle)', padding: '3px 10px', borderRadius: '6px' }}>
               <Calendar size={12} /> สร้างเมื่อ {formatDateTimeThai(st.created_at)}
             </div>
           )}
@@ -941,7 +941,7 @@ const StationSearch: React.FC = () => {
                   position: 'relative',
                   borderRadius: '22px',
                   overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #0f172a 100%)',
+                  background: 'linear-gradient(135deg, #081426 0%, #123a72 55%, #081426 100%)',
                   boxShadow: '0 18px 40px -20px rgba(15, 23, 42, 0.45)',
                 }}>
                   {/* Grid overlay */}
@@ -955,7 +955,7 @@ const StationSearch: React.FC = () => {
                   <div style={{
                     position: 'absolute', top: '-30%', right: '-10%',
                     width: '60%', height: '180%',
-                    background: 'radial-gradient(ellipse at center, rgba(41, 182, 246, 0.22), transparent 65%)',
+                    background: 'radial-gradient(ellipse at center, rgba(96, 165, 250, 0.22), transparent 65%)',
                     pointerEvents: 'none',
                   }} />
 
@@ -966,7 +966,7 @@ const StationSearch: React.FC = () => {
                         position: 'relative',
                         display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
                         background: 'var(--primary)',
-                        boxShadow: '0 0 0 0 rgba(41, 182, 246, 0.7)',
+                        boxShadow: '0 0 0 0 rgba(96, 165, 250, 0.65)',
                         animation: 'station-pulse 2s infinite',
                       }} />
                       <span style={{
@@ -1190,7 +1190,7 @@ const StationSearch: React.FC = () => {
                           <div style={{
                             width: '42px', height: '42px',
                             borderRadius: '50%',
-                            background: 'rgba(41, 182, 246, 0.12)',
+                            background: 'rgba(96, 165, 250, 0.13)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             color: 'var(--primary)',
                             marginBottom: '4px',
@@ -1651,7 +1651,7 @@ const StationSearch: React.FC = () => {
                                             
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                               {inst.status && inst.status !== 'Withdrawn' && (() => {
-                                                const sMeta = INSTANCE_STATUS_META[inst.status] ?? { label: inst.status, color: '#475569', bg: '#f1f5f9' };
+                                                const sMeta = INSTANCE_STATUS_META[inst.status] ?? { label: inst.status, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' };
                                                 return (
                                                   <span style={{
                                                     padding: '2px 7px', borderRadius: '20px', fontSize: '0.65rem',
@@ -1726,6 +1726,7 @@ const StationSearch: React.FC = () => {
                                       <select
                                         value={conditionDraft.status}
                                         onChange={(e) => setConditionDraft(d => ({ ...d, status: e.target.value }))}
+                                        disabled={!hasPermission('manage.stations')}
                                         style={{
                                           flex: '0 0 auto', fontSize: '0.72rem', fontWeight: 800,
                                           padding: '5px 10px', borderRadius: '6px',
@@ -1758,6 +1759,7 @@ const StationSearch: React.FC = () => {
                                         type="text"
                                         value={conditionDraft.note}
                                         onChange={(e) => setConditionDraft(d => ({ ...d, note: e.target.value }))}
+                                        disabled={!hasPermission('manage.stations')}
                                         placeholder="หมายเหตุ (ไม่บังคับ)"
                                         style={{
                                           flex: 1, minWidth: '120px', fontSize: '0.72rem',
@@ -1765,7 +1767,7 @@ const StationSearch: React.FC = () => {
                                           border: '1px solid var(--border)', background: 'var(--bg-app)', color: 'var(--text-main)'
                                         }}
                                       />
-                                      <button
+                                      {hasPermission('manage.stations') && <button
                                         onClick={() => saveCondition(asset)}
                                         disabled={savingCondition}
                                         style={{
@@ -1776,7 +1778,7 @@ const StationSearch: React.FC = () => {
                                         }}
                                       >
                                         {savingCondition ? 'กำลังบันทึก...' : 'บันทึกสภาพ'}
-                                      </button>
+                                      </button>}
                                     </div>
                                     {asset.conditionBy && (
                                       <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
