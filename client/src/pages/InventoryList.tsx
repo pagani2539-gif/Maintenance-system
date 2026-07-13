@@ -527,7 +527,7 @@ const InventoryList: React.FC = () => {
 
   return (
     <div className="inventory-page" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
         <BackButton />
         <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2rem' }}>
           <div className="page-title"><h2>จัดการอุปกรณ์และสต็อก</h2><p>เพิ่ม แก้ไข และติดตามจำนวนอุปกรณ์คงเหลือในระบบ</p></div>
@@ -615,7 +615,7 @@ const InventoryList: React.FC = () => {
           <div className="modal-content" style={{ maxWidth: '760px' }}>
             <h3>{editingItem ? 'แก้ไขข้อมูลอุปกรณ์' : 'เพิ่มอุปกรณ์ใหม่'}</h3>
             <form onSubmit={handleSaveItem}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 200px', gap: '2rem', alignItems: 'start' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 200px', gap: '2rem', alignItems: 'start' }}>
                 <div>
                   <Input
                     label="ชื่ออุปกรณ์"
@@ -662,7 +662,7 @@ const InventoryList: React.FC = () => {
                   </label>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
                 <Input
                   label="จำนวนคงเหลือ"
                   type="number"

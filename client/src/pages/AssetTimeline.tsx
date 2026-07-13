@@ -112,7 +112,7 @@ const AssetTimeline: React.FC = () => {
 
   return (
     <div style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 2.5rem' }}>
 
         <BackButton />
 

@@ -1,5 +1,8 @@
 node_modules/
 dist/
+client/playwright-report/
+client/test-results/
+client/.auth/
 .env
 .env.*
 *.log

@@ -133,7 +133,7 @@ const AuditLogs: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="responsive-page-content" style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
       <BackButton />
       <div className="page-header" style={{ marginBottom: '2rem' }}>
         <div className="page-title">

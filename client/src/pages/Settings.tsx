@@ -396,7 +396,7 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="responsive-page-content settings-page" style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
       <BackButton />
       <div className="page-header" style={{ marginBottom: '1.5rem' }}>
         <div className="page-title">
@@ -484,7 +484,7 @@ const Settings: React.FC = () => {
 
       {/* TAB CONTENT: 1. Companies */}
       {activeTab === 'companies' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="responsive-master-detail" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', alignItems: 'start' }}>
           {/* LEFT: Company List */}
           <Card style={{ padding: '1.25rem', position: 'sticky', top: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
@@ -602,7 +602,7 @@ const Settings: React.FC = () => {
 
                   <form onSubmit={handleSaveCompany}>
                     <FormSection title="ชื่อบริษัท" icon={<Building2 size={18} />} columns={1}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                      <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
                         <Input
                           label="ชื่อบริษัท (ไทย)"
                           required
@@ -633,7 +633,7 @@ const Settings: React.FC = () => {
                         onChange={(e) => setForm({ ...form, address: e.target.value })}
                         placeholder="123 ถนน... แขวง... เขต... กรุงเทพฯ 10000"
                       />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <Input
                           label="เบอร์โทรศัพท์"
                           value={form.phone}
@@ -648,7 +648,7 @@ const Settings: React.FC = () => {
                           placeholder="info@example.com"
                         />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <Input
                           label="เลขประจำตัวผู้เสียภาษี"
                           value={form.tax_id}

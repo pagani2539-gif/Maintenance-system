@@ -305,7 +305,7 @@ const RepairDetail: React.FC = () => {
       />
 
       {/* Sticky Glass Header */}
-      <div className="glass-card" style={{ 
+      <div className="glass-card responsive-detail-toolbar" style={{
         position: 'sticky', 
         top: 0, 
         zIndex: 20, 
@@ -343,7 +343,7 @@ const RepairDetail: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ padding: '0 2.5rem' }}>
+      <div className="responsive-page-content" style={{ padding: '0 2.5rem' }}>
         {/* Metadata Strip */}
         <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', padding: '1.5rem 2rem', borderRadius: '20px' }}>
           <div style={{ display: 'flex', gap: '3rem' }}>

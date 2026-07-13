@@ -355,7 +355,7 @@ const ClaimList: React.FC = () => {
   ), [canManageClaims]);
 
   return (
-    <div className="repair-board" style={{ padding: '2rem 2.5rem', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
+    <div className="repair-board responsive-page-content" style={{ padding: '2rem 2.5rem', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <BackButton />
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">

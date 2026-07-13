@@ -161,7 +161,7 @@ const NewClaim: React.FC = () => {
   };
 
   return (
-    <div className="new-claim-page" style={{ padding: '2rem' }}>
+    <div className="new-claim-page responsive-page-content" style={{ padding: '2rem' }}>
       <BackButton />
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">
@@ -170,7 +170,7 @@ const NewClaim: React.FC = () => {
         </div>
       </div>
       
-      <Card className="glass-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem', overflow: 'visible' }}>
+      <Card className="glass-card responsive-form-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem', overflow: 'visible' }}>
         <form onSubmit={handleSubmit}>
           {/* ① ข้อมูลการแจ้งเคลม */}
           <FormSection title="ข้อมูลการแจ้งเคลม" icon={<FileText size={18} />}>

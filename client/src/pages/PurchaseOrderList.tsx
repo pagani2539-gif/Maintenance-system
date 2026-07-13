@@ -352,7 +352,7 @@ const PurchaseOrderList: React.FC = () => {
 
   return (
     <div className="po-page fade-in" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">

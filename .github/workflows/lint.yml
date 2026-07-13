@@ -42,6 +42,27 @@ jobs:
           cd client
           npm run build
 
+      - name: Install responsive test browser
+        run: |
+          cd client
+          npx playwright install --with-deps chromium
+
+      - name: Run public responsive gate
+        run: |
+          cd client
+          npm run test:responsive -- --project=mobile-small --project=tablet --project=desktop
+
+      - name: Upload responsive test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-test-results
+          path: |
+            client/playwright-report
+            client/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
   server:
     name: Server tests and fresh migrations
     runs-on: ubuntu-latest

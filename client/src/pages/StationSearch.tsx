@@ -839,7 +839,7 @@ const StationSearch: React.FC = () => {
         <h4 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem', color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 800 }}>
           <HistoryIcon size={20} color="var(--primary)" /> สถิติย้อนหลัง (Snapshot)
         </h4>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
            <Card className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '8px' }}>เคสซ่อมสะสม</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>0</div>
@@ -1303,7 +1303,7 @@ const StationSearch: React.FC = () => {
                         </span>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1.3fr' }}>
+                      <div className="responsive-station-metrics" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1.3fr' }}>
                         {/* Cell 1: Activity sparkline */}
                         <div style={{
                           padding: '1.5rem 1.5rem',
@@ -2077,7 +2077,7 @@ const StationSearch: React.FC = () => {
                           DISPOSE: { label: 'ปลดระวาง', color: 'var(--danger)', bg: 'var(--danger-light)' },
                         }[event.event_type] || { label: event.event_type, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' });
                         return (
-                          <div key={event.id} style={{ display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) auto', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '9px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+                          <div key={event.id} className="responsive-timeline-row" style={{ display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) auto', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '9px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
                             <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 700 }}>{new Date(event.event_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -2188,7 +2188,7 @@ const StationSearch: React.FC = () => {
                   ];
 
                   return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                    <div className="responsive-channel-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                       {channels.map((ch, ci) => (
                         <div key={ci} style={{
                           background: 'var(--bg-card)',
@@ -2548,7 +2548,7 @@ const StationSearch: React.FC = () => {
                 </div>
 
                 {/* ทางหลวง + ทิศทาง */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>เส้นทางหลวง <span style={{ color: 'var(--danger)' }}>*</span></label>
                     <input

@@ -58,7 +58,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div style={{
+    <div className="login-page" style={{
       minHeight: '100vh',
       background: 'var(--bg-app)',
       display: 'flex',
@@ -243,7 +243,6 @@ const Login: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                tabIndex={-1}
                 aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                 style={{
                   position: 'absolute',

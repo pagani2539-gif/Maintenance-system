@@ -296,7 +296,7 @@ const UserManagement: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '2rem 2.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="responsive-page-content" style={{ padding: '2rem 2.5rem', maxWidth: '1200px', margin: '0 auto' }}>
       <BackButton />
       <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div className="page-title">
@@ -311,8 +311,8 @@ const UserManagement: React.FC = () => {
         </Button>
       </div>
 
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <Card className="responsive-table-scroll" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="responsive-raw-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border)' }}>
               <th style={th}>ผู้ใช้</th>
@@ -473,7 +473,7 @@ const UserManagement: React.FC = () => {
                         <button type="button" onClick={() => setAllDeletePerms(false)} style={chip}>ล้างทั้งหมด</button>
                       </div>
                     </div>
-                    <div style={{
+                    <div className="responsive-form-grid" style={{
                       display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px',
                       padding: '10px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-app)',
                     }}>
@@ -499,7 +499,7 @@ const UserManagement: React.FC = () => {
                         <button type="button" onClick={() => setAllManagePerms(false)} style={chip}>ล้างทั้งหมด</button>
                       </div>
                     </div>
-                    <div style={{
+                    <div className="responsive-form-grid" style={{
                       display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px',
                       padding: '10px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-app)',
                     }}>
