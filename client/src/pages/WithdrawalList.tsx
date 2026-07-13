@@ -213,7 +213,7 @@ const WithdrawalList: React.FC = () => {
       priority: 1,
       width: '140px',
       render: (val) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: 'var(--primary)', fontSize: '0.9rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: 'var(--primary)', fontSize: 'var(--table-text-size)' }}>
           <FileText size={14} color="var(--primary)" style={{ flexShrink: 0, opacity: 0.6 }} />
           {val}
         </div>
@@ -222,7 +222,7 @@ const WithdrawalList: React.FC = () => {
     {
       id: 'date',
       header: 'วันที่เบิก',
-      accessor: 'created_at',
+      accessor: (row) => row.withdrawal_date || row.created_at,
       priority: 1,
       width: '120px',
       render: (val) => {
@@ -246,7 +246,7 @@ const WithdrawalList: React.FC = () => {
           <div style={{ width: 26, height: 26, background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <User size={13} />
           </div>
-          <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val as string}>{val}</span>
+          <span style={{ fontWeight: 'var(--table-text-weight)', fontSize: 'var(--table-text-size)', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val as string}>{val}</span>
         </div>
       )
     },
@@ -277,10 +277,10 @@ const WithdrawalList: React.FC = () => {
         if (itemCount === 0) return <span className="cell-empty">—</span>;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', lineHeight: 1.15 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary)' }}>
-              <Boxes size={13} /> {itemCount} <span style={{ fontWeight: 600, fontSize: '0.7rem', color: 'var(--text-muted)' }}>รายการ</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'var(--table-text-weight)', fontSize: 'var(--table-text-size)', color: 'var(--primary)' }}>
+              <Boxes size={13} /> {itemCount} <span style={{ fontWeight: 'var(--table-secondary-weight)', fontSize: 'var(--table-secondary-size)', color: 'var(--text-muted)' }}>รายการ</span>
             </span>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <span style={{ fontSize: 'var(--table-secondary-size)', color: 'var(--text-muted)', fontWeight: 'var(--table-secondary-weight)' }}>
               รวม {totalQty} ชิ้น
             </span>
           </div>
@@ -295,7 +295,7 @@ const WithdrawalList: React.FC = () => {
       width: 'auto',
       render: (val) => (
         val
-          ? <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{val}</span>
+          ? <span style={{ fontSize: 'var(--table-text-size)', fontWeight: 'var(--table-text-weight)' }}>{val}</span>
           : <span className="cell-empty">—</span>
       )
     },
@@ -308,12 +308,14 @@ const WithdrawalList: React.FC = () => {
       render: (_, row) => (
         row.contract_no
           ? (
-            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+            <span style={{ fontSize: 'var(--table-text-size)', fontWeight: 'var(--table-text-weight)' }}>
               {row.contract_no}
-              <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}> · ปี {row.contract_year}</span>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 'var(--table-secondary-weight)' }}> · ปี {row.contract_year}</span>
             </span>
           )
-          : <span className="cell-empty">—</span>
+          : row.contract_reference_type === 'none'
+            ? <span style={{ fontSize: 'var(--table-secondary-size)', color: 'var(--text-muted)' }}>ไม่มีสัญญา</span>
+            : <span className="cell-empty">—</span>
       )
     },
     {
@@ -464,7 +466,7 @@ const WithdrawalList: React.FC = () => {
 
       return true;
     }).sort((a, b) => {
-      const t = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const t = new Date(b.withdrawal_date || b.created_at).getTime() - new Date(a.withdrawal_date || a.created_at).getTime();
       return t !== 0 ? t : b.id - a.id;
     });
   }, [withdrawals, urlState.search, urlState.filters]);
@@ -475,7 +477,7 @@ const WithdrawalList: React.FC = () => {
 
   const handleExportExcel = () => {
     const headers = [
-      'เลขที่ใบเบิก', 'ประเภทการเบิก', 'โครงการ/งาน', 'สถานที่', 'ผู้เบิก/หน่วยงาน', 'รายการอุปกรณ์', 'หมายเหตุ', 'วันที่เบิก'
+      'เลขที่ใบเบิก', 'ประเภทการเบิก', 'โครงการ/งาน', 'สถานที่', 'ผู้เบิก/หน่วยงาน', 'รายการอุปกรณ์', 'เอกสารอ้างอิง', 'หมายเหตุ', 'วันที่เบิกจริง', 'วันที่บันทึกระบบ'
     ];
     const rows = filteredData.map(w => [
       `WD-${String(w.id).padStart(5, '0')}`,
@@ -484,7 +486,9 @@ const WithdrawalList: React.FC = () => {
       w.location || '-',
       w.recipient,
       w.items_summary || '-',
+      w.contract_no ? `${w.contract_no} (ปี ${w.contract_year || '-'})` : (w.contract_reference_type === 'none' ? `ไม่มีสัญญา — ${w.contract_reference_note || '-'}` : '-'),
       w.note || '-',
+      w.withdrawal_date ? new Date(`${w.withdrawal_date}T00:00:00`).toLocaleDateString('th-TH') : '-',
       w.created_at ? new Date(w.created_at).toLocaleDateString('th-TH') : '-'
     ]);
     exportToCsv(`withdrawals_export_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`, headers, rows);
@@ -498,7 +502,7 @@ const WithdrawalList: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className={`badge ${getBadgeClass(row.type)}`}>{row.type}</span>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{formatDateTimeThai(row.created_at)}</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{row.withdrawal_date ? new Date(`${row.withdrawal_date}T00:00:00`).toLocaleDateString('th-TH') : formatDateTimeThai(row.created_at)}</span>
         </div>
 
         <section>

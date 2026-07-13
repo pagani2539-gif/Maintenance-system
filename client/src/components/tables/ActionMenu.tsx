@@ -59,10 +59,11 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
         const shouldDropUp = spaceBelow < popoverHeight + 20;
 
         setCoords({
-          top: shouldDropUp 
-            ? rect.top - popoverHeight - 4 
-            : rect.bottom + 4,
-          left: rect.right - 160 // popover is 160px wide
+          top: Math.max(8, Math.min(
+            shouldDropUp ? rect.top - popoverHeight - 4 : rect.bottom + 4,
+            window.innerHeight - popoverHeight - 8,
+          )),
+          left: Math.max(8, Math.min(rect.right - 160, window.innerWidth - 168))
         });
       };
 
@@ -81,6 +82,14 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
       };
     }
   }, [isOpen, overflowActions.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const frameId = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isOpen]);
 
   if (visibleActions.length === 0) return null;
 
@@ -146,6 +155,15 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
             aria-label="ตัวเลือกเพิ่มเติม"
             aria-haspopup="menu"
             aria-expanded={isOpen}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsOpen(true);
+              } else if (e.key === 'Escape' && isOpen) {
+                e.preventDefault();
+                setIsOpen(false);
+              }
+            }}
             onClick={(e) => {
               e.stopPropagation();
               setIsOpen(!isOpen);
@@ -174,6 +192,27 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
             <div
               ref={menuRef}
               role="menu"
+              onKeyDown={(e) => {
+                const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') || []);
+                const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+                if (e.key === 'ArrowDown' && items.length > 0) {
+                  e.preventDefault();
+                  items[(currentIndex + 1 + items.length) % items.length].focus();
+                } else if (e.key === 'ArrowUp' && items.length > 0) {
+                  e.preventDefault();
+                  items[(currentIndex - 1 + items.length) % items.length].focus();
+                } else if (e.key === 'Home' && items.length > 0) {
+                  e.preventDefault();
+                  items[0].focus();
+                } else if (e.key === 'End' && items.length > 0) {
+                  e.preventDefault();
+                  items[items.length - 1].focus();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setIsOpen(false);
+                  triggerRef.current?.focus();
+                }
+              }}
               style={{
                 position: 'fixed',
                 top: `${coords.top}px`,
@@ -193,6 +232,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
                 return (
                   <button
                     key={action.id}
+                    type="button"
                     role="menuitem"
                     disabled={isDisabled}
                     onClick={(e) => {

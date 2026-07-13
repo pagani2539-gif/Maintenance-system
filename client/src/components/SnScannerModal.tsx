@@ -3,6 +3,7 @@ import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 import Tesseract from 'tesseract.js';
 import { X, ScanLine, Camera, Check, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
+import AppDialog from './ui/AppDialog';
 
 interface SnScannerModalProps {
   isOpen: boolean;
@@ -159,13 +160,20 @@ export const SnScannerModal: React.FC<SnScannerModalProps> = ({ isOpen, onClose,
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1200 }}>
-      <div className="modal-content" style={{ maxWidth: '480px', gap: '1rem' }}>
+    <AppDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Scan serial number"
+      busy={ocrBusy}
+      closeOnBackdrop={false}
+      className="modal-content"
+      panelStyle={{ maxWidth: '480px', gap: '1rem' }}
+    >
         <div className="modal-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ScanLine size={20} color="var(--primary)" /> สแกน Serial Number
           </h3>
-          <button className="close-btn" onClick={onClose} aria-label="ปิด"><X size={20} /></button>
+          <button className="close-btn" onClick={onClose} disabled={ocrBusy} aria-label="ปิด"><X size={20} /></button>
         </div>
 
         {/* Mode toggle */}
@@ -231,8 +239,7 @@ export const SnScannerModal: React.FC<SnScannerModalProps> = ({ isOpen, onClose,
         <div className="modal-actions">
           <Button type="button" variant="primary" onClick={onClose} style={{ width: '100%' }}>เสร็จสิ้น</Button>
         </div>
-      </div>
-    </div>
+    </AppDialog>
   );
 };
 

@@ -1,4 +1,4 @@
-name: CI Linting
+name: CI
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main, master ]
 
 jobs:
-  lint-client:
-    name: Lint Client (React + TS)
+  client:
+    name: Client lint, test and build
     runs-on: ubuntu-latest
 
     steps:
@@ -31,3 +31,57 @@ jobs:
         run: |
           cd client
           npm run lint
+
+      - name: Run client tests
+        run: |
+          cd client
+          npm test -- --run
+
+      - name: Build production client
+        run: |
+          cd client
+          npm run build
+
+  server:
+    name: Server tests and fresh migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maintenance_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maintenance_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL_TEST: postgres://postgres:postgres@localhost:5432/maintenance_test
+      JWT_SECRET: ci-only-test-secret
+      DISABLE_BACKUP_SCHEDULER: '1'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+
+      - name: Run server tests
+        run: |
+          cd server
+          npm test -- --run

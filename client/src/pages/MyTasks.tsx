@@ -214,7 +214,7 @@ const MyTasks: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                          <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: '"Bai Jamjuree", monospace' }}>{r.ticket_no}</Link>
+                          <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>{r.ticket_no}</Link>
                           <span className={`badge badge-priority-${r.priority === 'วิกฤต' ? 'critical' : r.priority === 'ด่วนมาก' ? 'urgent' : r.priority === 'ด่วน' ? 'high' : 'normal'}`}>{r.priority}</span>
                           <span className={`badge badge-${r.status}`}>{r.status}</span>
                           {overdue && (
@@ -272,7 +272,7 @@ const MyTasks: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                        <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: '"Bai Jamjuree", monospace' }}>{r.ticket_no}</Link>
+                        <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>{r.ticket_no}</Link>
                         <span className={`badge badge-priority-${r.priority === 'วิกฤต' ? 'critical' : r.priority === 'ด่วนมาก' ? 'urgent' : r.priority === 'ด่วน' ? 'high' : 'normal'}`}>{r.priority}</span>
                         {r.type === 'claim' && <span className="badge badge-info">เคลม</span>}
                       </div>

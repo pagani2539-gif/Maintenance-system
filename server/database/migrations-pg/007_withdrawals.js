@@ -26,8 +26,9 @@ module.exports = {
         id BIGSERIAL PRIMARY KEY,
         withdrawal_id BIGINT REFERENCES withdrawals(id) ON DELETE CASCADE,
         inventory_id BIGINT REFERENCES inventory(id),
-        quantity INTEGER NOT NULL,
-        serial_numbers TEXT
+        quantity INTEGER NOT NULL CHECK (quantity > 0),
+        serial_numbers TEXT,
+        UNIQUE(withdrawal_id, inventory_id)
       )
     `);
   }

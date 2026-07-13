@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 
 const BACKUP_DIR = path.join(__dirname, 'backups');
+const SERVER_ROOT = path.join(__dirname, '..');
+const DEFAULT_OFFSITE_BACKUP_DIR = 'database/offsite-backups';
 const MAX_BACKUPS = 10;
 const isWindows = process.platform === 'win32';
 
@@ -20,6 +22,15 @@ const resolvePgBin = (toolName) => {
   }
   return exeName; // rely on PATH
 };
+
+// A relative destination is anchored to server/, not the process working
+// directory. This makes the scheduler, PM2, and production pre-flight check
+// agree on the same backup destination.
+const resolveOffsiteBackupDir = (configuredDir) => (
+  path.isAbsolute(configuredDir)
+    ? configuredDir
+    : path.resolve(SERVER_ROOT, configuredDir)
+);
 
 const execFileAsync = (file, args, options = {}) => new Promise((resolve, reject) => {
   execFile(file, args, { ...options, maxBuffer: 1024 * 1024 * 64 }, (err, stdout, stderr) => {
@@ -82,10 +93,9 @@ const runBackup = async () => {
  * the copy is complete and its byte count matches the local source file.
  */
 const copyBackupOffsite = async (backupPath) => {
-  const configuredDir = process.env.OFFSITE_BACKUP_DIR;
-  if (!configuredDir) return;
+  const configuredDir = process.env.OFFSITE_BACKUP_DIR || DEFAULT_OFFSITE_BACKUP_DIR;
 
-  const offsiteDir = path.resolve(configuredDir);
+  const offsiteDir = resolveOffsiteBackupDir(configuredDir);
   await fs.promises.mkdir(offsiteDir, { recursive: true });
   const destination = path.join(offsiteDir, path.basename(backupPath));
   const partialDestination = `${destination}.partial`;
@@ -194,5 +204,6 @@ module.exports = {
   runBackup,
   runRestore,
   scheduleBackups,
-  BACKUP_DIR
+  BACKUP_DIR,
+  resolveOffsiteBackupDir,
 };

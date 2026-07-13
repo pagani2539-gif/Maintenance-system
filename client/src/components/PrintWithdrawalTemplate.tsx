@@ -139,7 +139,7 @@ const chunkItems = (items: NormalizedItem[]): NormalizedItem[][] => {
 
 const PrintWithdrawalTemplate: React.FC<Props> = ({ withdrawal, isPreview, company = null, logo = null }) => {
   const docNumber = `WD-${String(withdrawal.id || 0).padStart(6, '0')}`;
-  const docDate = formatDateThai(parseDate(withdrawal.created_at));
+  const docDate = formatDateThai(parseDate(withdrawal.withdrawal_date || withdrawal.created_at));
   const printedAt = formatDateTimeThai(new Date());
 
   const items = normalizeItems(withdrawal);
@@ -294,6 +294,7 @@ const PrintWithdrawalTemplate: React.FC<Props> = ({ withdrawal, isPreview, compa
                   { label: 'ผู้เบิก / ผู้รับ', value: withdrawal.recipient || '-' },
                   { label: 'ประเภทการเบิก', value: withdrawal.type || '-' },
                   { label: 'ชื่อโครงการ / งาน', value: withdrawal.project_name || '-' },
+                  { label: 'เอกสารอ้างอิง', value: withdrawal.contract_no ? `${withdrawal.contract_no} (ปี ${withdrawal.contract_year || '-'})` : (withdrawal.contract_reference_type === 'none' ? `ไม่มีสัญญา — ${withdrawal.contract_reference_note || '-'}` : 'ไม่ระบุสัญญา') },
                   { label: 'สถานที่ปลายทาง', value: locationText },
                   { label: 'จำนวนรายการรวม', value: `${items.length} รายการ (${totalQty} ชิ้นรวม)` },
                   { label: 'หมายเหตุ', value: withdrawal.note || '-', span: 2 },

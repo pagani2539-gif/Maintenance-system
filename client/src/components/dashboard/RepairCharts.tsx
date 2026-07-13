@@ -61,7 +61,7 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
             </PieChart>
           )}</ChartFrame>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'Bai Jamjuree', lineHeight: 1 }}>
+            <div style={{ fontSize: '1.45rem', fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: 1 }}>
               <Counter end={kpis.total} />
             </div>
             <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '3px' }}>งานทั้งหมด</div>
@@ -88,7 +88,7 @@ const RepairCharts: React.FC<RepairChartsProps> = ({ kpis, monthlyTrend, claimsK
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
             <ScopeBadge show={filterActive} label="6 เดือนล่าสุด" />
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'Bai Jamjuree', color: 'var(--primary)', lineHeight: 1 }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--primary)', lineHeight: 1 }}>
               {latestTrend}
               <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', marginLeft: '4px' }}>เดือนนี้</span>
             </div>

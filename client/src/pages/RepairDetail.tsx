@@ -60,7 +60,6 @@ const RepairDetail: React.FC = () => {
     problem: '',
     priority: ''
   });
-  const [subLocation, setSubLocation] = useState('');
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
   const parseDate = (dateStr: string) => {
@@ -82,21 +81,15 @@ const RepairDetail: React.FC = () => {
       setEditForm({
         reporter: data.reporter,
         project_name: data.project_name || '',
-        location: data.location || '',
+        // Keep the original location text intact for legacy records that
+        // previously appended a free-form sub-location.
+        location: data.location_snapshot || data.location || '',
         station_id: data.station_id || null,
         station_area_id: data.station_area_id || null,
         device_name: data.device_name,
         problem: data.problem,
         priority: data.priority
       });
-      let initialSubLocation = '';
-      if (data.station_name && data.location_snapshot && data.location_snapshot.startsWith(data.station_name)) {
-        const suffix = data.location_snapshot.slice(data.station_name.length).trim();
-        if (suffix.startsWith('-')) {
-          initialSubLocation = suffix.slice(1).trim();
-        }
-      }
-      setSubLocation(initialSubLocation);
     } catch (error) {
       console.error('Error fetching repair detail:', error);
       notify('ไม่สามารถดึงข้อมูลรายการนี้ได้', 'error');
@@ -197,7 +190,6 @@ const RepairDetail: React.FC = () => {
     const trimmedLocation = editForm.location.trim();
     const trimmedDeviceName = editForm.device_name.trim();
     const trimmedProblem = editForm.problem.trim();
-    const finalLocation = trimmedLocation + (subLocation.trim() ? ` - ${subLocation.trim()}` : '');
 
     if (!trimmedReporter || !trimmedProjectName || !trimmedDeviceName || !trimmedProblem) {
       notify('กรุณากรอกข้อมูลให้ครบถ้วนในช่องที่จำเป็น', 'error');
@@ -212,8 +204,8 @@ const RepairDetail: React.FC = () => {
       notify('ชื่อโครงการยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error');
       return;
     }
-    if (finalLocation.length > 150) {
-      notify('สถานที่และจุดติดตั้งย่อยรวมกันยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error');
+    if (trimmedLocation.length > 150) {
+      notify('ชื่อสถานที่ยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error');
       return;
     }
     if (trimmedDeviceName.length > 100) {
@@ -230,9 +222,9 @@ const RepairDetail: React.FC = () => {
       await repairApi.update(id, {
         reporter: trimmedReporter,
         project_name: trimmedProjectName,
-        location: finalLocation,
+        location: trimmedLocation,
         station_id: editForm.station_id || undefined,
-        station_area_id: undefined,
+        station_area_id: editForm.station_area_id || undefined,
         device_name: trimmedDeviceName,
         problem: trimmedProblem,
         priority: editForm.priority
@@ -612,20 +604,10 @@ const RepairDetail: React.FC = () => {
                       setEditForm({
                         ...editForm,
                         station_id: data.stationId || null,
+                        station_area_id: null,
                         location: data.stationName || ''
                       });
                     }}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>จุดติดตั้ง / บริเวณพื้นที่ย่อย</label>
-                  <input
-                    type="text"
-                    maxLength={100}
-                    placeholder="ระบุตำแหน่งติดตั้งย่อย เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก..."
-                    value={subLocation}
-                    onChange={(e) => setSubLocation(e.target.value)}
-                    disabled={updatingEdit}
                   />
                 </div>
               </FormSection>

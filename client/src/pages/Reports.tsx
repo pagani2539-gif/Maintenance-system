@@ -639,7 +639,7 @@ const Reports: React.FC = () => {
               for (let i = 0; i < pageIdx; i++) startIndex += pages[i].length;
 
               return (
-                <div key={pageIdx} className="print-page" style={{ width: '210mm', minHeight: '297mm', backgroundColor: 'white', boxSizing: 'border-box', padding: '12mm', fontFamily: 'Sarabun, sans-serif', color: '#0f172a', position: 'relative', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div key={pageIdx} className="print-page" style={{ width: '210mm', minHeight: '297mm', backgroundColor: 'white', boxSizing: 'border-box', padding: '12mm', fontFamily: 'var(--font-ui)', color: '#0f172a', position: 'relative', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
                   {/* Top Gradient Accent Band */}
                   <div style={{

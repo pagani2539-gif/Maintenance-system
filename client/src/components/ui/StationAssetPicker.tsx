@@ -12,7 +12,7 @@ interface StatusMeta {
 const STATUS_META: Record<string, StatusMeta> = {
   'Withdrawn': { label: 'ใช้งานอยู่', color: '#15803d', bg: '#dcfce7' },
   'Under Repair': { label: 'ส่งซ่อม', color: '#b45309', bg: '#fef3c7' },
-  'Claiming': { label: 'กำลังเคลม', color: '#1d4ed8', bg: '#dbeafe' },
+  'Claiming': { label: 'กำลังเคลม', color: 'var(--primary)', bg: 'var(--primary-light)' },
   'Damaged': { label: 'เสียหาย/ปลดระวาง', color: '#b91c1c', bg: '#fee2e2' },
   'In Stock': { label: 'ในคลัง', color: '#475569', bg: '#f1f5f9' },
   'New': { label: 'ในคลัง', color: '#475569', bg: '#f1f5f9' },
@@ -33,6 +33,7 @@ const formatInstalledDate = (isoDate: string) => {
 interface StationAssetPickerProps {
   stationId?: number;
   selectedInstanceId?: number;
+  selectedInventoryId?: number;
   onSelect: (item: AssetLifecycleItem) => void;
   onClear: () => void;
   label?: string;
@@ -41,6 +42,7 @@ interface StationAssetPickerProps {
 const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
   stationId,
   selectedInstanceId,
+  selectedInventoryId,
   onSelect,
   onClear,
   label = 'อุปกรณ์ที่ติดตั้ง ณ ด่านนี้ (เลือกจากคลังจริง)'
@@ -76,8 +78,14 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
   }, [stationItems, query]);
 
   const selectedItem = useMemo(
-    () => instances.find(item => item.instance_id === selectedInstanceId),
-    [instances, selectedInstanceId]
+    () => {
+      if (selectedInstanceId) return instances.find(item => item.instance_id === selectedInstanceId);
+      if (selectedInventoryId) {
+        return instances.find(item => item.asset_kind === 'station_stock' && item.inventory_id === selectedInventoryId);
+      }
+      return undefined;
+    },
+    [instances, selectedInstanceId, selectedInventoryId]
   );
 
   const handleSelect = (item: AssetLifecycleItem) => {
@@ -108,6 +116,12 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
 
   if (selectedItem) {
     const meta = getStatusMeta(selectedItem.status);
+    const isUntracked = selectedItem.asset_kind === 'station_stock';
+    const serialLabel = selectedItem.serial_number
+      ? selectedItem.serial_number
+      : selectedItem.requires_sn
+        ? `ยังไม่ระบุ S/N (${selectedItem.untracked_quantity} ชิ้น)`
+        : `ไม่มี S/N (${selectedItem.untracked_quantity} ชิ้น)`;
     return (
       <div className="form-group" style={{ gridColumn: '1 / -1' }}>
         <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>{label}</label>
@@ -121,13 +135,19 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
               {selectedItem.device_name} {selectedItem.model && `(${selectedItem.model})`}
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              S/N: <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{selectedItem.serial_number || '-'}</span>
+              {isUntracked ? 'รายการประจำสถานี: ' : 'S/N: '}
+              <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{serialLabel}</span>
               {selectedItem.contract_no && <> · 📄 {selectedItem.contract_no} (ปี {selectedItem.contract_year})</>}
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
               <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: meta.color, background: meta.bg }}>
                 {meta.label}
               </span>
+              {isUntracked && (
+                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--info)', background: 'var(--info-light)' }}>
+                  อยู่ประจำสถานี {selectedItem.quantity} ชิ้น
+                </span>
+              )}
               <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 ติดตั้งเมื่อ {formatInstalledDate(selectedItem.installed_at)} ({selectedItem.age_months} เดือน)
               </span>
@@ -198,9 +218,12 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
         }}>
           {filteredItems.map(item => {
             const meta = getStatusMeta(item.status);
+            const itemKey = item.instance_id
+              ? `instance-${item.instance_id}`
+              : `station-${item.station_id}-inventory-${item.inventory_id}`;
             return (
               <div
-                key={item.instance_id}
+                key={itemKey}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   handleSelect(item);
@@ -214,7 +237,9 @@ const StationAssetPicker: React.FC<StationAssetPickerProps> = ({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                   <span>
-                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{item.serial_number}</span> - {item.device_name} {item.model && `(${item.model})`}
+                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                      {item.serial_number || (item.requires_sn ? `ยังไม่ระบุ S/N ${item.untracked_quantity} ชิ้น` : `ไม่มี S/N ${item.untracked_quantity} ชิ้น`)}
+                    </span> - {item.device_name} {item.model && `(${item.model})`}
                   </span>
                   <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '0.68rem', fontWeight: 700, color: meta.color, background: meta.bg, whiteSpace: 'nowrap' }}>
                     {meta.label}

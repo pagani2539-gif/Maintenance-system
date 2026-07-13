@@ -1,228 +1,193 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, X } from 'lucide-react';
 
 interface DatePickerProps {
-  value: string; // YYYY-MM-DD
+  value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
   style?: React.CSSProperties;
+  disabled?: boolean;
+  includeTime?: boolean;
 }
 
-const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'เลือกวันที่', style }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const containerRef = useRef<HTMLDivElement>(null);
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+];
+const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
-  // Parse value to Date object for the calendar view if it's a valid string
+const pad = (value: number) => String(value).padStart(2, '0');
+const dateToValue = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const parseDate = (value: string) => {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const DatePicker: React.FC<DatePickerProps> = ({
+  value,
+  onChange,
+  placeholder = 'เลือกวันที่',
+  className = '',
+  style,
+  disabled = false,
+  includeTime = false,
+}) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const initialDate = parseDate(value) || new Date();
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+  const [timeValue, setTimeValue] = useState(value.includes('T') ? value.slice(11, 16) : '08:00');
+
+  const selectedDate = parseDate(value);
+  const todayValue = dateToValue(new Date());
+  const selectedValue = selectedDate ? dateToValue(selectedDate) : '';
+
   useEffect(() => {
-    if (value) {
-      const dateValue = new Date(value);
-      if (!isNaN(dateValue.getTime())) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCurrentMonth(new Date(dateValue.getFullYear(), dateValue.getMonth(), 1));
-      }
-    }
+    const nextDate = parseDate(value);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the visible month aligned with externally controlled form values
+    if (nextDate) setCurrentMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+    if (value.includes('T')) setTimeValue(value.slice(11, 16));
   }, [value]);
 
-  // Close when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+    if (!isOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
+  }, [isOpen]);
 
-  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const startDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+  const calendarDays = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const padding: Array<{ key: string; day?: number }> = Array.from({ length: new Date(year, month, 1).getDay() }, (_, index) => ({ key: `empty-${index}` }));
+    const days: Array<{ key: string; day?: number }> = Array.from({ length: new Date(year, month + 1, 0).getDate() }, (_, index) => ({
+      key: `${year}-${month}-${index + 1}`,
+      day: index + 1,
+    }));
+    return [...padding, ...days];
+  }, [currentMonth]);
 
-  const handlePrevMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  };
-
-  const handleNextMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  const emitValue = (dateValue: string, nextTime = timeValue) => {
+    onChange(includeTime ? `${dateValue}T${nextTime || '00:00'}` : dateValue);
   };
 
   const handleDateSelect = (day: number) => {
-    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const offset = selected.getTimezoneOffset() * 60000;
-    const formatted = new Date(selected.getTime() - offset).toISOString().split('T')[0];
-    onChange(formatted);
-    setIsOpen(false);
+    const dateValue = `${currentMonth.getFullYear()}-${pad(currentMonth.getMonth() + 1)}-${pad(day)}`;
+    emitValue(dateValue);
+    if (!includeTime) setIsOpen(false);
   };
 
-  const formatDateThai = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const handleTimeChange = (nextTime: string) => {
+    setTimeValue(nextTime);
+    if (/^\d{2}:\d{2}$/.test(nextTime) && selectedValue) emitValue(selectedValue, nextTime);
   };
 
-  const monthsThai = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-  ];
+  const formatTriggerValue = () => {
+    if (!selectedDate) return placeholder;
+    const dateText = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(selectedDate);
+    return includeTime && value.includes('T') ? `${dateText} · ${value.slice(11, 16)}` : dateText;
+  };
 
-  const days = Array.from({ length: daysInMonth(currentMonth.getFullYear(), currentMonth.getMonth()) }, (_, i) => i + 1);
-  const padding = Array.from({ length: startDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth()) }, (_, i) => i);
+  const changeMonth = (offset: number) => {
+    setCurrentMonth((month) => new Date(month.getFullYear(), month.getMonth() + offset, 1));
+  };
+
+  const setToday = () => {
+    const today = new Date();
+    const nextValue = dateToValue(today);
+    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    emitValue(nextValue);
+  };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', ...style }}>
-      {/* Trigger Button */}
-      <div 
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '8px 14px',
-          background: 'var(--bg-card)',
-          borderRadius: '12px',
-          border: '1px solid var(--border)',
-          cursor: 'pointer',
-          color: value ? 'var(--text-main)' : 'var(--text-muted)',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          transition: 'all 0.2s',
-          minWidth: '150px',
-          userSelect: 'none'
-        }}
+    <div ref={rootRef} className={`custom-date-picker ${className}`} style={style}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="custom-date-picker__trigger"
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
       >
-        <CalendarIcon size={16} color={value ? 'var(--primary)' : 'var(--text-muted)'} />
-        <span style={{ flex: 1 }}>{value ? formatDateThai(value) : placeholder}</span>
+        <CalendarDays size={17} aria-hidden="true" />
+        <span className={!selectedDate ? 'is-placeholder' : undefined}>{formatTriggerValue()}</span>
         {value && (
-          <X 
-            size={14} 
-            color="var(--text-muted)" 
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange('');
-            }}
-            style={{ cursor: 'pointer' }}
-          />
+          <span
+            className="custom-date-picker__clear"
+            role="button"
+            tabIndex={0}
+            aria-label="ล้างวันที่"
+            onClick={(event) => { event.stopPropagation(); onChange(''); }}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onChange(''); } }}
+          >
+            <X size={14} aria-hidden="true" />
+          </span>
         )}
-      </div>
+        <ChevronRight className={`custom-date-picker__caret${isOpen ? ' is-open' : ''}`} size={15} aria-hidden="true" />
+      </button>
 
-      {/* Calendar Dropdown */}
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 8px)',
-          left: 0,
-          zIndex: 9999,
-          background: 'var(--bg-card)',
-          borderRadius: '20px',
-          padding: '1.25rem',
-          boxShadow: 'var(--shadow-lg)',
-          border: '1px solid var(--border)',
-          width: '280px',
-          animation: 'revealUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
-        }}>
-          {/* Calendar Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              style={{
-                background: 'var(--bg-app)',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '6px',
-                cursor: 'pointer',
-                display: 'flex',
-                color: 'var(--text-muted)'
-              }}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem' }}>
-              {monthsThai[currentMonth.getMonth()]} {currentMonth.getFullYear() + 543}
+        <div className="custom-date-picker__popover" role="dialog" aria-label="เลือกวันที่">
+          <div className="custom-date-picker__header">
+            <button type="button" className="custom-date-picker__nav" aria-label="เดือนก่อนหน้า" onClick={() => changeMonth(-1)}><ChevronLeft size={17} /></button>
+            <div>
+              <strong>{THAI_MONTHS[currentMonth.getMonth()]}</strong>
+              <span>{currentMonth.getFullYear() + 543}</span>
             </div>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              style={{
-                background: 'var(--bg-app)',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '6px',
-                cursor: 'pointer',
-                display: 'flex',
-                color: 'var(--text-muted)'
-              }}
-            >
-              <ChevronRight size={18} />
-            </button>
+            <button type="button" className="custom-date-picker__nav" aria-label="เดือนถัดไป" onClick={() => changeMonth(1)}><ChevronRight size={17} /></button>
           </div>
 
-          {/* Days of Week */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '8px' }}>
-            {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(day => (
-              <div key={day} style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', padding: '4px 0' }}>
-                {day}
-              </div>
-            ))}
+          <div className="custom-date-picker__weekdays">
+            {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="custom-date-picker__grid">
+            {calendarDays.map((entry) => entry.day ? (
+              <button
+                key={entry.key}
+                type="button"
+                className={`custom-date-picker__day${selectedValue === `${currentMonth.getFullYear()}-${pad(currentMonth.getMonth() + 1)}-${pad(entry.day)}` ? ' is-selected' : ''}${todayValue === `${currentMonth.getFullYear()}-${pad(currentMonth.getMonth() + 1)}-${pad(entry.day)}` ? ' is-today' : ''}`}
+                onClick={() => handleDateSelect(entry.day!)}
+              >
+                {entry.day}
+              </button>
+            ) : <span key={entry.key} aria-hidden="true" />)}
           </div>
 
-          {/* Dates Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-            {padding.map(i => <div key={`pad-${i}`} />)}
-            {days.map(day => {
-              const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isSelected = value === dateStr;
-              const isToday = new Date().toISOString().split('T')[0] === dateStr;
+          {includeTime && (
+            <div className="custom-date-picker__time">
+              <label htmlFor={`${selectTimeId(value)}-time`}><Clock3 size={15} /> เวลา</label>
+              <input
+                id={`${selectTimeId(value)}-time`}
+                type="text"
+                inputMode="numeric"
+                value={timeValue}
+                maxLength={5}
+                placeholder="08:00"
+                onChange={(event) => handleTimeChange(event.target.value.replace(/[^0-9:]/g, '').slice(0, 5))}
+                onBlur={() => {
+                  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeValue)) setTimeValue('08:00');
+                }}
+              />
+            </div>
+          )}
 
-              return (
-                <div 
-                  key={day}
-                  onClick={() => handleDateSelect(day)}
-                  style={{
-                    textAlign: 'center',
-                    padding: '8px 0',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background: isSelected ? 'var(--primary)' : 'transparent',
-                    color: isSelected ? '#ffffff' : isToday ? 'var(--primary)' : 'var(--text-main)',
-                    border: isToday && !isSelected ? '1px solid var(--primary)' : '1px solid transparent',
-                  }}
-                  onMouseOver={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.background = 'var(--primary-light)';
-                      e.currentTarget.style.color = 'var(--primary)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = isToday ? 'var(--primary)' : 'var(--text-main)';
-                    }
-                  }}
-                >
-                  {day}
-                </div>
-              );
-            })}
+          <div className="custom-date-picker__footer">
+            <button type="button" onClick={() => onChange('')} disabled={!value}>ล้าง</button>
+            <button type="button" onClick={setToday}><Check size={14} /> วันนี้</button>
           </div>
         </div>
       )}
-
-      {/* Animation Styles */}
-      <style>{`
-        @keyframes revealUp {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 };
+
+const selectTimeId = (value: string) => `date-time-${value.replace(/[^0-9]/g, '') || 'picker'}`;
 
 export default DatePicker;

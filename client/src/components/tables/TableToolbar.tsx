@@ -44,9 +44,17 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
   }, [localSearch, onSearchChange, searchValue]);
 
   const filterCount = Object.values(activeFilters).filter(v => v !== undefined && v !== '' && v !== 'All').length;
+  const activeFilterEntries = filters
+    .map(filter => {
+      const value = activeFilters[filter.id];
+      if (value === undefined || value === '' || value === 'All') return null;
+      const option = filter.options?.find(item => String(item.value) === String(value));
+      return { filter, value: option?.label || String(value) };
+    })
+    .filter((entry): entry is { filter: TableFilter; value: string } => entry !== null);
 
   return (
-    <div style={{ 
+    <div className="table-toolbar" style={{
       display: 'flex', 
       flexDirection: 'column', 
       gap: '1rem', 
@@ -59,15 +67,16 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
       position: 'relative',
       zIndex: 30
     }}>
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="table-toolbar__top" style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
         {searchEnabled && (
-          <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
+          <div className="table-toolbar__search" style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
               style={{
                 width: '100%',
                 height: '42px',
@@ -82,7 +91,9 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
             />
             {localSearch && (
               <button 
+                type="button"
                 onClick={() => setLocalSearch('')}
+                aria-label="ล้างคำค้นหา"
                 style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
                 <X size={16} />
@@ -91,7 +102,7 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div className="table-toolbar__summary" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           {filters.length > 0 && (
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--bg-app)', padding: '4px 12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
               <Filter size={16} color="var(--primary)" />
@@ -108,26 +119,46 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
       </div>
 
       {filters.length > 0 && (
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+        <div className="table-toolbar__filters" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
           {filters.map(filter => (
             <div
               key={filter.id}
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               title={filter.disabled ? filter.disabledHint : undefined}
             >
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: filter.disabled ? 'var(--border-hover)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              <label htmlFor={`table-filter-${filter.id}`} style={{ fontSize: '0.8rem', fontWeight: 700, color: filter.disabled ? 'var(--border-hover)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                 {filter.label}:
-              </span>
+              </label>
               {filter.type === 'select' && (
                 <Select
                   value={(activeFilters[filter.id] as string) || 'All'}
                   options={[{ label: 'ทั้งหมด', value: 'All' }, ...(filter.options || [])]}
                   onChange={(val) => onFilterChange({ ...activeFilters, [filter.id]: val })}
                   disabled={filter.disabled}
+                  id={`table-filter-${filter.id}`}
+                  ariaLabel={filter.label}
                   style={{ minWidth: '130px' }}
                 />
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {activeFilterEntries.length > 0 && (
+        <div className="table-toolbar__active-filters" aria-label="ตัวกรองที่ใช้งาน">
+          <span className="table-toolbar__active-label">กำลังกรอง:</span>
+          {activeFilterEntries.map(({ filter, value }) => (
+            <button
+              key={filter.id}
+              type="button"
+              className="table-filter-chip"
+              onClick={() => onFilterChange({ ...activeFilters, [filter.id]: 'All' })}
+              aria-label={`ล้างตัวกรอง ${filter.label}`}
+            >
+              <span>{filter.label}: {value}</span>
+              <X size={13} aria-hidden="true" />
+            </button>
           ))}
         </div>
       )}

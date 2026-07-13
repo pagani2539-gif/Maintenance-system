@@ -44,7 +44,7 @@ const StationQrLabels: React.FC<StationQrLabelsProps> = ({ stationId, stationNam
 
   useEffect(() => {
     inventoryApi.getLifecycleReport()
-      .then(list => setInstances(list.filter(i => i.station_id === stationId && i.serial_number)))
+      .then(list => setInstances(list.filter(i => i.station_id === stationId && i.asset_kind === 'serial' && Boolean(i.serial_number))))
       .catch(err => console.error('Failed to load station assets for QR labels:', err));
   }, [stationId]);
 
@@ -53,7 +53,7 @@ const StationQrLabels: React.FC<StationQrLabelsProps> = ({ stationId, stationNam
       key: `sn-${i.instance_id}`,
       device_name: i.device_name,
       model: i.model,
-      serial_number: i.serial_number,
+      serial_number: i.serial_number!,
       station_name: i.station_name || stationName,
       contract_no: i.contract_no,
       contract_year: i.contract_year,
@@ -143,9 +143,10 @@ const StationQrLabels: React.FC<StationQrLabelsProps> = ({ stationId, stationNam
 <head>
   <meta charset="UTF-8">
   <title>ป้าย QR อุปกรณ์ — ${escHtml(stationName)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     @page { size: A4 portrait; margin: 10mm; }
-    body { margin: 0; padding: 0; font-family: 'Sarabun', 'Thonburi', sans-serif; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; padding: 0; font-family: 'Anuphan', 'Noto Sans Thai', 'Thonburi', sans-serif; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .sheet-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; border-bottom: 2px solid #29b6f6; padding-bottom: 6px; margin-bottom: 12px; }
     .sheet-head .station { font-size: 15px; font-weight: 800; color: #0f172a; }
     .sheet-head .station small { display: block; font-size: 10px; font-weight: 600; color: #29b6f6; letter-spacing: .04em; }

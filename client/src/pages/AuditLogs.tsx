@@ -218,7 +218,7 @@ const AuditLogs: React.FC = () => {
                           </span>
                         </td>
                         <td style={td}>
-                          <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.78rem' }}>
                             #{log.entity_id}
                           </span>
                         </td>

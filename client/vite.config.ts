@@ -7,13 +7,18 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Keep emitting the web app manifest, but replace every previously
+      // installed Workbox worker with a one-shot cleanup worker. The app is an
+      // online system, so a service worker must not own the application shell:
+      // doing so allowed a normal reload to revive an older build.
+      selfDestroying: true,
+      injectRegister: null,
       includeAssets: ['favicon.svg', 'pwa-192x192.svg', 'pwa-512x512.svg', 'apple-touch-icon-180x180.svg'],
       manifest: {
         name: 'ระบบจัดการซ่อมบำรุงและคลังอุปกรณ์',
         short_name: 'Maintenance',
         description: 'ระบบจัดการงานซ่อม เคลม คลังพัสดุ และการเบิกจ่ายอุปกรณ์',
-        theme_color: '#1e3a8a',
+        theme_color: '#29b6f6',
         background_color: '#f0f4f8',
         display: 'standalone',
         orientation: 'any',
@@ -40,43 +45,6 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https?:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'gstatic-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
     })
   ],
   server: {

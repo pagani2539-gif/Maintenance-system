@@ -34,6 +34,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 // โหลด scanner (กล้อง + บาร์โค้ด + OCR) เฉพาะตอนเปิดใช้ เพื่อไม่ถ่วง bundle หลัก
 const SnScannerModal = React.lazy(() => import('../components/SnScannerModal'));
 
+const getLocalDateInput = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+};
+
 interface WithdrawalItem {
   inventory_id: number;
   name: string;
@@ -52,9 +59,12 @@ interface LastWithdrawalData {
   project_name?: string;
   location: string;
   station_id: number;
-  station_area_id?: number;
   type: string;
   note?: string;
+  withdrawal_date?: string;
+  contract_id?: number;
+  contract_reference_type?: 'contract' | 'none' | 'legacy';
+  contract_reference_note?: string;
   return_due_date?: string;
   id?: number;
   created_at: string;
@@ -66,7 +76,7 @@ interface LastWithdrawalData {
   items_detail: WithdrawalItem[];
 }
 
-type WithdrawalFieldErrors = Partial<Record<'items' | 'projectName' | 'stationId' | 'customType' | 'quantities' | 'dueDate', string>>;
+type WithdrawalFieldErrors = Partial<Record<'items' | 'projectName' | 'stationId' | 'contractId' | 'contractReferenceNote' | 'withdrawalDate' | 'customType' | 'quantities' | 'dueDate', string>>;
 
 const NewWithdrawal: React.FC = () => {
   const { notify, playNotificationSound } = useNotification();
@@ -80,7 +90,9 @@ const NewWithdrawal: React.FC = () => {
   const [location, setLocation] = useState('');
   const [stationId, setStationId] = useState<number | undefined>(undefined);
   const [contractId, setContractId] = useState<number | undefined>(undefined);
-  const [subLocation, setSubLocation] = useState('');
+  const [contractReferenceType, setContractReferenceType] = useState<'contract' | 'none'>('contract');
+  const [contractReferenceNote, setContractReferenceNote] = useState('');
+  const [withdrawalDate, setWithdrawalDate] = useState(getLocalDateInput);
   const [type, setType] = useState('ติดตั้งใหม่');
   const [selectedType, setSelectedType] = useState('ติดตั้งใหม่');
   const [customType, setCustomType] = useState('');
@@ -123,6 +135,9 @@ const NewWithdrawal: React.FC = () => {
     if (selectedItems.length === 0) errors.items = 'เลือกอุปกรณ์อย่างน้อย 1 รายการ';
     if (!projectName.trim()) errors.projectName = 'ระบุชื่อโครงการหรืองานที่ใช้พัสดุ';
     if (!stationId) errors.stationId = 'เลือกสถานที่หรือด่านปลายทาง';
+    if (!withdrawalDate) errors.withdrawalDate = 'ระบุวันที่เบิกจริง';
+    if (contractReferenceType === 'contract' && !contractId) errors.contractId = 'เลือกสัญญาที่ใช้อ้างอิง หรือเลือกไม่มีสัญญา';
+    if (contractReferenceType === 'none' && !contractReferenceNote.trim()) errors.contractReferenceNote = 'ระบุเหตุผลกรณีไม่ผูกสัญญา';
     if (selectedType === 'อื่นๆ...' && !customType.trim()) errors.customType = 'ระบุประเภทการเบิก';
     if (selectedItems.some(item => item.quantity <= 0 || item.quantity > item.max_quantity)) errors.quantities = 'ตรวจสอบจำนวนพัสดุให้ไม่เกินคงเหลือ';
     if (returnableTypes.includes(type.trim()) && borrowDuration === 'custom' && !customDueDate) errors.dueDate = 'เลือกวันกำหนดส่งคืน';
@@ -307,7 +322,7 @@ const NewWithdrawal: React.FC = () => {
 
     const errors = validateWithdrawal();
     if (Object.keys(errors).length > 0) {
-      const firstField = (['items', 'projectName', 'stationId', 'customType', 'quantities', 'dueDate'] as const)
+      const firstField = (['items', 'projectName', 'stationId', 'withdrawalDate', 'contractId', 'contractReferenceNote', 'customType', 'quantities', 'dueDate'] as const)
         .find(field => errors[field]);
       if (firstField) {
         window.setTimeout(() => document.getElementById(`withdrawal-${firstField}`)?.focus(), 0);
@@ -335,9 +350,8 @@ const NewWithdrawal: React.FC = () => {
       return;
     }
 
-    const finalLocation = trimmedLocation + (subLocation.trim() ? ` - ${subLocation.trim()}` : '');
-    if (finalLocation.length > 150) {
-      notify('สถานที่และจุดติดตั้งย่อยรวมกันยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
+    if (trimmedLocation.length > 150) {
+      notify('ชื่อสถานที่ยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
       return;
     }
 
@@ -369,10 +383,12 @@ const NewWithdrawal: React.FC = () => {
       const payload = {
         recipient: trimmedRecipient,
         project_name: trimmedProjectName,
-        location: finalLocation,
+        location: trimmedLocation,
         station_id: stationId,
-        station_area_id: undefined,
-        contract_id: contractId,
+        contract_id: contractReferenceType === 'contract' ? contractId : undefined,
+        withdrawal_date: withdrawalDate,
+        contract_reference_type: contractReferenceType,
+        contract_reference_note: contractReferenceType === 'none' ? contractReferenceNote.trim() : undefined,
         type: trimmedType,
         note: trimmedNote,
         return_due_date: calculatedDueDate,
@@ -490,6 +506,9 @@ const NewWithdrawal: React.FC = () => {
               setLocation('');
               setStationId(undefined);
               setContractId(undefined);
+              setContractReferenceType('contract');
+              setContractReferenceNote('');
+              setWithdrawalDate(getLocalDateInput());
               setNote('');
               setType('ติดตั้งใหม่');
               setSelectedType('ติดตั้งใหม่');
@@ -751,6 +770,7 @@ const NewWithdrawal: React.FC = () => {
                                   />
                                   <button
                                     type="button"
+                                    className="pastel-primary-action"
                                     onClick={() => {
                                       setScanKnownSns((si.serial_numbers || []).filter(Boolean));
                                       setScanItemId(si.inventory_id);
@@ -884,9 +904,25 @@ const NewWithdrawal: React.FC = () => {
                   id="withdrawal-projectName"
                   error={fieldErrors.projectName}
                 />
+
+                <div id="withdrawal-withdrawalDate" className="form-group" style={{ marginBottom: 0 }} tabIndex={-1}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    วันที่เบิกจริง <span style={{ color: 'var(--danger)' }}>*</span>
+                    <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+                      (วันที่ตามเอกสาร ไม่ใช่วันที่บันทึกเข้าระบบ)
+                    </span>
+                  </label>
+                  <DatePicker
+                    value={withdrawalDate}
+                    onChange={(value) => { setWithdrawalDate(value); clearFieldError('withdrawalDate'); }}
+                    placeholder="เลือกวันที่เบิกจริง"
+                    style={{ width: '100%' }}
+                  />
+                  {fieldErrors.withdrawalDate && <span className="form-field-error" role="alert">{fieldErrors.withdrawalDate}</span>}
+                </div>
               </FormSection>
 
-              <FormSection title="สถานที่ & สัญญา" icon={<MapPin size={18} />} columns={1}>
+              <FormSection title="สถานที่ & เอกสารอ้างอิง" icon={<MapPin size={18} />} columns={1}>
                 <div id="withdrawal-stationId" className="form-group" style={{ marginBottom: 0 }} tabIndex={-1}>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
                     สถานที่ตั้งด่าน / จุดควบคุมน้ำหนักทางหลวง <span style={{ color: 'var(--danger)' }}>*</span>
@@ -904,26 +940,58 @@ const NewWithdrawal: React.FC = () => {
                   {fieldErrors.stationId && <span className="form-field-error" role="alert">{fieldErrors.stationId}</span>}
                 </div>
 
-                <Input
-                  label="จุดติดตั้ง / บริเวณพื้นที่ย่อย"
-                  maxLength={100}
-                  placeholder="ระบุตำแหน่งติดตั้งย่อย เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก..."
-                  value={subLocation}
-                  onChange={(e) => setSubLocation(e.target.value)}
-                  disabled={loading}
-                />
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                    สัญญา / ปีสัญญา
-                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>
-                      (ใช้ติดตามว่าอุปกรณ์หน้างานเป็นของสัญญาปีไหน)
-                    </span>
+                <div id="withdrawal-contractId" className="form-group" style={{ marginBottom: 0 }} tabIndex={-1}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    เอกสารอ้างอิงการจัดหา <span style={{ color: 'var(--danger)' }}>*</span>
                   </label>
-                  <ContractSelector
-                    selectedContractId={contractId}
-                    onChange={(id) => setContractId(id)}
-                  />
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', padding: '4px', borderRadius: '10px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+                    {[
+                      { value: 'contract' as const, label: 'ผูกกับสัญญา' },
+                      { value: 'none' as const, label: 'ไม่มีสัญญา / ของเดิม' }
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setContractReferenceType(option.value);
+                          if (option.value === 'none') setContractId(undefined);
+                          clearFieldError('contractId');
+                          clearFieldError('contractReferenceNote');
+                        }}
+                        style={{ flex: 1, padding: '8px 10px', border: 'none', borderRadius: '7px', background: contractReferenceType === option.value ? 'var(--primary)' : 'transparent', color: contractReferenceType === option.value ? '#fff' : 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {contractReferenceType === 'contract' ? (
+                    <>
+                      <ContractSelector
+                        selectedContractId={contractId}
+                        asOfDate={withdrawalDate}
+                        required={true}
+                        onChange={(id) => { setContractId(id); clearFieldError('contractId'); }}
+                      />
+                      <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        ระบบจะเก็บข้อมูลเลขสัญญาและปีงบประมาณไว้กับใบเบิก ณ วันที่ทำรายการ แม้สัญญาปัจจุบันจะเปลี่ยนในภายหลัง
+                      </p>
+                      {fieldErrors.contractId && <span className="form-field-error" role="alert">{fieldErrors.contractId}</span>}
+                    </>
+                  ) : (
+                    <div id="withdrawal-contractReferenceNote" tabIndex={-1}>
+                      <Input
+                        label="เหตุผลที่ไม่ผูกสัญญา"
+                        required
+                        maxLength={200}
+                        placeholder="เช่น อุปกรณ์เดิม / โอนจากหน่วยงานอื่น / จัดซื้อทั่วไป"
+                        value={contractReferenceNote}
+                        onChange={e => { setContractReferenceNote(e.target.value); clearFieldError('contractReferenceNote'); }}
+                        disabled={loading}
+                        error={fieldErrors.contractReferenceNote}
+                      />
+                    </div>
+                  )}
                 </div>
               </FormSection>
 

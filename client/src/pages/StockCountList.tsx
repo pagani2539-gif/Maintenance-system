@@ -184,7 +184,7 @@ const StockCountList: React.FC = () => {
                         className="dash-row-link"
                       >
                         <td style={td}>
-                          <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: '"Bai Jamjuree", monospace' }}>{c.count_no}</span>
+                          <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{c.count_no}</span>
                           {c.note && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>{c.note}</div>}
                         </td>
                         <td style={td}>

@@ -17,9 +17,9 @@ const contentSecurityPolicy = [
   "frame-ancestors 'self'",
   "form-action 'self'",
   "img-src 'self' data: blob:",
-  "font-src 'self' data:",
+  "font-src 'self' data: https://fonts.gstatic.com",
   "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "connect-src 'self'",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -144,9 +144,40 @@ console.log('Routes mounted on /api/repairs, /api/inventory, /api/withdrawals, /
 // Serve static frontend files in production if dist folder exists
 const distPath = path.join(__dirname, '../client/dist');
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      const fileName = path.basename(filePath);
+      const relativePath = path.relative(distPath, filePath);
+      const isHashedAsset = relativePath.startsWith(`assets${path.sep}`)
+        && /-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(fileName);
+
+      // Hashed assets are content-addressed and safe to cache forever. HTML,
+      // service workers, manifests and icons must never be stored: allowing
+      // browser revalidation here can keep an old app shell alive when Chrome
+      // still owns a stale ETag or legacy service-worker cache.
+      if (isHashedAsset) {
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.set({
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          Pragma: 'no-cache',
+          Expires: '0'
+        });
+      }
+    }
+  }));
   console.log('Serving production frontend from client/dist');
+  // Do not serve index.html for a missing JavaScript/CSS asset. Returning HTML
+  // here turns a stale lazy import into a misleading MIME-type failure.
+  app.get('/assets/*', (_req, res) => {
+    res.status(404).type('text/plain').send('Asset not found');
+  });
   app.get('*', (req, res) => {
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      Pragma: 'no-cache',
+      Expires: '0'
+    });
     res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {

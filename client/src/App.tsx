@@ -1,39 +1,39 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import RepairList from './pages/RepairList';
-import NewRepair from './pages/NewRepair';
-import NewClaim from './pages/NewClaim';
-import ClaimList from './pages/ClaimList';
-import RepairDetail from './pages/RepairDetail';
-import InventoryList from './pages/InventoryList';
-import WithdrawalList from './pages/WithdrawalList';
-import TransactionList from './pages/TransactionList';
-import PendingReturns from './pages/PendingReturns';
-import MyTasks from './pages/MyTasks';
-import StockCountList from './pages/StockCountList';
-import StockCountDetail from './pages/StockCountDetail';
-import AssetTimeline from './pages/AssetTimeline';
-import PurchaseOrderList from './pages/PurchaseOrderList';
-import TechnicianStockList from './pages/TechnicianStockList';
-import TechnicianStockMovements from './pages/TechnicianStockMovements';
-import Technicians from './pages/Technicians';
-import StationSearch from './pages/StationSearch';
-import Login from './pages/Login';
-import ChangePassword from './pages/ChangePassword';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 
-// These routes carry PDF/export, scanner, report, or admin-only code. Loading
-// them on demand keeps the first authenticated screen lighter for technicians.
+// Route code is loaded only when it is opened. This keeps charts, maps, QR,
+// printing, and scanner dependencies out of the initial application bundle.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const RepairList = lazy(() => import('./pages/RepairList'));
+const NewRepair = lazy(() => import('./pages/NewRepair'));
+const NewClaim = lazy(() => import('./pages/NewClaim'));
+const ClaimList = lazy(() => import('./pages/ClaimList'));
+const RepairDetail = lazy(() => import('./pages/RepairDetail'));
+const InventoryList = lazy(() => import('./pages/InventoryList'));
 const NewWithdrawal = lazy(() => import('./pages/NewWithdrawal'));
+const WithdrawalList = lazy(() => import('./pages/WithdrawalList'));
 const WithdrawalDetail = lazy(() => import('./pages/WithdrawalDetail'));
+const TransactionList = lazy(() => import('./pages/TransactionList'));
+const PendingReturns = lazy(() => import('./pages/PendingReturns'));
+const MyTasks = lazy(() => import('./pages/MyTasks'));
+const StockCountList = lazy(() => import('./pages/StockCountList'));
+const StockCountDetail = lazy(() => import('./pages/StockCountDetail'));
+const AssetTimeline = lazy(() => import('./pages/AssetTimeline'));
+const PurchaseOrderList = lazy(() => import('./pages/PurchaseOrderList'));
+const TechnicianStockList = lazy(() => import('./pages/TechnicianStockList'));
+const TechnicianStockMovements = lazy(() => import('./pages/TechnicianStockMovements'));
+const Technicians = lazy(() => import('./pages/Technicians'));
+const StationSearch = lazy(() => import('./pages/StationSearch'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const Login = lazy(() => import('./pages/Login'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 
 function App() {
   return (

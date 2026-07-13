@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { inventoryApi, technicianStockApi } from '../api';
 import { useNotification } from './Layout';
 import { Button } from './ui/Button';
+import AppDialog from './ui/AppDialog';
 import StationSelector from './ui/StationSelector';
+import Select from './ui/Select';
 import { getApiErrorMessage } from '../utils/apiError';
 import type { InventoryItem, Technician, TechnicianHoldingsDetail } from '../types';
 import { Package, Plus, Trash2, X, Search, ChevronDown, Truck, MapPin, PackageOpen, Undo2 } from 'lucide-react';
@@ -204,27 +206,36 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '760px', width: '100%', maxHeight: '92vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+    <AppDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={meta.title}
+      busy={loading}
+      closeOnBackdrop={false}
+      className="modal-content"
+      panelStyle={{ maxWidth: '760px', width: '100%', maxHeight: '92vh', overflowY: 'auto' }}
+    >
         <div className="modal-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: meta.accent }}>{meta.icon} {meta.title}</h3>
-          <button className="close-btn" onClick={onClose}><X size={20} /></button>
+          <button type="button" className="close-btn" onClick={onClose} disabled={loading} aria-label="ปิด"><X size={20} /></button>
         </div>
 
         {/* Technician */}
         <div className="form-group" style={{ marginBottom: '1rem' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>ช่าง <span style={{ color: 'var(--danger)' }}>*</span></label>
-          <select
+          <Select
             value={technicianId ?? ''}
-            onChange={(e) => { setTechnicianId(e.target.value ? Number(e.target.value) : undefined); setItems([]); }}
+            options={[
+              { value: '', label: '-- เลือกช่าง --' },
+              ...technicians.filter((t) => t.is_active).map((t) => ({
+                value: t.id,
+                label: `${t.full_name}${t.code ? ` (${t.code})` : ''}`,
+              })),
+            ]}
+            onChange={(value) => { setTechnicianId(value ? Number(value) : undefined); setItems([]); }}
             disabled={!!presetTechnicianId}
-            style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.9rem' }}
-          >
-            <option value="">-- เลือกช่าง --</option>
-            {technicians.filter((t) => t.is_active).map((t) => (
-              <option key={t.id} value={t.id}>{t.full_name}{t.code ? ` (${t.code})` : ''}</option>
-            ))}
-          </select>
+            style={{ width: '100%' }}
+          />
         </div>
 
         {/* Item picker */}
@@ -365,10 +376,8 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
           <Button variant="outline" style={{ flex: 1 }} onClick={onClose} disabled={loading}>ยกเลิก</Button>
           <Button variant="primary" style={{ flex: 2 }} onClick={handleSubmit} loading={loading} disabled={loading}>{meta.cta}</Button>
         </div>
-      </div>
-
       <style>{`.dropdown-item-hover:hover { background: rgba(59,130,246,0.08) !important; }`}</style>
-    </div>
+    </AppDialog>
   );
 };
 

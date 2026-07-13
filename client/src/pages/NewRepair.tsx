@@ -39,7 +39,6 @@ const NewRepair: React.FC = () => {
     instance_id: undefined as number | undefined,
     inventory_id: undefined as number | undefined
   });
-  const [subLocation, setSubLocation] = useState('');
   const [images, setImages] = useState<File[]>([]);
 
   const searchParams = new URLSearchParams(locationSearch.search);
@@ -94,7 +93,6 @@ const NewRepair: React.FC = () => {
     const trimmedLocation = formData.location.trim();
     const trimmedDeviceName = formData.device_name.trim();
     const trimmedProblem = formData.problem.trim();
-    const finalLocation = trimmedLocation + (subLocation.trim() ? ` - ${subLocation.trim()}` : '');
 
     if (!trimmedProjectName || !formData.station_id || !trimmedDeviceName || !trimmedProblem) {
       notify('กรุณากรอกข้อมูลให้ครบถ้วนในช่องที่จำเป็น', 'error');
@@ -105,8 +103,8 @@ const NewRepair: React.FC = () => {
       notify('ชื่อโครงการยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error');
       return;
     }
-    if (finalLocation.length > 150) {
-      notify('สถานที่และจุดติดตั้งย่อยรวมกันยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error');
+    if (trimmedLocation.length > 150) {
+      notify('ชื่อสถานที่ยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error');
       return;
     }
     if (trimmedDeviceName.length > 100) {
@@ -129,7 +127,7 @@ const NewRepair: React.FC = () => {
     try {
       const data = new FormData();
       data.append('project_name', trimmedProjectName);
-      data.append('location', finalLocation);
+      data.append('location', trimmedLocation);
       if (formData.station_id) {
         data.append('station_id', String(formData.station_id));
       }
@@ -242,13 +240,6 @@ const NewRepair: React.FC = () => {
                 }}
               />
             </div>
-            <Input
-              label="จุดติดตั้ง / บริเวณพื้นที่ย่อย"
-              maxLength={100}
-              placeholder="ระบุตำแหน่งติดตั้งย่อย เช่น ข้างเลนชั่ง, กล่องควบคุมฝั่งขาออก..."
-              value={subLocation}
-              onChange={(e) => setSubLocation(e.target.value)}
-            />
           </FormSection>
 
           {/* ③ อุปกรณ์และอาการ */}
@@ -256,12 +247,13 @@ const NewRepair: React.FC = () => {
             <StationAssetPicker
               stationId={formData.station_id}
               selectedInstanceId={formData.instance_id}
+              selectedInventoryId={formData.inventory_id}
               label="อุปกรณ์ที่แจ้งซ่อม (เลือกจากคุรุภัณฑ์ที่ติดตั้งอยู่ในด่านนี้)"
               onSelect={(item: AssetLifecycleItem) => {
                 setFormData(prev => ({
                   ...prev,
                   device_name: `${item.device_name}${item.model ? ' ' + item.model : ''}`,
-                  instance_id: item.instance_id,
+                  instance_id: item.instance_id || undefined,
                   inventory_id: item.inventory_id
                 }));
               }}

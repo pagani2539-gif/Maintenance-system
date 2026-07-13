@@ -40,7 +40,7 @@ const KpiStrip: React.FC<KpiStripProps> = ({
               <div style={{ width: 30, height: 30, background: k.bg, color: k.color, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <k.icon size={16} />
               </div>
-              <div style={{ fontSize: '1.7rem', fontWeight: 800, lineHeight: 1, color: 'var(--text-main)', fontFamily: 'Bai Jamjuree' }}>
+              <div style={{ fontSize: '1.7rem', fontWeight: 800, lineHeight: 1, color: 'var(--text-main)', fontFamily: 'var(--font-display)' }}>
                 <Counter end={k.value} />
               </div>
             </div>

@@ -1,4 +1,4 @@
-const { query } = require('../database/db');
+const { query, withTransaction } = require('../database/db');
 const { validateStationExists, validateStationAreaBelongsToStation, getStationSnapshotName } = require('../utils/stationValidation');
 const { logAudit } = require('../utils/auditLogger');
 const { sendLineNotify } = require('../utils/lineNotify');
@@ -672,35 +672,171 @@ exports.replaceDevice = async (req, res) => {
   const { old_serial, old_model, new_serial, new_model } = req.body;
   const actor = req.user.full_name;
 
+  const oldSerial = String(old_serial || '').trim();
+  const newSerial = String(new_serial || '').trim();
+  if (!oldSerial || !newSerial) {
+    return res.status(400).json({ error: 'กรุณาระบุ S/N เดิมและ S/N ใหม่ให้ครบ' });
+  }
+  if (oldSerial.toLocaleLowerCase('en-US') === newSerial.toLocaleLowerCase('en-US')) {
+    return res.status(400).json({ error: 'S/N เดิมและ S/N ใหม่ต้องไม่ซ้ำกัน' });
+  }
+
   try {
-    await query(`
-      INSERT INTO device_changes (repair_id, old_serial, old_model, new_serial, new_model, changed_by)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [id, old_serial, old_model, new_serial, new_model, actor]);
-
-    // Update old and new device status immediately
-    const repair = await queryGet('SELECT * FROM repairs WHERE id = $1', [id]);
-    if (repair) {
-      if (old_serial) {
-        await query(
-          "UPDATE inventory_instances SET status = $1, station_id = NULL, current_location = 'Warehouse' WHERE serial_number = $2",
-          [INSTANCE_STATUS.DAMAGED, old_serial]
-        );
+    await withTransaction(async (client) => {
+      const { rows: repairRows } = await client.query(
+        'SELECT * FROM repairs WHERE id = $1 FOR UPDATE',
+        [id]
+      );
+      const repair = repairRows[0];
+      if (!repair) {
+        const err = new Error('ไม่พบงานซ่อมที่ต้องการเปลี่ยนอุปกรณ์');
+        err.status = 404;
+        throw err;
       }
-      if (new_serial) {
-        await query(
-          "UPDATE inventory_instances SET status = $1, station_id = $2, current_location = $3 WHERE serial_number = $4",
-          [INSTANCE_STATUS.WITHDRAWN, repair.station_id, repair.location, new_serial]
-        );
+      if (!repair.station_id) {
+        const err = new Error('งานซ่อมนี้ไม่ได้ผูกกับสถานี');
+        err.status = 409;
+        throw err;
       }
-    }
 
-    await query('INSERT INTO repair_logs (repair_id, action, "user", note) VALUES ($1, $2, $3, $4)',
-      [id, 'เปลี่ยนอะไหล่/อุปกรณ์', actor, `เปลี่ยน ${old_model} (${old_serial}) เป็น ${new_model} (${new_serial})`]);
+      const { rows: oldRows } = await client.query(`
+        SELECT * FROM inventory_instances
+        WHERE LOWER(serial_number) = LOWER($1)
+        FOR UPDATE
+      `, [oldSerial]);
+      const oldInstance = oldRows[0];
+      if (!oldInstance || Number(oldInstance.station_id) !== Number(repair.station_id)) {
+        const err = new Error('S/N เดิมไม่ได้ติดตั้งอยู่ที่สถานีของงานซ่อมนี้');
+        err.status = 409;
+        throw err;
+      }
+
+      const { rows: newRows } = await client.query(`
+        SELECT * FROM inventory_instances
+        WHERE LOWER(serial_number) = LOWER($1)
+        FOR UPDATE
+      `, [newSerial]);
+      const newInstance = newRows[0];
+      if (!newInstance) {
+        const err = new Error('ไม่พบ S/N ใหม่ในคลัง');
+        err.status = 404;
+        throw err;
+      }
+      if (newInstance.status !== INSTANCE_STATUS.IN_STOCK || newInstance.station_id != null) {
+        const err = new Error('S/N ใหม่ไม่ได้อยู่ในคลังกลางหรือถูกใช้งานอยู่แล้ว');
+        err.status = 409;
+        throw err;
+      }
+
+      const warehouseUpdate = await client.query(`
+        UPDATE inventory
+        SET quantity = quantity - 1, updated_at = NOW()
+        WHERE id = $1 AND quantity >= 1
+        RETURNING quantity
+      `, [newInstance.inventory_id]);
+      if (warehouseUpdate.rowCount !== 1) {
+        const err = new Error('ยอด S/N ใหม่ในคลังไม่เพียงพอ');
+        err.status = 409;
+        throw err;
+      }
+
+      const sourceBalance = await client.query(`
+        UPDATE station_inventory
+        SET quantity = quantity - 1, updated_at = NOW()
+        WHERE station_id = $1 AND inventory_id = $2 AND quantity >= 1
+        RETURNING quantity
+      `, [oldInstance.station_id, oldInstance.inventory_id]);
+      if (sourceBalance.rowCount !== 1) {
+        const err = new Error('ยอด S/N เดิมที่สถานีไม่ถูกต้อง');
+        err.status = 409;
+        throw err;
+      }
+      await client.query(
+        'DELETE FROM station_inventory WHERE station_id = $1 AND inventory_id = $2 AND quantity = 0',
+        [oldInstance.station_id, oldInstance.inventory_id]
+      );
+
+      const { rows: sourceLotRows } = await client.query(`
+        SELECT id FROM station_inventory_lots
+        WHERE station_id = $1 AND inventory_id = $2 AND quantity_remaining > 0
+        ORDER BY (withdrawal_id = $3) DESC, withdrawal_date ASC NULLS LAST, id ASC
+        LIMIT 1
+        FOR UPDATE
+      `, [oldInstance.station_id, oldInstance.inventory_id, oldInstance.source_withdrawal_id]);
+      if (!sourceLotRows[0]) {
+        const err = new Error('ไม่พบ lot ต้นทางของ S/N เดิม');
+        err.status = 409;
+        throw err;
+      }
+      await client.query(`
+        UPDATE station_inventory_lots
+        SET quantity_remaining = quantity_remaining - 1, updated_at = NOW()
+        WHERE id = $1
+      `, [sourceLotRows[0].id]);
+
+      await client.query(`
+        UPDATE inventory_instances
+        SET status = $1, station_id = NULL, current_location = 'Warehouse', updated_at = NOW()
+        WHERE id = $2
+      `, [INSTANCE_STATUS.DAMAGED, oldInstance.id]);
+
+      await client.query(`
+        UPDATE inventory_instances
+        SET status = $1, station_id = $2, current_location = $3, updated_at = NOW()
+        WHERE id = $4
+      `, [INSTANCE_STATUS.WITHDRAWN, repair.station_id, repair.location, newInstance.id]);
+
+      await client.query(`
+        INSERT INTO station_inventory (station_id, inventory_id, quantity, updated_by, updated_at)
+        VALUES ($1, $2, 1, $3, NOW())
+        ON CONFLICT (station_id, inventory_id) DO UPDATE
+          SET quantity = station_inventory.quantity + 1,
+              updated_by = EXCLUDED.updated_by,
+              updated_at = NOW()
+      `, [repair.station_id, newInstance.inventory_id, actor]);
+      await client.query(`
+        INSERT INTO station_inventory_lots (
+          station_id, inventory_id, quantity_received, quantity_remaining,
+          untracked_remaining, withdrawal_date, project_name_snapshot, contract_id,
+          contract_no_snapshot, contract_name_snapshot, contract_year_snapshot,
+          contract_company_snapshot
+        ) VALUES ($1,$2,1,1,0,CURRENT_DATE,$3,$4,$5,$6,$7,$8)
+      `, [
+        repair.station_id, newInstance.inventory_id,
+        newInstance.project_name_snapshot || repair.project_name || null,
+        newInstance.contract_id || null, newInstance.contract_no_snapshot || null,
+        newInstance.contract_name_snapshot || null, newInstance.contract_year_snapshot || null,
+        newInstance.contract_company_snapshot || null
+      ]);
+
+      await client.query(`
+        INSERT INTO station_asset_events (
+          station_id, inventory_id, instance_id, event_type, quantity,
+          source_withdrawal_id, project_name_snapshot, contract_id,
+          contract_no_snapshot, contract_name_snapshot, contract_year_snapshot,
+          old_serial_number, new_serial_number, note, performed_by
+        ) VALUES ($1,$2,$3,'REPLACE',1,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      `, [
+        repair.station_id, newInstance.inventory_id, newInstance.id,
+        newInstance.source_withdrawal_id, newInstance.project_name_snapshot || repair.project_name || null,
+        newInstance.contract_id, newInstance.contract_no_snapshot, newInstance.contract_name_snapshot,
+        newInstance.contract_year_snapshot, oldSerial, newSerial,
+        `เปลี่ยนอุปกรณ์จากงานซ่อม #${id}`, actor
+      ]);
+
+      await client.query(`
+        INSERT INTO device_changes (repair_id, old_serial, old_model, new_serial, new_model, changed_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [id, oldSerial, old_model, newSerial, new_model, actor]);
+      await client.query(
+        'INSERT INTO repair_logs (repair_id, action, "user", note) VALUES ($1, $2, $3, $4)',
+        [id, 'เปลี่ยนอะไหล่/อุปกรณ์', actor, `เปลี่ยน ${old_model} (${oldSerial}) เป็น ${new_model} (${newSerial})`]
+      );
+    });
 
     res.json({ message: 'บันทึกการเปลี่ยนอะไหล่เรียบร้อย' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 };
 

@@ -9,6 +9,24 @@ interface State {
   error: Error | null;
 }
 
+const CHUNK_RELOAD_KEY = 'maintenance:chunk-reload-attempted';
+
+const isChunkLoadError = (error: Error) => (
+  /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i.test(error.message)
+);
+
+const clearStaleReleaseAndReload = async () => {
+  await Promise.allSettled([
+    navigator.serviceWorker?.getRegistrations().then(registrations => (
+      Promise.all(registrations.map(registration => registration.unregister()))
+    )) ?? Promise.resolve(),
+    'caches' in window
+      ? caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      : Promise.resolve(),
+  ]);
+  window.location.reload();
+};
+
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -21,9 +39,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error inside ErrorBoundary:", error, errorInfo);
+
+    // A deployment replaces Vite's hashed lazy chunks. If a PWA tab still has
+    // an older app shell, clear that one stale release and reload once.
+    if (isChunkLoadError(error) && sessionStorage.getItem(CHUNK_RELOAD_KEY) !== '1') {
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+      void clearStaleReleaseAndReload();
+    }
   }
 
   private handleReset = () => {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
@@ -37,7 +63,7 @@ export class ErrorBoundary extends Component<Props, State> {
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '400px',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
+          fontFamily: 'var(--font-ui)'
         }}>
           <div style={{
             maxWidth: '500px',
@@ -96,7 +122,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReset}
                 style={{
                   padding: '10px 18px',
-                  backgroundColor: '#3b82f6',
+                  backgroundColor: '#0277bd',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',

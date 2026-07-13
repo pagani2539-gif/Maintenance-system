@@ -369,10 +369,12 @@ const buildStockCountReport = async ({ startDate, endDate }) => {
 // วงจรชีวิตสินทรัพย์ — snapshot of serialized units currently deployed at stations.
 const buildAssetLifecycleReport = async () => {
   const rowsData = await queryAll(`
-    SELECT ii.serial_number, ii.created_at AS installed_at,
+    SELECT ii.serial_number, COALESCE(ii.withdrawal_date, ii.created_at::date) AS installed_at,
            i.name AS device_name, i.model,
            st.name AS station_name, st.code AS station_code,
-           c.contract_no,
+           ii.project_name_snapshot,
+           COALESCE(ii.contract_no_snapshot, c.contract_no) AS contract_no,
+           COALESCE(ii.contract_year_snapshot, c.year_be) AS contract_year,
            (SELECT COUNT(*) FROM repairs r WHERE r.instance_id = ii.id) AS repair_count
     FROM inventory_instances ii
     JOIN inventory i ON ii.inventory_id = i.id
@@ -383,7 +385,7 @@ const buildAssetLifecycleReport = async () => {
   `);
 
   const now = Date.now();
-  const headers = ['S/N', 'อุปกรณ์', 'รุ่น (Model)', 'สถานีติดตั้ง', 'วันที่ติดตั้ง', 'อายุใช้งาน', 'จำนวนครั้งที่ซ่อม', 'สัญญา'];
+  const headers = ['S/N', 'อุปกรณ์', 'รุ่น (Model)', 'สถานีติดตั้ง', 'วันที่เบิกลงสถานี', 'โครงการ', 'สัญญา / ปี', 'อายุใช้งาน', 'จำนวนครั้งที่ซ่อม'];
   const rows = rowsData.map(a => {
     const inst = a.installed_at ? new Date(a.installed_at) : null;
     const months = inst ? Math.max(0, Math.floor((now - inst.getTime()) / (30.44 * 86400000))) : 0;
@@ -393,9 +395,10 @@ const buildAssetLifecycleReport = async () => {
       dash(a.model),
       `${a.station_code ? `[${a.station_code}] ` : ''}${dash(a.station_name)}`,
       formatThaiDate(a.installed_at),
+      dash(a.project_name_snapshot),
+      a.contract_no ? `${a.contract_no} (ปี ${a.contract_year || '-'})` : '-',
       ageLabel(months),
-      `${Number(a.repair_count)} ครั้ง`,
-      dash(a.contract_no)
+      `${Number(a.repair_count)} ครั้ง`
     ];
   });
 
@@ -403,7 +406,7 @@ const buildAssetLifecycleReport = async () => {
     title: 'รายงานวงจรชีวิตสินทรัพย์ติดตั้ง (Asset Lifecycle)',
     headers,
     rows,
-    colWidths: ['13%', '17%', '14%', '18%', '11%', '12%', '9%', '6%'],
+    colWidths: ['11%', '14%', '11%', '15%', '11%', '14%', '13%', '8%', '8%'],
     totals: [{ label: 'จำนวนสินทรัพย์ที่ติดตั้งใช้งาน:', value: `${rowsData.length} หน่วย` }],
     count: rowsData.length
   };

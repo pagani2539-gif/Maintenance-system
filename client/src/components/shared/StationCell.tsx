@@ -18,8 +18,8 @@ const StationCell: React.FC<StationCellProps> = ({
   locationSnapshot,
   compact = false,
 }) => {
-  const nameSize = compact ? '0.875rem' : '0.9rem';
-  const subSize = compact ? '0.75rem' : '0.8rem';
+  const nameSize = compact ? 'var(--table-text-size)' : '0.9rem';
+  const subSize = compact ? 'var(--table-secondary-size)' : '0.8rem';
 
   if (stationName) {
     const formattedProvince = province
@@ -49,7 +49,7 @@ const StationCell: React.FC<StationCellProps> = ({
           <span
             className="station-cell-sub line-clamp-1"
             title={secondaryText}
-            style={{ fontSize: subSize, color: 'var(--text-muted)', lineHeight: 1.2 }}
+            style={{ fontSize: subSize, fontWeight: compact ? 'var(--table-secondary-weight)' : 500, color: 'var(--text-muted)', lineHeight: 1.2 }}
           >
             {secondaryText}
           </span>

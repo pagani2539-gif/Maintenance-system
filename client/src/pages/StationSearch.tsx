@@ -7,6 +7,8 @@ import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import Card from '../components/ui/Card';
 import Select from '../components/ui/Select';
+import DatePicker from '../components/ui/DatePicker';
+import StationSelector from '../components/ui/StationSelector';
 import type { Station, InventoryTransaction, Repair } from '../types';
 import ThailandMap from '../components/ui/ThailandMap';
 import type { TableColumn, TableAction } from '../types/table.types';
@@ -45,11 +47,12 @@ type StationFormData = {
   region: string;
   province: string;
   responsible_person: string;
+  operational_start_date: string;
 };
 
 const EMPTY_FORM: StationFormData = {
   name: '', station_type: 'WEIGH_STATION', custom_type: '',
-  highway_no: '', direction: 'INBOUND', region: '', province: '', responsible_person: ''
+  highway_no: '', direction: 'INBOUND', region: '', province: '', responsible_person: '', operational_start_date: ''
 };
 
 const REGIONS = ['ภาคเหนือ', 'ภาคตะวันออกเฉียงเหนือ', 'ภาคกลาง', 'ภาคตะวันออก', 'ภาคตะวันตก', 'ภาคใต้'];
@@ -109,6 +112,11 @@ interface DeployedInstance {
   condition: string;
   status?: string;
   updated_at?: string;
+  withdrawal_date?: string;
+  project_name_snapshot?: string;
+  contract_no_snapshot?: string;
+  contract_year_snapshot?: number;
+  source_withdrawal_id?: number;
 }
 
 interface ActiveAsset {
@@ -124,6 +132,11 @@ interface ActiveAsset {
   conditionBy?: string;
   conditionAt?: string;
   instances?: DeployedInstance[];
+  latestWithdrawalDate?: string;
+  latestWithdrawalId?: number;
+  latestProject?: string;
+  latestContract?: string;
+  sourceCount?: number;
 }
 
 const StationSearch: React.FC = () => {
@@ -153,9 +166,16 @@ const StationSearch: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [assetStatusFilter, setAssetStatusFilter] = useState<AssetStatusKey | null>(null);
+  const [assetSearch, setAssetSearch] = useState('');
   const [expandedAssetId, setExpandedAssetId] = useState<number | null>(null);
   const [conditionDraft, setConditionDraft] = useState<{ status: string; note: string }>({ status: 'ปกติ', note: '' });
   const [savingCondition, setSavingCondition] = useState(false);
+  const [verifyingStation, setVerifyingStation] = useState(false);
+  const [moveAsset, setMoveAsset] = useState<{ inventoryId: number; instanceId?: number; name: string; quantity: number } | null>(null);
+  const [moveTargetStationId, setMoveTargetStationId] = useState<number | undefined>(undefined);
+  const [moveQuantity, setMoveQuantity] = useState(1);
+  const [moveNote, setMoveNote] = useState('');
+  const [movingAsset, setMovingAsset] = useState(false);
 
   // ลบ error เมื่อผู้ใช้แก้ค่า
   const clearFieldError = (field: string) => {
@@ -261,7 +281,8 @@ const StationSearch: React.FC = () => {
       direction: st.direction,
       region: st.region,
       province: st.province,
-      responsible_person: st.responsible_person || ''
+      responsible_person: st.responsible_person || '',
+      operational_start_date: st.operational_start_date || ''
     });
     setFieldErrors({});
     setStationModal({ open: true, mode: 'edit', station: st });
@@ -317,7 +338,8 @@ const StationSearch: React.FC = () => {
         direction: formData.direction,
         region: formData.region,
         province: formData.province.trim(),
-        responsible_person: responsibleTrim
+        responsible_person: responsibleTrim,
+        operational_start_date: formData.operational_start_date || undefined
       };
 
       if (stationModal.mode === 'edit' && stationModal.station) {
@@ -501,33 +523,72 @@ const StationSearch: React.FC = () => {
   const activeAssets = useMemo(() => {
     if (!details || !details.withdrawals) return [];
     const assetsMap = new Map<number, ActiveAsset>();
-    details.withdrawals.forEach(w => {
-      if (w.items) {
-        w.items.forEach(item => {
-          const invId = item.inventory_id;
-          const existing = assetsMap.get(invId);
-          if (existing) {
-            existing.quantity += item.quantity;
-          } else {
-            assetsMap.set(invId, {
-              id: invId,
-              name: item.item_name || 'ไม่ระบุชื่อพัสดุ',
-              model: item.item_model || '—',
-              quantity: item.quantity,
-              image: item.item_image,
-              status: 'normal',
-              activeTickets: [],
-              condition: 'ปกติ'
-            });
-          }
+    if (details.assets && details.assets.length > 0) {
+      details.assets.forEach(asset => {
+        const latestLot = asset.source_lots?.[0];
+        assetsMap.set(asset.inventory_id, {
+          id: asset.inventory_id,
+          name: asset.device_name || 'ไม่ระบุชื่อพัสดุ',
+          model: asset.model || '—',
+          quantity: Number(asset.current_quantity) || 0,
+          image: asset.image_path,
+          status: 'normal',
+          activeTickets: [],
+          condition: 'ปกติ',
+          latestWithdrawalDate: latestLot?.withdrawal_date,
+          latestWithdrawalId: latestLot?.withdrawal_id,
+          latestProject: latestLot?.project_name_snapshot || undefined,
+          latestContract: latestLot?.contract_no_snapshot
+            ? `${latestLot.contract_no_snapshot}${latestLot.contract_year_snapshot ? ` (ปี ${latestLot.contract_year_snapshot})` : ''}`
+            : 'ไม่ระบุสัญญา',
+          sourceCount: asset.source_lots?.length || 0,
         });
-      }
-    });
+      });
+    } else {
+      details.withdrawals.forEach(w => {
+        if (w.items) {
+          w.items.forEach(item => {
+            const invId = item.inventory_id;
+            const existing = assetsMap.get(invId);
+            if (existing) {
+              existing.quantity += item.quantity;
+            } else {
+              assetsMap.set(invId, {
+                id: invId,
+                name: item.item_name || 'ไม่ระบุชื่อพัสดุ',
+                model: item.item_model || '—',
+                quantity: item.quantity,
+                image: item.item_image,
+                status: 'normal',
+                activeTickets: [],
+                condition: 'ปกติ'
+              });
+            }
+          });
+        }
+      });
+    }
 
     const activeTickets = [...(details.repairs || []), ...(details.claims || [])]
       .filter(r => r.status !== 'เสร็จสิ้น');
 
     assetsMap.forEach(asset => {
+      const sourceWithdrawals = (details.withdrawals || [])
+        .filter(w => (w.items || []).some(item => item.inventory_id === asset.id))
+        .sort((a, b) => new Date(b.withdrawal_date || b.created_at).getTime() - new Date(a.withdrawal_date || a.created_at).getTime());
+      const latestSource = sourceWithdrawals[0];
+      const sourceLots = details.assets?.find(item => item.inventory_id === asset.id)?.source_lots || [];
+      if (sourceLots.length === 0 && latestSource) {
+        asset.latestWithdrawalDate = latestSource.withdrawal_date || latestSource.created_at;
+        asset.latestWithdrawalId = latestSource.id;
+        asset.latestProject = latestSource.project_name || 'ไม่ระบุโครงการ';
+        asset.latestContract = latestSource.contract_no
+          ? `${latestSource.contract_no}${latestSource.contract_year ? ` (ปี ${latestSource.contract_year})` : ''}`
+          : latestSource.contract_reference_type === 'none'
+            ? 'ไม่มีสัญญา'
+            : 'ไม่ระบุสัญญา';
+        asset.sourceCount = new Set(sourceWithdrawals.map(w => `${w.contract_id || w.contract_reference_type || 'none'}-${w.project_name || ''}`)).size;
+      }
       const tickets = activeTickets.filter(r =>
         r.inventory_id != null
           ? r.inventory_id === asset.id
@@ -569,7 +630,12 @@ const StationSearch: React.FC = () => {
             serial_number: inst.serial_number,
             condition: inst.condition || 'New',
             status: inst.status || 'Withdrawn',
-            updated_at: inst.updated_at
+            updated_at: inst.updated_at,
+            withdrawal_date: inst.withdrawal_date,
+            project_name_snapshot: inst.project_name_snapshot,
+            contract_no_snapshot: inst.contract_no_snapshot,
+            contract_year_snapshot: inst.contract_year_snapshot,
+            source_withdrawal_id: inst.source_withdrawal_id
           });
         }
       });
@@ -585,9 +651,14 @@ const StationSearch: React.FC = () => {
   }, [activeAssets]);
 
   const visibleAssets = useMemo(() => {
-    if (!assetStatusFilter) return activeAssets;
-    return activeAssets.filter(asset => asset.status === assetStatusFilter);
-  }, [activeAssets, assetStatusFilter]);
+    const q = assetSearch.trim().toLowerCase();
+    return activeAssets.filter(asset => {
+      if (assetStatusFilter && asset.status !== assetStatusFilter) return false;
+      if (!q) return true;
+      const instanceText = (asset.instances || []).map(instance => [instance.serial_number, instance.contract_no_snapshot, instance.project_name_snapshot].filter(Boolean).join(' ')).join(' ');
+      return [asset.name, asset.model, asset.latestProject, asset.latestContract, instanceText].filter(Boolean).join(' ').toLowerCase().includes(q);
+    });
+  }, [activeAssets, assetStatusFilter, assetSearch]);
 
   // เปิด/ปิดการ์ด + เซ็ตค่าตั้งต้นของ editor สภาพอุปกรณ์
   const toggleAsset = useCallback((asset: ActiveAsset) => {
@@ -615,6 +686,34 @@ const StationSearch: React.FC = () => {
       setSavingCondition(false);
     }
   }, [details, conditionDraft, notify, fetchDetails]);
+
+  const submitMoveAsset = useCallback(async () => {
+    if (!details?.station?.id || !moveAsset || !moveTargetStationId) {
+      notify('กรุณาเลือกสถานีปลายทาง', 'error');
+      return;
+    }
+    setMovingAsset(true);
+    try {
+      await stationApi.moveAsset(details.station.id, {
+        inventory_id: moveAsset.inventoryId,
+        instance_id: moveAsset.instanceId,
+        quantity: moveAsset.instanceId ? 1 : moveQuantity,
+        to_station_id: moveTargetStationId,
+        note: moveNote.trim() || undefined,
+      });
+      notify('ย้ายอุปกรณ์เรียบร้อยแล้ว', 'success');
+      setMoveAsset(null);
+      setMoveTargetStationId(undefined);
+      setMoveQuantity(1);
+      setMoveNote('');
+      await fetchDetails({ station_id: details.station.id });
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      notify(error.response?.data?.error || 'ย้ายอุปกรณ์ไม่สำเร็จ', 'error');
+    } finally {
+      setMovingAsset(false);
+    }
+  }, [details, moveAsset, moveTargetStationId, moveQuantity, moveNote, notify, fetchDetails]);
 
   const columns: TableColumn<Station>[] = [
     { 
@@ -982,7 +1081,7 @@ const StationSearch: React.FC = () => {
                         fontSize: '0.62rem', fontWeight: 700,
                         letterSpacing: '0.18em', textTransform: 'uppercase',
                         color: '#94a3b8',
-                        fontFamily: "'JetBrains Mono', 'Consolas', 'Menlo', monospace",
+                        fontFamily: 'var(--font-ui)',
                       }}>// ตรวจวัดสถานะสด</span>
                     </div>
 
@@ -990,7 +1089,7 @@ const StationSearch: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem' }}>
                       <div style={{ flex: 1, minWidth: '285px' }}>
                         <div style={{
-                          fontFamily: "'JetBrains Mono', 'Consolas', 'Menlo', monospace",
+                          fontFamily: 'var(--font-ui)',
                           fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700,
                           letterSpacing: '0.1em', marginBottom: '6px',
                         }}>
@@ -1031,6 +1130,28 @@ const StationSearch: React.FC = () => {
                         >
                           <QrCode size={12} style={{ marginRight: '4px' }} /> คิวอาร์โค้ด
                         </button>
+                        {hasPermission('manage.stations') && (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            disabled={verifyingStation}
+                            onClick={async () => {
+                              setVerifyingStation(true);
+                              try {
+                                await stationApi.verify(details.station.id);
+                                notify('บันทึกการตรวจสอบสถานีเรียบร้อยแล้ว', 'success');
+                                await fetchDetails({ station_id: details.station.id });
+                              } catch {
+                                notify('บันทึกการตรวจสอบสถานีไม่สำเร็จ', 'error');
+                              } finally {
+                                setVerifyingStation(false);
+                              }
+                            }}
+                            style={{ borderRadius: '10px', fontSize: '0.75rem', padding: '8px 16px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontWeight: 800, opacity: verifyingStation ? 0.6 : 1 }}
+                          >
+                            {verifyingStation ? 'กำลังบันทึก...' : '✓ ตรวจสอบสถานีแล้ว'}
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1054,6 +1175,13 @@ const StationSearch: React.FC = () => {
                         </div>
                       ))}
                     </div>
+                    <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.68rem', color: '#cbd5e1' }}>
+                      <span>สร้างข้อมูล: {details.station.created_at ? formatDateTimeThai(details.station.created_at) : 'ไม่ระบุ'}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.25)' }}>•</span>
+                      <span>เริ่มใช้งาน: {details.station.operational_start_date ? new Date(`${details.station.operational_start_date}T00:00:00`).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : 'ยังไม่ระบุ'}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.25)' }}>•</span>
+                      <span>ตรวจสอบล่าสุด: {details.station.last_verified_at ? formatDateTimeThai(details.station.last_verified_at) : 'ยังไม่ตรวจสอบ'}</span>
+                    </div>
 
                     {/* Time window segmented control */}
                     <div style={{
@@ -1065,7 +1193,7 @@ const StationSearch: React.FC = () => {
                         fontSize: '0.6rem', fontWeight: 800,
                         color: '#94a3b8',
                         letterSpacing: '0.2em', textTransform: 'uppercase',
-                        fontFamily: "'JetBrains Mono', 'Consolas', monospace",
+                        fontFamily: 'var(--font-ui)',
                       }}>ช่วงเวลา ▸</span>
                       <div style={{
                         display: 'flex', gap: '3px',
@@ -1168,7 +1296,7 @@ const StationSearch: React.FC = () => {
                         <span style={{
                           fontSize: '0.62rem', fontWeight: 700,
                           color: 'var(--text-muted)',
-                          fontFamily: "'JetBrains Mono', 'Consolas', monospace",
+                          fontFamily: 'var(--font-ui)',
                           letterSpacing: '0.08em',
                         }}>
                           {dateRange === 'all' ? 'ข้อมูลทั้งหมด' : dateRange === '7d' ? '7 วันล่าสุด' : dateRange === '30d' ? '30 วันล่าสุด' : '90 วันล่าสุด'}
@@ -1236,7 +1364,7 @@ const StationSearch: React.FC = () => {
                               return <circle key={i} cx={x} cy={y} r={i === 6 ? 3.5 : 2} fill="var(--primary)" />;
                             })}
                           </svg>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 700, fontFamily: 'var(--font-ui)', width: '100%' }}>
                             {dayLabels.map((d, i) => <span key={i}>{d}</span>)}
                           </div>
                         </div>
@@ -1335,7 +1463,7 @@ const StationSearch: React.FC = () => {
                                     color: 'white',
                                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: '0.65rem', fontWeight: 800, flexShrink: 0,
-                                    fontFamily: "'JetBrains Mono', monospace",
+                                    fontFamily: 'var(--font-ui)',
                                   }}>
                                     {i + 1}
                                   </span>
@@ -1381,6 +1509,15 @@ const StationSearch: React.FC = () => {
 
                     {activeAssets.length > 0 && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ position: 'relative' }}>
+                          <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                          <input
+                            value={assetSearch}
+                            onChange={e => setAssetSearch(e.target.value)}
+                            placeholder="ค้นหาอุปกรณ์ / S/N / สัญญา"
+                            style={{ width: '190px', padding: '5px 8px 5px 27px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.68rem', outline: 'none' }}
+                          />
+                        </div>
                         <button
                           onClick={() => setAssetStatusFilter(null)}
                           style={{
@@ -1443,6 +1580,11 @@ const StationSearch: React.FC = () => {
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+                        {visibleAssets.length === 0 && (
+                          <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา
+                          </div>
+                        )}
                         {visibleAssets.map((asset) => {
                           const meta = ASSET_STATUS_META[asset.status];
                           const isExpanded = expandedAssetId === asset.id;
@@ -1466,12 +1608,14 @@ const StationSearch: React.FC = () => {
                                 if (match) {
                                   list.push({
                                     id: w.id,
-                                    date: w.created_at,
+                                    date: w.withdrawal_date || w.created_at,
                                     quantity: match.quantity,
                                     project: w.project_name || 'ไม่ระบุโครงการ',
-                                    contract: w.contract_no 
-                                      ? `${w.contract_no}${w.contract_year ? ` (ปี ${w.contract_year})` : ''}` 
-                                      : 'ไม่ระบุสัญญา',
+                                    contract: w.contract_no
+                                      ? `${w.contract_no}${w.contract_year ? ` (ปี ${w.contract_year})` : ''}`
+                                      : w.contract_reference_type === 'none'
+                                        ? `ไม่มีสัญญา${w.contract_reference_note ? ` — ${w.contract_reference_note}` : ''}`
+                                        : 'ไม่ระบุสัญญา',
                                     sns: match.serial_numbers ? match.serial_numbers.split(', ').filter(s => s.trim()) : []
                                   });
                                 }
@@ -1576,6 +1720,20 @@ const StationSearch: React.FC = () => {
                                     </>
                                   )}
                                 </div>
+                                {asset.latestWithdrawalDate && (
+                                  <div style={{ marginTop: '8px', padding: '7px 8px', borderRadius: '7px', background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: '0.68rem', lineHeight: 1.55 }}>
+                                    <div style={{ color: 'var(--text-main)', fontWeight: 800 }}>
+                                      เบิกล่าสุด {new Date(asset.latestWithdrawalDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                      {asset.latestWithdrawalId ? ` · WD-${asset.latestWithdrawalId}` : ''}
+                                    </div>
+                                    <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={asset.latestProject}>
+                                      {asset.latestProject} · {asset.latestContract}
+                                    </div>
+                                    {asset.sourceCount && asset.sourceCount > 1 && (
+                                      <div style={{ marginTop: '2px', color: 'var(--primary)', fontWeight: 800 }}>มีแหล่งที่มา {asset.sourceCount} รอบ · คลิกเพื่อดูรายละเอียด</div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -1634,20 +1792,27 @@ const StationSearch: React.FC = () => {
                                             background: 'var(--bg-app)', border: '1px solid var(--border)',
                                             gap: '8px'
                                           }}>
-                                            <span
-                                              onClick={() => navigate(`/asset/${inst.id}`)}
-                                              title="ดูพาสปอร์ต/ประวัติเครื่องนี้"
-                                              style={{
-                                                fontSize: '0.72rem', fontWeight: 700,
-                                                fontFamily: "'JetBrains Mono', monospace",
-                                                color: 'var(--primary)',
-                                                background: 'var(--bg-card)',
-                                                padding: '2px 6px', borderRadius: '4px',
-                                                border: '1px solid var(--border)',
-                                                cursor: 'pointer', textDecoration: 'underline dotted'
-                                              }}>
-                                              S/N: {inst.serial_number || '—'}
-                                            </span>
+                                            <div style={{ minWidth: 0 }}>
+                                              <span
+                                                onClick={() => navigate(`/asset/${inst.id}`)}
+                                                title="ดูพาสปอร์ต/ประวัติเครื่องนี้"
+                                                style={{
+                                                  fontSize: '0.72rem', fontWeight: 700,
+                                                  fontFamily: 'var(--font-ui)',
+                                                  color: 'var(--primary)',
+                                                  background: 'var(--bg-card)',
+                                                  padding: '2px 6px', borderRadius: '4px',
+                                                  border: '1px solid var(--border)',
+                                                  cursor: 'pointer', textDecoration: 'underline dotted'
+                                                }}>
+                                                S/N: {inst.serial_number || '—'}
+                                              </span>
+                                              {(inst.withdrawal_date || inst.contract_no_snapshot || inst.project_name_snapshot) && (
+                                                <div style={{ marginTop: '4px', fontSize: '0.6rem', color: 'var(--text-muted)', maxWidth: '190px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${inst.project_name_snapshot || 'ไม่ระบุโครงการ'} · ${inst.contract_no_snapshot || 'ไม่ระบุสัญญา'}`}>
+                                                  {inst.withdrawal_date ? new Date(inst.withdrawal_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : 'ไม่ระบุวันที่'} · {inst.contract_no_snapshot || 'ไม่ระบุสัญญา'}{inst.contract_year_snapshot ? ` (${inst.contract_year_snapshot})` : ''}
+                                                </div>
+                                              )}
+                                            </div>
                                             
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                               {inst.status && inst.status !== 'Withdrawn' && (() => {
@@ -1662,40 +1827,38 @@ const StationSearch: React.FC = () => {
                                                   </span>
                                                 );
                                               })()}
-                                              <select
+                                              <Select
                                                 value={inst.condition || 'New'}
+                                                options={INSTANCE_CONDITION_OPTIONS.map(opt => {
+                                                  const optMeta = INSTANCE_CONDITION_META[opt] || INSTANCE_CONDITION_META['New'];
+                                                  return { value: opt, label: `${optMeta.icon} ${optMeta.label}` };
+                                                })}
                                                 disabled={isUpdating}
-                                                onChange={(e) => handleInstanceConditionChange(inst.id, e.target.value)}
+                                                onChange={(value) => handleInstanceConditionChange(inst.id, String(value))}
+                                                className="station-inline-select"
                                                 style={{
+                                                  width: 'auto', minWidth: '112px',
                                                   fontSize: '0.7rem', fontWeight: 800,
-                                                  padding: '4px 8px', borderRadius: '4px',
+                                                  padding: '4px 26px 4px 8px', borderRadius: '6px',
                                                   border: `1.2px solid ${instMeta.color}`,
                                                   background: instMeta.bg,
                                                   color: instMeta.color,
-                                                  cursor: isUpdating ? 'not-allowed' : 'pointer',
-                                                  outline: 'none',
-                                                  transition: 'all 0.15s ease'
                                                 }}
-                                              >
-                                                {INSTANCE_CONDITION_OPTIONS.map(opt => {
-                                                  const optMeta = INSTANCE_CONDITION_META[opt] || INSTANCE_CONDITION_META['New'];
-                                                  return (
-                                                    <option
-                                                      key={opt}
-                                                      value={opt}
-                                                      style={{
-                                                        background: 'var(--bg-app)',
-                                                        color: optMeta.color,
-                                                        fontWeight: 700
-                                                      }}
-                                                    >
-                                                      {optMeta.icon} {optMeta.label}
-                                                    </option>
-                                                  );
-                                                })}
-                                              </select>
+                                              />
                                               {isUpdating && (
                                                 <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>...</span>
+                                              )}
+                                              {hasPermission('manage.stations') && (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setMoveAsset({ inventoryId: asset.id, instanceId: inst.id, name: `${asset.name} ${inst.serial_number || ''}`, quantity: 1 });
+                                                  }}
+                                                  style={{ padding: '4px 7px', borderRadius: '5px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--info)', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                                >
+                                                  ย้าย
+                                                </button>
                                               )}
                                             </div>
                                           </div>
@@ -1723,38 +1886,24 @@ const StationSearch: React.FC = () => {
                                   }}>
                                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-main)' }}>ปรับสภาพอุปกรณ์</span>
                                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                      <select
+                                      <Select
                                         value={conditionDraft.status}
-                                        onChange={(e) => setConditionDraft(d => ({ ...d, status: e.target.value }))}
+                                        options={CONDITION_OPTIONS.map(opt => {
+                                          const optMeta = CONDITION_META[opt] || CONDITION_META['ปกติ'];
+                                          return { value: opt, label: `${optMeta.icon} ${opt}` };
+                                        })}
+                                        onChange={(value) => setConditionDraft(d => ({ ...d, status: String(value) }))}
                                         disabled={!hasPermission('manage.stations')}
+                                        className="station-inline-select"
                                         style={{
-                                          flex: '0 0 auto', fontSize: '0.72rem', fontWeight: 800,
-                                          padding: '5px 10px', borderRadius: '6px',
+                                          width: 'auto', minWidth: '100px', flex: '0 0 auto',
+                                          fontSize: '0.72rem', fontWeight: 800,
+                                          padding: '5px 24px 5px 8px', borderRadius: '6px',
                                           border: `1.5px solid ${condMeta.color}`,
                                           background: condMeta.bg,
                                           color: condMeta.color,
-                                          cursor: 'pointer',
-                                          outline: 'none',
-                                          transition: 'all 0.15s ease'
                                         }}
-                                      >
-                                        {CONDITION_OPTIONS.map(opt => {
-                                          const optMeta = CONDITION_META[opt] || CONDITION_META['ปกติ'];
-                                          return (
-                                            <option
-                                              key={opt}
-                                              value={opt}
-                                              style={{
-                                                background: 'var(--bg-app)',
-                                                color: optMeta.color,
-                                                fontWeight: 700
-                                              }}
-                                            >
-                                              {optMeta.icon} {opt}
-                                            </option>
-                                          );
-                                        })}
-                                      </select>
+                                      />
                                       <input
                                         type="text"
                                         value={conditionDraft.note}
@@ -1825,7 +1974,7 @@ const StationSearch: React.FC = () => {
                                          }}>
                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800 }}>
                                              <span style={{ color: 'var(--primary)' }}>
-                                               นำเข้าเมื่อ: {new Date(item.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                               เบิกลงสถานีเมื่อ: {new Date(item.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
                                              </span>
                                              <span style={{ background: 'var(--primary-light)', padding: '2px 6px', borderRadius: '4px', color: 'var(--primary)' }}>
                                                {item.quantity} ชิ้น
@@ -1843,7 +1992,7 @@ const StationSearch: React.FC = () => {
                                                {item.sns.map((sn, snIdx) => (
                                                  <span key={snIdx} style={{
                                                    background: 'var(--bg-card)', border: '1px solid var(--border)',
-                                                   padding: '1px 5px', borderRadius: '4px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.62rem',
+                                                   padding: '1px 5px', borderRadius: '4px', fontFamily: 'var(--font-ui)', fontSize: '0.62rem',
                                                    color: 'var(--text-main)'
                                                  }}>
                                                    {sn}
@@ -1860,6 +2009,21 @@ const StationSearch: React.FC = () => {
                                      </span>
                                    )}
                                  </div>
+
+                                 {hasPermission('manage.stations') && asset.quantity > (asset.instances?.length || 0) && (
+                                   <button
+                                     type="button"
+                                     onClick={() => setMoveAsset({ inventoryId: asset.id, name: asset.name, quantity: Math.max(0, asset.quantity - (asset.instances?.length || 0)) })}
+                                     style={{
+                                      marginTop: '4px', fontSize: '0.72rem', fontWeight: 800,
+                                      color: 'var(--info)', background: 'var(--info-light)',
+                                      border: '1px solid var(--info)', borderRadius: '8px',
+                                      padding: '6px 10px', cursor: 'pointer'
+                                    }}
+                                   >
+                                     ↗ ย้ายอุปกรณ์ไปสถานีอื่น
+                                   </button>
+                                 )}
 
                                  <button
                                    onClick={() => navigate(`/new?station_id=${details.station.id}`)}
@@ -1884,6 +2048,53 @@ const StationSearch: React.FC = () => {
 
                 {/* === QR labels for field inspection (offline) === */}
                 <StationQrLabels stationId={details.station.id} stationName={details.station.name} withdrawals={details.withdrawals} />
+
+                {/* === ASSET TIMELINE — source, return, repair and transfer events === */}
+                {(() => {
+                  const assetEvents = details.asset_events || [];
+                  if (assetEvents.length === 0) return null;
+                  return (
+                  <section className="glass-card" style={{ marginTop: '1.25rem', padding: '1.25rem 1.5rem', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
+                      <div>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 800 }}>
+                          <HistoryIcon size={17} color="var(--primary)" /> ประวัติความเคลื่อนไหวของอุปกรณ์
+                        </h3>
+                        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                          แสดงการเบิก คืน และเหตุการณ์ที่เกี่ยวข้องกับอุปกรณ์ของสถานีนี้
+                        </p>
+                      </div>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)' }}>{assetEvents.length} เหตุการณ์</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', maxHeight: '260px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {assetEvents.slice(0, 12).map(event => {
+                        const eventMeta = ({
+                          WITHDRAW_TO_STATION: { label: 'เบิกลงสถานี', color: 'var(--primary)', bg: 'var(--primary-light)' },
+                          INSTALL_FROM_TECHNICIAN: { label: 'ช่างติดตั้ง', color: 'var(--primary)', bg: 'var(--primary-light)' },
+                          RETURN_TO_WAREHOUSE: { label: 'คืนเข้าคลัง', color: 'var(--success)', bg: 'var(--success-light)' },
+                          TRANSFER: { label: 'ย้ายสถานี', color: 'var(--info)', bg: 'var(--info-light)' },
+                          REPLACE: { label: 'เปลี่ยนอุปกรณ์', color: 'var(--warning)', bg: 'var(--warning-light)' },
+                          DISPOSE: { label: 'ปลดระวาง', color: 'var(--danger)', bg: 'var(--danger-light)' },
+                        }[event.event_type] || { label: event.event_type, color: 'var(--text-muted)', bg: 'var(--bg-subtle)' });
+                        return (
+                          <div key={event.id} style={{ display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr) auto', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '9px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 700 }}>{new Date(event.event_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {event.device_name || 'อุปกรณ์'} {event.quantity ? `· ${event.quantity} ชิ้น` : ''}
+                              </div>
+                              <div style={{ marginTop: '2px', fontSize: '0.64rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {event.project_name_snapshot || 'ไม่ระบุโครงการ'} · {event.contract_no_snapshot || 'ไม่ระบุสัญญา'}{event.contract_year_snapshot ? ` (ปี ${event.contract_year_snapshot})` : ''}
+                              </div>
+                            </div>
+                            <span style={{ padding: '3px 7px', borderRadius: '999px', background: eventMeta.bg, color: eventMeta.color, fontSize: '0.62rem', fontWeight: 800, whiteSpace: 'nowrap' }}>{eventMeta.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  );
+                })()}
 
                 {/* === ACTIVITY LOG — 4 channel feed === */}
                 {(() => {
@@ -1969,7 +2180,7 @@ const StationSearch: React.FC = () => {
                           title: tx.product_name,
                           subtitle: tx.user_name || 'ระบบ',
                           time: tx.created_at,
-                          extra: <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px', background: `${accent}1a`, color: accent, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em' }}>{isIn ? 'IN' : 'OUT'}</span>,
+                          extra: <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '1px 7px', borderRadius: '4px', background: `${accent}1a`, color: accent, fontFamily: 'var(--font-ui)', letterSpacing: '0.08em' }}>{isIn ? 'IN' : 'OUT'}</span>,
                           href: null as string | null,
                         };
                       }),
@@ -2006,7 +2217,7 @@ const StationSearch: React.FC = () => {
                                   padding: '3px 7px', borderRadius: '5px',
                                   background: ch.color, color: 'white',
                                   letterSpacing: '0.15em',
-                                  fontFamily: "'JetBrains Mono', monospace",
+                                  fontFamily: 'var(--font-ui)',
                                 }}>{ch.code}</span>
                                 <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)' }}>
                                   {ch.label}
@@ -2086,12 +2297,12 @@ const StationSearch: React.FC = () => {
                                       <span style={{
                                         fontSize: '0.68rem', fontWeight: 800,
                                         color: it.codeColor || ch.color,
-                                        fontFamily: "'JetBrains Mono', monospace",
+                                        fontFamily: 'var(--font-ui)',
                                         letterSpacing: '0.04em',
                                       }}>{it.code}</span>
                                       <span style={{
                                         fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700,
-                                        fontFamily: "'JetBrains Mono', monospace",
+                                        fontFamily: 'var(--font-ui)',
                                       }}>{formatRelativeTime(it.time)}</span>
                                     </div>
                                     {/* Title */}
@@ -2148,6 +2359,59 @@ const StationSearch: React.FC = () => {
               </div>
             )}
          </div>
+      )}
+
+      {moveAsset && details?.station?.id && (
+        <div className="modal-overlay" style={{ zIndex: 1080 }} onClick={() => !movingAsset && setMoveAsset(null)}>
+          <div className="modal-content" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ marginBottom: '0.75rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Navigation size={20} color="var(--info)" /> ย้ายอุปกรณ์ไปสถานีอื่น
+              </h3>
+              <button className="close-btn" onClick={() => setMoveAsset(null)} disabled={movingAsset}><X size={20} /></button>
+            </div>
+            <p style={{ margin: '0 0 1rem', color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.55 }}>
+              อุปกรณ์ต้นทาง: <strong style={{ color: 'var(--text-main)' }}>{moveAsset.name}</strong><br />
+              ระบบจะคงสัญญาและโครงการต้นทางไว้ พร้อมบันทึกประวัติการย้ายสถานี
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ display: 'block', marginBottom: '7px', fontSize: '0.85rem', fontWeight: 700 }}>สถานีปลายทาง *</label>
+                <StationSelector
+                  selectedStationId={moveTargetStationId}
+                  required
+                  showArea={false}
+                  ariaLabel="เลือกสถานีปลายทาง"
+                  onChange={(data) => setMoveTargetStationId(data.stationId)}
+                />
+              </div>
+              {!moveAsset.instanceId && (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ display: 'block', marginBottom: '7px', fontSize: '0.85rem', fontWeight: 700 }}>จำนวนที่ย้าย *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={moveAsset.quantity}
+                    value={moveQuantity}
+                    onChange={e => setMoveQuantity(Math.max(1, Math.min(moveAsset.quantity, Number(e.target.value) || 1)))}
+                    className="form-control"
+                  />
+                  <span style={{ display: 'block', marginTop: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>คงเหลือที่สถานีต้นทาง {moveAsset.quantity} ชิ้น</span>
+                </div>
+              )}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ display: 'block', marginBottom: '7px', fontSize: '0.85rem', fontWeight: 700 }}>หมายเหตุ</label>
+                <textarea value={moveNote} onChange={e => setMoveNote(e.target.value)} rows={3} maxLength={500} className="form-control" placeholder="เช่น ย้ายเพื่อทดแทนอุปกรณ์เสีย" />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setMoveAsset(null)} disabled={movingAsset}>ยกเลิก</button>
+                <button type="button" className="btn btn-primary" onClick={submitMoveAsset} disabled={movingAsset || !moveTargetStationId}>
+                  {movingAsset ? 'กำลังบันทึก...' : 'ยืนยันการย้าย'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Station Create/Edit Modal — แบบฟอร์มละเอียด บังคับกรอกทุกฟิลด์ + field-level validation */}
@@ -2236,6 +2500,18 @@ const StationSearch: React.FC = () => {
                   {fieldErrors.responsible_person && (
                     <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.responsible_person}</p>
                   )}
+                </div>
+
+                {/* วันที่เริ่มใช้งานจริง */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>
+                    วันที่เริ่มใช้งานจริง
+                    <span style={{ marginLeft: '8px', fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)' }}>(ถ้าทราบ)</span>
+                  </label>
+                  <DatePicker
+                    value={formData.operational_start_date}
+                    onChange={value => updateField('operational_start_date', value)}
+                  />
                 </div>
 
                 {/* จังหวัด — dropdown grouped by region */}
@@ -2435,8 +2711,9 @@ const StationSearch: React.FC = () => {
                         '<html>' +
                           '<head>' +
                             '<title>Print QR Sticker - ' + qrStation.name + '</title>' +
+                            '<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet">' +
                             '<style>' +
-                              'body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: "Inter", "Segoe UI", sans-serif; }' +
+                              'body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: "Anuphan", "Noto Sans Thai", "Segoe UI", sans-serif; }' +
                               '.sticker { border: 2px solid #000; padding: 25px; border-radius: 15px; text-align: center; width: 280px; }' +
                               '.code { font-size: 22px; font-weight: bold; margin-bottom: 5px; }' +
                               '.name { font-size: 15px; color: #333; margin-bottom: 15px; }' +

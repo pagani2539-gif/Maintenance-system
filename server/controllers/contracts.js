@@ -62,6 +62,30 @@ exports.updateContract = async (req, res) => {
     const oldContract = oldRows[0];
     if (!oldContract) return res.status(404).json({ error: 'ไม่พบสัญญาที่ต้องการแก้ไข' });
 
+    // A contract is historical reference data once it has been used by a
+    // withdrawal/asset/transaction. Changing its identity would silently
+    // rewrite the meaning of old records, so create a new contract instead.
+    const { rows: usageRows } = await query(`
+      SELECT EXISTS (SELECT 1 FROM withdrawals WHERE contract_id = $1) AS withdrawal_used,
+             EXISTS (SELECT 1 FROM inventory_instances WHERE contract_id = $1) AS asset_used,
+             EXISTS (SELECT 1 FROM inventory_transactions WHERE contract_id = $1) AS transaction_used
+    `, [id]);
+    const usage = usageRows[0] || {};
+    const identityChanged = [
+      ['contract_no', contract_no],
+      ['name', name],
+      ['year_be', year_be],
+      ['company_id', company_id || null],
+      ['start_date', start_date || null],
+      ['end_date', end_date || null]
+    ].some(([key, value]) => String(oldContract[key] ?? '') !== String(value ?? ''));
+
+    if (identityChanged && (usage.withdrawal_used || usage.asset_used || usage.transaction_used)) {
+      return res.status(409).json({
+        error: 'สัญญานี้ถูกใช้อ้างอิงในประวัติแล้ว ไม่สามารถแก้เลขที่สัญญา ชื่อ ปี หรือช่วงเวลาได้ กรุณาสร้างสัญญาฉบับใหม่แทน'
+      });
+    }
+
     const { rows } = await query(`
       UPDATE contracts
       SET contract_no = $1, name = $2, year_be = $3, company_id = $4, start_date = $5, end_date = $6, note = $7, updated_at = NOW()

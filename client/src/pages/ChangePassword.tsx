@@ -98,7 +98,7 @@ const ChangePassword: React.FC = () => {
           left: 10%;
           width: 320px;
           height: 320px;
-          background: #60a5fa;
+          background: var(--primary);
           opacity: 0.14;
           animation: float-blob-1 12s infinite ease-in-out;
         }
@@ -107,7 +107,7 @@ const ChangePassword: React.FC = () => {
           right: 15%;
           width: 380px;
           height: 380px;
-          background: #2563eb;
+          background: var(--primary);
           opacity: 0.12;
           animation: float-blob-2 15s infinite ease-in-out;
         }
@@ -116,20 +116,20 @@ const ChangePassword: React.FC = () => {
           left: 35%;
           width: 280px;
           height: 280px;
-          background: #3b82f6;
+          background: var(--primary-hover);
           opacity: 0.08;
           animation: float-blob-3 10s infinite ease-in-out;
         }
         [data-theme='dark'] .bg-blob-1 {
-          background: #1d4ed8;
+          background: var(--primary-action);
           opacity: 0.08;
         }
         [data-theme='dark'] .bg-blob-2 {
-          background: #1e40af;
+          background: var(--primary-deep);
           opacity: 0.08;
         }
         [data-theme='dark'] .bg-blob-3 {
-          background: #172554;
+          background: var(--bg-subtle);
           opacity: 0.05;
         }
       `}</style>
@@ -179,7 +179,7 @@ const ChangePassword: React.FC = () => {
             fontWeight: 800,
             color: 'var(--text-main)',
             letterSpacing: '-0.02em',
-            fontFamily: '"Bai Jamjuree", "Sarabun", sans-serif'
+            fontFamily: 'var(--font-display)'
           }}>
             {isFirstLogin ? 'กรุณาตั้งรหัสผ่านใหม่' : 'เปลี่ยนรหัสผ่าน'}
           </h2>
@@ -189,7 +189,7 @@ const ChangePassword: React.FC = () => {
               fontSize: '0.82rem', 
               color: 'var(--text-muted)',
               fontWeight: 500,
-              fontFamily: '"Bai Jamjuree", "Sarabun", sans-serif'
+              fontFamily: 'var(--font-display)'
             }}>
               นี่คือการเข้าสู่ระบบครั้งแรก กรุณาเปลี่ยนรหัสผ่านเริ่มต้น
             </p>

@@ -10,7 +10,8 @@ module.exports = {
       max_memory_restart: '512M',
       env: {
         NODE_ENV: 'production',
-        PORT: '5221'
+        PORT: '5221',
+        OFFSITE_BACKUP_DIR: 'database/offsite-backups'
       }
     }
   ]

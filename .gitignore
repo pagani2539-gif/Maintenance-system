@@ -7,6 +7,8 @@ dist/
 server/database/repair_system.db
 server/database/repair_system_test.db
 server/database/backups/
+server/database/offsite-backups/*
+!server/database/offsite-backups/.gitkeep
 server/uploads/*
 !server/uploads/.gitkeep
 .claude/

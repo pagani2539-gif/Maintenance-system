@@ -5,10 +5,17 @@ require('../server/utils/loadEnv')();
 
 const root = path.join(__dirname, '..');
 const checks = [];
+const DEFAULT_OFFSITE_BACKUP_DIR = 'database/offsite-backups';
 
 const addCheck = (name, ok, detail) => {
   checks.push({ name, ok, detail });
 };
+
+const resolveOffsiteBackupDir = (configuredDir = DEFAULT_OFFSITE_BACKUP_DIR) => (
+  path.isAbsolute(configuredDir)
+    ? configuredDir
+    : path.resolve(root, 'server', configuredDir)
+);
 
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath));
 
@@ -48,8 +55,8 @@ async function main() {
   addCheck('backup directory exists', exists('server/database/backups'), 'Database backup location');
   addCheck(
     'OFFSITE_BACKUP_DIR is set and accessible',
-    Boolean(process.env.OFFSITE_BACKUP_DIR) && fs.existsSync(process.env.OFFSITE_BACKUP_DIR),
-    process.env.OFFSITE_BACKUP_DIR || 'Set OFFSITE_BACKUP_DIR to a mounted network share or cloud-synced backup folder'
+    fs.existsSync(resolveOffsiteBackupDir(process.env.OFFSITE_BACKUP_DIR)),
+    resolveOffsiteBackupDir(process.env.OFFSITE_BACKUP_DIR)
   );
   addCheck('server dependencies installed', exists('server/node_modules'), 'Run npm.cmd install in server');
   addCheck('client dependencies installed', exists('client/node_modules'), 'Run npm.cmd install in client');

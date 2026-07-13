@@ -4,16 +4,26 @@ import { contractApi } from '../../api';
 import type { Contract } from '../../types';
 import { FileText, X } from 'lucide-react';
 import { useNotification } from '../Layout';
+import DatePicker from './DatePicker';
 
 interface ContractSelectorProps {
   selectedContractId?: number;
   onChange: (contractId: number | undefined) => void;
   required?: boolean;
+  asOfDate?: string;
 }
 
 const formatContract = (c: Contract) => `${c.contract_no} — ${c.name} (ปี ${c.year_be})`;
+const formatDate = (value?: string) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+const isEffectiveOn = (contract: Contract, asOfDate?: string) => {
+  if (!asOfDate) return contract.status === 1;
+  const date = new Date(`${asOfDate}T00:00:00`).getTime();
+  const start = contract.start_date ? new Date(`${contract.start_date}T00:00:00`).getTime() : -Infinity;
+  const end = contract.end_date ? new Date(`${contract.end_date}T23:59:59`).getTime() : Infinity;
+  return contract.status === 1 && date >= start && date <= end;
+};
 
-const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId, onChange, required = false }) => {
+const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId, onChange, required = false, asOfDate }) => {
   const { notify } = useNotification();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +37,8 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
   const [addNo, setAddNo] = useState('');
   const [addName, setAddName] = useState('');
   const [addYear, setAddYear] = useState<string>(String(new Date().getFullYear() + 543)); // default current B.E. year
+  const [addStartDate, setAddStartDate] = useState('');
+  const [addEndDate, setAddEndDate] = useState('');
   const [addNote, setAddNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -35,7 +47,10 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
     const load = async () => {
       try {
         setLoading(true);
-        const list = await contractApi.getAll({ status: 1 });
+        // Keep inactive contracts available for historical/backdated withdrawals.
+        // The selector ranks currently effective contracts first instead of
+        // hiding the references needed for audit history.
+        const list = await contractApi.getAll();
         setContracts(list);
         setError(null);
       } catch (err) {
@@ -61,20 +76,29 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
 
   const filtered = useMemo(() => {
     const selected = contracts.find(c => c.id === selectedContractId);
-    if (selected && formatContract(selected) === searchQuery) return contracts;
-    if (!searchQuery) return contracts;
+    const sortContracts = (list: Contract[]) => [...list].sort((a, b) => {
+      const aEffective = isEffectiveOn(a, asOfDate) ? 1 : 0;
+      const bEffective = isEffectiveOn(b, asOfDate) ? 1 : 0;
+      if (aEffective !== bEffective) return bEffective - aEffective;
+      if (a.year_be !== b.year_be) return b.year_be - a.year_be;
+      return a.contract_no.localeCompare(b.contract_no, 'th');
+    });
+    if (selected && formatContract(selected) === searchQuery) return sortContracts(contracts);
+    if (!searchQuery) return sortContracts(contracts);
     const q = searchQuery.toLowerCase();
-    return contracts.filter(c =>
+    return sortContracts(contracts.filter(c =>
       c.contract_no.toLowerCase().includes(q) ||
       c.name.toLowerCase().includes(q) ||
       String(c.year_be).includes(q)
-    );
-  }, [contracts, searchQuery, selectedContractId]);
+    ));
+  }, [contracts, searchQuery, selectedContractId, asOfDate]);
 
   const openAddModal = () => {
     setAddNo('');
     setAddName('');
     setAddYear(String(new Date().getFullYear() + 543));
+    setAddStartDate('');
+    setAddEndDate('');
     setAddNote('');
     setFieldErrors({});
     setIsAddModalOpen(true);
@@ -103,6 +127,8 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
         contract_no: noTrim,
         name: nameTrim,
         year_be: yearNum,
+        start_date: addStartDate || undefined,
+        end_date: addEndDate || undefined,
         note: addNote.trim() || undefined
       });
       notify('เพิ่มสัญญาใหม่เรียบร้อยแล้ว');
@@ -209,8 +235,24 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
                 onMouseOver={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
                 onMouseOut={(e) => e.currentTarget.style.background = 'none'}
               >
-                <div style={{ fontWeight: 700 }}>{c.contract_no} — {c.name}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>📅 ปี พ.ศ. {c.year_be}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ fontWeight: 700 }}>{c.contract_no} — {c.name}</div>
+                  <span style={{
+                    flexShrink: 0,
+                    padding: '2px 6px',
+                    borderRadius: '999px',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    color: isEffectiveOn(c, asOfDate) ? '#15803d' : 'var(--text-muted)',
+                    background: isEffectiveOn(c, asOfDate) ? '#dcfce7' : 'var(--bg-app)'
+                  }}>
+                    {isEffectiveOn(c, asOfDate) ? 'มีผล ณ วันที่เลือก' : c.status === 1 ? 'นอกช่วงวันที่' : 'ปิดใช้งาน'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  📅 ปี พ.ศ. {c.year_be}
+                  {(c.start_date || c.end_date) && ` · ${formatDate(c.start_date) || 'ไม่ระบุ'} - ${formatDate(c.end_date) || 'ไม่ระบุ'}`}
+                </div>
               </div>
             ))}
           </div>
@@ -289,6 +331,21 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
                 {fieldErrors.year_be && <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.year_be}</p>}
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
+                    เริ่มมีผล
+                  </label>
+                  <DatePicker value={addStartDate} onChange={setAddStartDate} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
+                    สิ้นสุด
+                  </label>
+                  <DatePicker value={addEndDate} onChange={setAddEndDate} />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                   หมายเหตุ (ถ้ามี)
@@ -307,7 +364,7 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
                   style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
                   ยกเลิก
                 </button>
-                <button type="submit" disabled={isSubmitting}
+                <button type="submit" className="pastel-primary-action" disabled={isSubmitting}
                   style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1 }}>
                   {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกสัญญา'}
                 </button>

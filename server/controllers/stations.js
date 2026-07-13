@@ -1,5 +1,6 @@
-const { query } = require('../database/db');
+const { query, withTransaction } = require('../database/db');
 const { logAudit } = require('../utils/auditLogger');
+const { validateStationExists } = require('../utils/stationValidation');
 
 // สภาพอุปกรณ์ (manual) ที่ตั้งได้เองต่อ (สถานี × ชนิดอุปกรณ์)
 const VALID_ASSET_STATUSES = ['ปกติ', 'ชำรุด', 'ชำรุดรอเปลี่ยน', 'ปลดระวาง'];
@@ -139,11 +140,62 @@ exports.getStationDetails = async (req, res) => {
     // Fetch individual inventory instances deployed at this station
     const instances = station.id
       ? (await query(
-          `SELECT id, inventory_id, serial_number, condition, status, updated_at
+          `SELECT id, inventory_id, serial_number, condition, status, updated_at,
+                  created_at, station_id, source_withdrawal_id, withdrawal_date,
+                  project_name_snapshot, contract_id, contract_no_snapshot,
+                  contract_name_snapshot, contract_year_snapshot,
+                  contract_company_snapshot
            FROM inventory_instances WHERE station_id = $1`,
           [station.id]
         )).rows
       : [];
+
+    const [assetSummaryResult, assetLotsResult, assetEventsResult] = station.id
+      ? await Promise.all([
+          query(`
+            SELECT $1::BIGINT AS station_id, i.id AS inventory_id,
+                   GREATEST(COALESCE(si.quantity, 0), COUNT(ii.id)::INTEGER) AS current_quantity,
+                   i.name AS device_name, i.model, i.image_path, i.requires_sn,
+                   COUNT(ii.id)::INTEGER AS serial_count,
+                   MAX(COALESCE(ii.withdrawal_date, ii.created_at::date)) AS latest_serial_date
+            FROM inventory i
+            LEFT JOIN station_inventory si
+              ON si.station_id = $1 AND si.inventory_id = i.id
+            LEFT JOIN inventory_instances ii
+              ON ii.station_id = $1
+             AND ii.inventory_id = i.id
+             AND ii.status = 'Withdrawn'
+            WHERE (COALESCE(si.quantity, 0) > 0 OR ii.id IS NOT NULL)
+            GROUP BY i.id, si.quantity,
+                     i.name, i.model, i.image_path, i.requires_sn
+            ORDER BY i.name ASC, i.model ASC
+          `, [station.id]),
+          query(`
+            SELECT l.id, l.station_id, l.inventory_id, l.withdrawal_id,
+                   l.withdrawal_item_id, l.quantity_received, l.quantity_remaining,
+                   l.untracked_remaining, l.withdrawal_date, l.project_name_snapshot,
+                   l.contract_id, l.contract_no_snapshot, l.contract_name_snapshot,
+                   l.contract_year_snapshot, l.contract_company_snapshot,
+                   i.name AS device_name, i.model
+            FROM station_inventory_lots l
+            JOIN inventory i ON i.id = l.inventory_id
+            WHERE l.station_id = $1 AND l.quantity_remaining > 0
+            ORDER BY l.withdrawal_date DESC NULLS LAST, l.id DESC
+          `, [station.id]),
+          query(`
+            SELECT e.*, i.name AS device_name, i.model,
+                   s_from.name AS from_station_name,
+                   s_to.name AS to_station_name
+            FROM station_asset_events e
+            LEFT JOIN inventory i ON i.id = e.inventory_id
+            LEFT JOIN stations s_from ON s_from.id = e.from_station_id
+            LEFT JOIN stations s_to ON s_to.id = e.to_station_id
+            WHERE e.station_id = $1 OR e.from_station_id = $1 OR e.to_station_id = $1
+            ORDER BY e.event_at DESC, e.id DESC
+            LIMIT 300
+          `, [station.id])
+        ])
+      : [{ rows: [] }, { rows: [] }, { rows: [] }];
 
     res.json({
       station: station,
@@ -161,7 +213,12 @@ exports.getStationDetails = async (req, res) => {
       withdrawals: withdrawalsWithItems,
       transactions,
       asset_statuses: assetStatuses,
-      instances
+      instances,
+      assets: assetSummaryResult.rows.map(asset => ({
+        ...asset,
+        source_lots: assetLotsResult.rows.filter(lot => lot.inventory_id === asset.inventory_id),
+      })),
+      asset_events: assetEventsResult.rows
     });
   } catch (err) {
     console.error('Get Station Details Error:', err);
@@ -211,8 +268,298 @@ exports.upsertAssetStatus = async (req, res) => {
   }
 };
 
+exports.verifyStation = async (req, res) => {
+  const { id } = req.params;
+  const verifiedBy = req.user?.full_name || 'System/Admin';
+  try {
+    const { rows } = await query(`
+      UPDATE stations
+      SET last_verified_at = NOW(), updated_at = NOW()
+      WHERE id = $1 AND status = 1
+      RETURNING *
+    `, [id]);
+    if (!rows[0]) return res.status(404).json({ error: 'ไม่พบสถานีที่เปิดใช้งานอยู่' });
+    logAudit('station', id, 'verify', null, { last_verified_at: rows[0].last_verified_at }, verifiedBy)
+      .catch(e => console.error(e));
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Verify Station Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.moveAsset = async (req, res) => {
+  const { stationId } = req.params;
+  const { inventory_id, instance_id, quantity = 1, to_station_id, note } = req.body;
+  const performedBy = req.user?.full_name || 'System/Admin';
+  const qty = Number(quantity);
+
+  if (!to_station_id || String(to_station_id) === String(stationId)) {
+    return res.status(400).json({ error: 'กรุณาเลือกสถานีปลายทางที่แตกต่างจากสถานีเดิม' });
+  }
+  if (!inventory_id || !Number.isInteger(qty) || qty <= 0) {
+    return res.status(400).json({ error: 'ข้อมูลอุปกรณ์หรือจำนวนย้ายไม่ถูกต้อง' });
+  }
+  if (instance_id && qty !== 1) {
+    return res.status(400).json({ error: 'อุปกรณ์ที่มี S/N ย้ายได้ครั้งละ 1 เครื่อง' });
+  }
+
+  try {
+    await validateStationExists(Number(stationId));
+    await validateStationExists(Number(to_station_id));
+
+    const result = await withTransaction(async (client) => {
+      const { rows: lockedStations } = await client.query(`
+        SELECT id, name FROM stations
+        WHERE id IN ($1, $2) AND status = 1
+        FOR UPDATE
+      `, [stationId, to_station_id]);
+      if (lockedStations.length !== 2) {
+        const err = new Error('สถานีต้นทางหรือปลายทางไม่พร้อมใช้งาน');
+        err.status = 409;
+        throw err;
+      }
+      const targetName = lockedStations.find(row => String(row.id) === String(to_station_id))?.name || String(to_station_id);
+
+      let moved = [];
+      if (instance_id) {
+        const { rows } = await client.query(`
+          SELECT ii.*, s.name AS from_station_name
+          FROM inventory_instances ii
+          LEFT JOIN stations s ON s.id = ii.station_id
+          WHERE ii.id = $1 AND ii.inventory_id = $2 AND ii.station_id = $3 AND ii.status = 'Withdrawn'
+          FOR UPDATE
+        `, [instance_id, inventory_id, stationId]);
+        const instance = rows[0];
+        if (!instance) {
+          const err = new Error('ไม่พบอุปกรณ์ S/N นี้ที่สถานีต้นทาง');
+          err.status = 400;
+          throw err;
+        }
+
+        await client.query(`
+          UPDATE inventory_instances
+          SET station_id = $1, current_location = $2, updated_at = NOW()
+          WHERE id = $3
+        `, [to_station_id, targetName, instance_id]);
+
+        const sourceBalanceUpdate = await client.query(`
+          UPDATE station_inventory SET quantity = quantity - 1, updated_at = NOW()
+          WHERE station_id = $1 AND inventory_id = $2 AND quantity >= 1
+          RETURNING quantity
+        `, [stationId, inventory_id]);
+        if (sourceBalanceUpdate.rowCount !== 1) {
+          const err = new Error('ยอดอุปกรณ์ที่สถานีต้นทางไม่เพียงพอ');
+          err.status = 409;
+          throw err;
+        }
+        await client.query(`DELETE FROM station_inventory WHERE station_id = $1 AND inventory_id = $2 AND quantity = 0`, [stationId, inventory_id]);
+        await client.query(`
+          INSERT INTO station_inventory (station_id, inventory_id, quantity, updated_by, updated_at)
+          VALUES ($1, $2, 1, $3, NOW())
+          ON CONFLICT (station_id, inventory_id) DO UPDATE
+            SET quantity = station_inventory.quantity + 1, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `, [to_station_id, inventory_id, performedBy]);
+
+        if (instance.source_withdrawal_id) {
+          const { rows: sourceLotRows } = await client.query(`
+            SELECT * FROM station_inventory_lots
+            WHERE station_id = $1 AND inventory_id = $2 AND withdrawal_id = $3 AND quantity_remaining > 0
+            ORDER BY withdrawal_date ASC NULLS LAST, id ASC
+            LIMIT 1
+            FOR UPDATE
+          `, [stationId, inventory_id, instance.source_withdrawal_id]);
+          const sourceLot = sourceLotRows[0];
+          if (!sourceLot) {
+            const err = new Error('ไม่พบ lot ต้นทางของ S/N ที่ต้องการย้าย');
+            err.status = 409;
+            throw err;
+          }
+          await client.query(`
+            UPDATE station_inventory_lots
+            SET quantity_remaining = quantity_remaining - 1, updated_at = NOW()
+            WHERE id = $1
+          `, [sourceLot.id]);
+          await client.query(`
+            INSERT INTO station_inventory_lots (
+              station_id, inventory_id, withdrawal_id, withdrawal_item_id, quantity_received, quantity_remaining,
+              untracked_remaining, withdrawal_date, project_name_snapshot, contract_id,
+              contract_no_snapshot, contract_name_snapshot, contract_year_snapshot,
+              contract_company_snapshot
+            ) VALUES ($1,$2,$3,$4,1,1,0,$5,$6,$7,$8,$9,$10,$11)
+          `, [
+            to_station_id, inventory_id, instance.source_withdrawal_id, sourceLot.withdrawal_item_id || null,
+            instance.withdrawal_date || null,
+            instance.project_name_snapshot || null, instance.contract_id || null,
+            instance.contract_no_snapshot || null, instance.contract_name_snapshot || null,
+            instance.contract_year_snapshot || null, instance.contract_company_snapshot || null
+          ]);
+        }
+
+        // Keep the active return source aligned with the instance's current
+        // station so Pending Returns cannot return it from the old station.
+        await client.query(`
+          WITH active_source AS (
+            SELECT id FROM inventory_transactions
+            WHERE instance_id = $1
+              AND transaction_type IN ('WITHDRAW', 'BORROW')
+              AND status <> 'RETURNED'
+            ORDER BY id DESC
+            LIMIT 1
+            FOR UPDATE
+          )
+          UPDATE inventory_transactions t
+          SET station_id = $2, location = $3
+          FROM active_source src
+          WHERE t.id = src.id
+        `, [instance_id, to_station_id, targetName]);
+
+        await client.query(`
+          INSERT INTO station_asset_events (
+            station_id, inventory_id, instance_id, event_type, quantity,
+            from_station_id, to_station_id, source_withdrawal_id,
+            project_name_snapshot, contract_id, contract_no_snapshot,
+            contract_name_snapshot, contract_year_snapshot, note, performed_by
+          ) VALUES ($1,$2,$3,'TRANSFER',1,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        `, [
+          to_station_id, inventory_id, instance_id, stationId, to_station_id,
+          instance.source_withdrawal_id, instance.project_name_snapshot || null,
+          instance.contract_id || null, instance.contract_no_snapshot || null,
+          instance.contract_name_snapshot || null, instance.contract_year_snapshot || null,
+          note || null, performedBy
+        ]);
+        moved = [{ instance_id: Number(instance_id), quantity: 1 }];
+      } else {
+        const { rows: sourceLots } = await client.query(`
+          SELECT * FROM station_inventory_lots
+          WHERE station_id = $1 AND inventory_id = $2 AND untracked_remaining > 0
+          ORDER BY withdrawal_date ASC NULLS LAST, id ASC
+          FOR UPDATE
+        `, [stationId, inventory_id]);
+        const sourceTotal = sourceLots.reduce((sum, lot) => sum + Number(lot.untracked_remaining || 0), 0);
+        if (sourceTotal < qty) {
+          const err = new Error(`อุปกรณ์ที่สถานีมีไม่พอสำหรับย้าย (มี ${sourceTotal} ชิ้น)`);
+          err.status = 400;
+          throw err;
+        }
+
+        let remaining = qty;
+        for (const lot of sourceLots) {
+          if (remaining <= 0) break;
+          const moveQty = Math.min(remaining, Number(lot.untracked_remaining));
+          await client.query(`
+            UPDATE station_inventory_lots
+            SET quantity_remaining = quantity_remaining - $1,
+                untracked_remaining = GREATEST(0, untracked_remaining - $1), updated_at = NOW()
+            WHERE id = $2
+          `, [moveQty, lot.id]);
+          await client.query(`
+            INSERT INTO station_inventory_lots (
+              station_id, inventory_id, withdrawal_id, withdrawal_item_id, quantity_received, quantity_remaining,
+              untracked_remaining, withdrawal_date, project_name_snapshot, contract_id,
+              contract_no_snapshot, contract_name_snapshot, contract_year_snapshot,
+              contract_company_snapshot
+            ) VALUES ($1,$2,$3,$4,$5,$5,$5,$6,$7,$8,$9,$10,$11,$12)
+          `, [
+            to_station_id, inventory_id, lot.withdrawal_id || null, lot.withdrawal_item_id || null,
+            moveQty, lot.withdrawal_date || null,
+            lot.project_name_snapshot || null, lot.contract_id || null,
+            lot.contract_no_snapshot || null, lot.contract_name_snapshot || null,
+            lot.contract_year_snapshot || null, lot.contract_company_snapshot || null
+          ]);
+          await client.query(`
+            INSERT INTO station_asset_events (
+              station_id, inventory_id, event_type, quantity, from_station_id, to_station_id,
+              source_withdrawal_id, project_name_snapshot, contract_id, contract_no_snapshot,
+              contract_name_snapshot, contract_year_snapshot, note, performed_by
+            ) VALUES ($1,$2,'TRANSFER',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          `, [
+            to_station_id, inventory_id, moveQty, stationId, to_station_id, lot.withdrawal_id || null,
+            lot.project_name_snapshot || null, lot.contract_id || null, lot.contract_no_snapshot || null,
+            lot.contract_name_snapshot || null, lot.contract_year_snapshot || null, note || null, performedBy
+          ]);
+
+          if (lot.withdrawal_id) {
+            const { rows: sourceTransactionRows } = await client.query(`
+              SELECT * FROM inventory_transactions
+              WHERE withdrawal_id = $1
+                AND inventory_id = $2
+                AND station_id = $3
+                AND instance_id IS NULL
+                AND transaction_type = 'WITHDRAW'
+                AND status <> 'RETURNED'
+              ORDER BY id ASC
+              LIMIT 1
+              FOR UPDATE
+            `, [lot.withdrawal_id, inventory_id, stationId]);
+            const sourceTransaction = sourceTransactionRows[0];
+            if (!sourceTransaction || Number(sourceTransaction.quantity_withdrawn) < moveQty) {
+              const err = new Error('ไม่พบรายการเบิกต้นทางที่เพียงพอสำหรับการย้าย');
+              err.status = 409;
+              throw err;
+            }
+
+            if (Number(sourceTransaction.quantity_withdrawn) === moveQty) {
+              await client.query(`
+                UPDATE inventory_transactions
+                SET station_id = $1, location = $2
+                WHERE id = $3
+              `, [to_station_id, targetName, sourceTransaction.id]);
+            } else {
+              await client.query(`
+                UPDATE inventory_transactions
+                SET quantity_withdrawn = quantity_withdrawn - $1
+                WHERE id = $2
+              `, [moveQty, sourceTransaction.id]);
+              await client.query(`
+                INSERT INTO inventory_transactions (
+                  inventory_id, transaction_type, quantity_withdrawn,
+                  project_name, location, station_id, contract_id,
+                  user_name, note, withdrawal_id, status, created_at
+                ) VALUES ($1,'WITHDRAW',$2,$3,$4,$5,$6,$7,$8,$9,'ACTIVE',$10)
+              `, [
+                inventory_id, moveQty, sourceTransaction.project_name, targetName,
+                to_station_id, sourceTransaction.contract_id, sourceTransaction.user_name,
+                sourceTransaction.note, sourceTransaction.withdrawal_id, sourceTransaction.created_at
+              ]);
+            }
+          }
+          remaining -= moveQty;
+        }
+
+        const sourceBalanceUpdate = await client.query(`
+          UPDATE station_inventory SET quantity = quantity - $1, updated_at = NOW()
+          WHERE station_id = $2 AND inventory_id = $3 AND quantity >= $1
+          RETURNING quantity
+        `, [qty, stationId, inventory_id]);
+        if (sourceBalanceUpdate.rowCount !== 1) {
+          const err = new Error('ยอดอุปกรณ์ที่สถานีต้นทางไม่เพียงพอ');
+          err.status = 409;
+          throw err;
+        }
+        await client.query(`DELETE FROM station_inventory WHERE station_id = $1 AND inventory_id = $2 AND quantity = 0`, [stationId, inventory_id]);
+        await client.query(`
+          INSERT INTO station_inventory (station_id, inventory_id, quantity, updated_by, updated_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (station_id, inventory_id) DO UPDATE
+            SET quantity = station_inventory.quantity + EXCLUDED.quantity, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `, [to_station_id, inventory_id, qty, performedBy]);
+        moved = [{ quantity: qty }];
+      }
+      return moved;
+    });
+
+    logAudit('station_asset', Number(inventory_id), 'transfer', null, { from_station_id: Number(stationId), to_station_id: Number(to_station_id), instance_id: instance_id || null, quantity: qty, note }, performedBy)
+      .catch(e => console.error(e));
+    res.json({ message: 'ย้ายอุปกรณ์เรียบร้อยแล้ว', moved: result });
+  } catch (err) {
+    console.error('Move Station Asset Error:', err);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+};
+
 exports.createStation = async (req, res) => {
-  const { name, station_type, highway_no, direction, region, province, responsible_person } = req.body;
+  const { name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date } = req.body;
   if (!name || !station_type || !highway_no || !direction || !region || !province || !responsible_person) {
     return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง (รวมถึง "ผู้รับผิดชอบสถานี")' });
   }
@@ -231,10 +578,10 @@ exports.createStation = async (req, res) => {
     const code = `STN-${nextId}-${shortDir}`;
 
     const { rows } = await query(`
-      INSERT INTO stations (code, name, station_type, highway_no, direction, region, province, responsible_person)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO stations (code, name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
-    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim()]);
+    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), operational_start_date || null]);
 
     const row = rows[0];
     logAudit('station', row.id, 'create', null, row, 'System/Admin').catch(e => console.error(e));
@@ -277,7 +624,7 @@ exports.deleteStation = async (req, res) => {
 
 exports.updateStation = async (req, res) => {
   const { id } = req.params;
-  const { name, station_type, highway_no, direction, region, province, responsible_person } = req.body;
+  const { name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date } = req.body;
 
   if (!name || !station_type || !highway_no || !direction || !region || !province || !responsible_person) {
     return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง (รวมถึง "ผู้รับผิดชอบสถานี")' });
@@ -298,10 +645,10 @@ exports.updateStation = async (req, res) => {
 
     const { rows } = await query(`
       UPDATE stations
-      SET code = $1, name = $2, station_type = $3, highway_no = $4, direction = $5, region = $6, province = $7, responsible_person = $8, updated_at = NOW()
-      WHERE id = $9
+      SET code = $1, name = $2, station_type = $3, highway_no = $4, direction = $5, region = $6, province = $7, responsible_person = $8, operational_start_date = $9, updated_at = NOW()
+      WHERE id = $10
       RETURNING *
-    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), id]);
+    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), operational_start_date || null, id]);
 
     const row = rows[0];
     if (!row) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการแก้ไข' });

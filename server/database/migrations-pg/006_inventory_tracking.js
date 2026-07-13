@@ -17,6 +17,11 @@ module.exports = {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_inv_inst_station_id ON inventory_instances(station_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_inventory_instances_contract_id ON inventory_instances(contract_id)`);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uidx_inventory_instances_serial_ci
+      ON inventory_instances (LOWER(serial_number))
+      WHERE serial_number IS NOT NULL
+    `);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS station_asset_status (

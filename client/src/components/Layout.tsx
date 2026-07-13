@@ -43,6 +43,7 @@ import type { GlobalSearchResults } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import ErrorBoundary from './ErrorBoundary';
 import { Button } from './ui/Button';
+import AppDialog from './ui/AppDialog';
 
 
 // Notification Context
@@ -104,23 +105,6 @@ const Layout: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
-
-  // Spotlight Glow coordinate coordinator
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const cards = document.querySelectorAll('.glass-card');
-      cards.forEach(card => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        (card as HTMLElement).style.setProperty('--mouse-x', `${x}px`);
-        (card as HTMLElement).style.setProperty('--mouse-y', `${y}px`);
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
 
   const [unreadRepairCount, setUnreadRepairCount] = useState(0);
   const [unreadClaimCount, setUnreadClaimCount] = useState(0);
@@ -548,6 +532,7 @@ const Layout: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button 
+              type="button"
               className="mobile-hamburger"
               onClick={() => setIsSearchOpen(true)}
               aria-label="ค้นหา"
@@ -555,6 +540,7 @@ const Layout: React.FC = () => {
               <Search size={20} />
             </button>
             <button 
+              type="button"
               className="mobile-hamburger"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="เปิดเมนู"
@@ -600,6 +586,7 @@ const Layout: React.FC = () => {
                     <span className="toast-title">{n.title}</span>
                     <span className="toast-time">{n.timestamp}</span>
                     <button 
+                      type="button"
                       onClick={() => removeNotification(n.id)}
                       className="toast-close-btn"
                       title="ปิด"
@@ -635,6 +622,7 @@ const Layout: React.FC = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="hide-on-mobile">
               <button 
+                type="button"
                 className="sidebar-toggle-btn"
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                 title={isSidebarCollapsed ? "ขยายเมนู" : "ย่อเมนู"}
@@ -645,6 +633,7 @@ const Layout: React.FC = () => {
             
             {/* Close button visible only on mobile inside sidebar */}
             <button 
+              type="button"
               className="mobile-hamburger sidebar-close-btn"
               onClick={() => setIsMobileMenuOpen(false)}
               aria-label="ปิดเมนู"
@@ -864,7 +853,7 @@ const Layout: React.FC = () => {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  background: user.is_full ? 'linear-gradient(135deg, var(--primary), #1e3a8a)' : 'var(--bg-card)',
+                  background: user.is_full ? 'linear-gradient(135deg, var(--primary), var(--primary-deep))' : 'var(--bg-card)',
                   border: user.is_full ? 'none' : '1px solid var(--border)',
                   color: user.is_full ? '#fff' : 'var(--text-main)',
                   display: 'flex',
@@ -959,7 +948,7 @@ const Layout: React.FC = () => {
                   justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
                   gap: '10px',
                   padding: isSidebarCollapsed ? '10px' : '10px 14px',
-                  background: 'linear-gradient(135deg, var(--primary), #1e3a8a)',
+                  background: 'linear-gradient(135deg, var(--primary), var(--primary-deep))',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '10px',
@@ -982,17 +971,38 @@ const Layout: React.FC = () => {
         <div className="main-layout-container">
           {user && !isMobileView && (
             <header className="desktop-header">
+              <nav className="desktop-quick-actions" aria-label="งานด่วน">
+                <button type="button" className="header-quick-action" onClick={() => navigate('/new')}>
+                  <ClipboardPlus size={16} aria-hidden="true" />
+                  <span>แจ้งซ่อม</span>
+                </button>
+                <button type="button" className="header-quick-action" onClick={() => navigate('/claim')}>
+                  <FileWarning size={16} aria-hidden="true" />
+                  <span>แจ้งเคลม</span>
+                </button>
+                <button type="button" className="header-quick-action" onClick={() => navigate('/withdrawal')}>
+                  <PackageMinus size={16} aria-hidden="true" />
+                  <span>เบิกพัสดุ</span>
+                </button>
+                <button type="button" className="header-quick-action" onClick={() => setIsSearchOpen(true)}>
+                  <Search size={16} aria-hidden="true" />
+                  <span>ค้นหา</span>
+                </button>
+              </nav>
               <div style={{ position: 'relative' }}>
                 {/* Trigger Button */}
                 <button
+                  type="button"
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="profile-trigger-btn"
+                  aria-expanded={isProfileDropdownOpen}
+                  aria-haspopup="menu"
                 >
                   <div style={{
                     width: '28px',
                     height: '28px',
                     borderRadius: '50%',
-                    background: user.is_full ? 'linear-gradient(135deg, var(--primary), #1e3a8a)' : 'var(--bg-card)',
+                    background: user.is_full ? 'linear-gradient(135deg, var(--primary), var(--primary-deep))' : 'var(--bg-card)',
                     border: user.is_full ? 'none' : '1px solid var(--border)',
                     color: user.is_full ? '#fff' : 'var(--text-main)',
                     display: 'flex',
@@ -1037,6 +1047,7 @@ const Layout: React.FC = () => {
                     
                     <div 
                       className="glass-card profile-dropdown-animate"
+                      role="menu"
                       style={{
                         position: 'absolute',
                         top: '100%',
@@ -1058,7 +1069,7 @@ const Layout: React.FC = () => {
                           width: '36px',
                           height: '36px',
                           borderRadius: '50%',
-                          background: user.is_full ? 'linear-gradient(135deg, var(--primary), #1e3a8a)' : 'var(--bg-card)',
+                          background: user.is_full ? 'linear-gradient(135deg, var(--primary), var(--primary-deep))' : 'var(--bg-card)',
                           color: user.is_full ? '#fff' : 'var(--text-main)',
                           display: 'flex',
                           alignItems: 'center',
@@ -1080,22 +1091,26 @@ const Layout: React.FC = () => {
 
                       {/* Menu Actions */}
                       <button
+                        type="button"
                         onClick={() => {
                           setIsProfileDropdownOpen(false);
                           navigate('/change-password');
                         }}
                         className="dropdown-item-btn"
+                        role="menuitem"
                       >
                         <UserCog size={16} />
                         <span>เปลี่ยนรหัสผ่าน</span>
                       </button>
                       
                       <button
+                        type="button"
                         onClick={() => {
                           setIsProfileDropdownOpen(false);
                           logout();
                         }}
                         className="dropdown-item-btn danger"
+                        role="menuitem"
                       >
                         <LogOut size={16} />
                         <span>ออกจากระบบ</span>
@@ -1117,17 +1132,17 @@ const Layout: React.FC = () => {
 
       {/* Global Command Palette Search Modal */}
       {isSearchOpen && (
-        <div 
-          className="search-overlay" 
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setIsSearchOpen(false);
-              setSearchQuery('');
-              setSearchResults(null);
-            }
+        <AppDialog
+          isOpen={isSearchOpen}
+          onClose={() => {
+            setIsSearchOpen(false);
+            setSearchQuery('');
+            setSearchResults(null);
           }}
+          title="ค้นหาข้อมูลในระบบ"
+          className="search-modal glass-card"
+          panelStyle={{ alignSelf: 'flex-start', marginTop: '10vh', maxWidth: '650px', maxHeight: '75vh' }}
         >
-          <div className="search-modal glass-card">
             <div className="search-modal-header">
               <Search className="search-modal-icon" size={20} />
               <input
@@ -1150,6 +1165,7 @@ const Layout: React.FC = () => {
                 aria-label="พิมพ์เพื่อค้นหาพัสดุ งานซ่อม หรือใบเคลม"
               />
               <button 
+                type="button"
                 onClick={() => {
                   setIsSearchOpen(false);
                   setSearchQuery('');
@@ -1234,24 +1250,21 @@ const Layout: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </AppDialog>
       )}
 
       {confirmState.isOpen && (
-        <div 
-          className="modal-overlay" 
-          style={{ zIndex: 2000 }} 
-          onClick={() => {
+        <AppDialog
+          isOpen={confirmState.isOpen}
+          onClose={() => {
             if (confirmState.resolve) confirmState.resolve(false);
             setConfirmState(prev => ({ ...prev, isOpen: false }));
           }}
+          title={confirmState.title}
+          busy={false}
+          className="modal-content"
+          panelStyle={{ maxWidth: '440px', padding: '2rem', gap: '1.25rem', borderRadius: '16px' }}
         >
-          <div 
-            className="modal-content" 
-            style={{ maxWidth: '440px', padding: '2rem', gap: '1.25rem', borderRadius: '16px' }} 
-            onClick={(e) => e.stopPropagation()}
-          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
               <AlertTriangle 
                 size={24} 
@@ -1296,8 +1309,7 @@ const Layout: React.FC = () => {
                 {confirmState.confirmText}
               </Button>
             </div>
-          </div>
-        </div>
+        </AppDialog>
       )}
     </NotificationContext.Provider>
   );

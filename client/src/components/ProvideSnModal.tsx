@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { useNotification } from './Layout';
 import { getApiErrorMessage } from '../utils/apiError';
 import Select from './ui/Select';
+import AppDialog from './ui/AppDialog';
 
 // โหลด scanner (กล้อง + บาร์โค้ด + OCR) เฉพาะตอนเปิดใช้ เพื่อไม่ถ่วง bundle หลัก
 const SnScannerModal = React.lazy(() => import('./SnScannerModal'));
@@ -143,8 +144,16 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="modal-content" style={{ maxWidth: '600px' }}>
+    <>
+      <AppDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title={title}
+        busy={loading}
+        closeOnBackdrop={false}
+        className="modal-content"
+        panelStyle={{ maxWidth: '600px' }}
+      >
         <h3>{title}</h3>
         
         <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -283,7 +292,7 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
                   style={{ 
                     width: '100%', padding: '10px', fontSize: '0.9rem', border: '1px solid var(--border)', 
                     background: 'var(--bg-card)', color: 'var(--text-main)',
-                    borderRadius: '6px', outline: 'none', fontFamily: 'monospace'
+                    borderRadius: '6px', outline: 'none', fontFamily: 'var(--font-mono)'
                   }}
                 />
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -300,7 +309,7 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
             </Button>
           </div>
         </form>
-      </div>
+      </AppDialog>
 
       {scannerOpen && (
         <Suspense fallback={null}>
@@ -312,6 +321,6 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
           />
         </Suspense>
       )}
-    </div>
+    </>
   );
 };

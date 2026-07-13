@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from './ui/Button';
+import AppDialog from './ui/AppDialog';
 import { settingsApi, UPLOAD_URL } from '../api';
 import Select from './ui/Select';
 import { printElement } from '../utils/pdfGenerator';
@@ -123,34 +124,21 @@ export const PrintDialog: React.FC<Props> = ({ open, onClose, templateId, docTit
         {renderTemplate(selectedCompany ?? null, selectedLogo)}
       </div>
 
-      {/* Modal overlay */}
-      <div
-        className="modal-overlay"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.55)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          padding: '20px',
+      <AppDialog
+        isOpen={open}
+        onClose={onClose}
+        title="พิมพ์เอกสาร"
+        busy={printing}
+        className="modal-content"
+        panelStyle={{
+          borderRadius: '16px',
+          maxWidth: '560px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         }}
-        onClick={onClose}
       >
-        <div
-          className="modal-content"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            background: 'var(--bg-card)',
-            borderRadius: '16px',
-            maxWidth: '560px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          }}
-        >
           {/* Header */}
           <div style={{
             padding: '20px 24px',
@@ -164,8 +152,11 @@ export const PrintDialog: React.FC<Props> = ({ open, onClose, templateId, docTit
               พิมพ์เอกสาร
             </h3>
             <button
+              type="button"
               className="close-btn"
               onClick={onClose}
+              disabled={printing}
+              aria-label="ปิดหน้าต่างพิมพ์"
               style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
             >
               <X size={22} />
@@ -369,8 +360,7 @@ export const PrintDialog: React.FC<Props> = ({ open, onClose, templateId, docTit
               พิมพ์เอกสาร
             </Button>
           </div>
-        </div>
-      </div>
+      </AppDialog>
 
     </>
   );

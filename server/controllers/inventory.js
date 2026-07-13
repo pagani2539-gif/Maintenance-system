@@ -421,7 +421,8 @@ exports.getInstanceTimeline = async (req, res) => {
 exports.getLifecycleReport = async (req, res) => {
   try {
     const { rows } = await query(`
-      SELECT
+      WITH serial_assets AS (
+        SELECT
         ii.id as instance_id,
         ii.serial_number,
         ii.status,
@@ -437,13 +438,66 @@ exports.getLifecycleReport = async (req, res) => {
         c.contract_no,
         c.name as contract_name,
         c.year_be as contract_year,
-        (SELECT COUNT(*) FROM repairs r WHERE r.instance_id = ii.id) as repair_count
-      FROM inventory_instances ii
-      JOIN inventory i ON ii.inventory_id = i.id
-      LEFT JOIN stations st ON ii.station_id = st.id
-      LEFT JOIN contracts c ON ii.contract_id = c.id
-      WHERE ii.status = 'Withdrawn' AND ii.station_id IS NOT NULL
-      ORDER BY ii.created_at DESC
+        (SELECT COUNT(*) FROM repairs r WHERE r.instance_id = ii.id) as repair_count,
+        'serial'::TEXT AS asset_kind,
+        1::INTEGER AS quantity,
+        0::INTEGER AS untracked_quantity,
+        i.requires_sn
+        FROM inventory_instances ii
+        JOIN inventory i ON ii.inventory_id = i.id
+        LEFT JOIN stations st ON ii.station_id = st.id
+        LEFT JOIN contracts c ON ii.contract_id = c.id
+        WHERE ii.status = 'Withdrawn' AND ii.station_id IS NOT NULL
+      ), station_items AS (
+        SELECT
+          NULL::BIGINT AS instance_id,
+          NULL::TEXT AS serial_number,
+          CASE WHEN i.requires_sn = 1 THEN 'Awaiting S/N' ELSE 'No S/N' END AS status,
+          st.name AS current_location,
+          si.station_id,
+          COALESCE(latest_lot.withdrawal_date::timestamptz, si.updated_at) AS installed_at,
+          i.id AS inventory_id,
+          i.name AS device_name,
+          i.model,
+          st.name AS station_name,
+          st.code AS station_code,
+          latest_lot.contract_id,
+          latest_lot.contract_no_snapshot AS contract_no,
+          latest_lot.contract_name_snapshot AS contract_name,
+          latest_lot.contract_year_snapshot AS contract_year,
+          (SELECT COUNT(*) FROM repairs r WHERE r.station_id = si.station_id AND r.inventory_id = i.id) AS repair_count,
+          'station_stock'::TEXT AS asset_kind,
+          si.quantity,
+          GREATEST(si.quantity - COUNT(ii.id)::INTEGER, 0) AS untracked_quantity,
+          i.requires_sn
+        FROM station_inventory si
+        JOIN inventory i ON i.id = si.inventory_id
+        JOIN stations st ON st.id = si.station_id
+        LEFT JOIN LATERAL (
+          SELECT l.withdrawal_date, l.contract_id, l.contract_no_snapshot,
+                 l.contract_name_snapshot, l.contract_year_snapshot
+          FROM station_inventory_lots l
+          WHERE l.station_id = si.station_id
+            AND l.inventory_id = si.inventory_id
+            AND l.quantity_remaining > 0
+          ORDER BY l.withdrawal_date DESC NULLS LAST, l.id DESC
+          LIMIT 1
+        ) latest_lot ON TRUE
+        LEFT JOIN inventory_instances ii
+          ON ii.inventory_id = si.inventory_id
+          AND ii.station_id = si.station_id
+          AND ii.status = 'Withdrawn'
+        GROUP BY si.station_id, si.inventory_id, si.quantity, si.updated_at,
+                 i.id, i.name, i.model, i.requires_sn, st.name, st.code,
+                 latest_lot.withdrawal_date, latest_lot.contract_id,
+                 latest_lot.contract_no_snapshot, latest_lot.contract_name_snapshot,
+                 latest_lot.contract_year_snapshot
+        HAVING GREATEST(si.quantity - COUNT(ii.id)::INTEGER, 0) > 0
+      )
+      SELECT * FROM serial_assets
+      UNION ALL
+      SELECT * FROM station_items
+      ORDER BY installed_at DESC
     `);
 
     const reports = rows.map(row => {

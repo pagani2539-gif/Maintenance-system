@@ -16,14 +16,14 @@ export const printElement = (elementId: string, title: string) => {
 <head>
   <meta charset="UTF-8">
   <title>${title}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     @page { 
       size: A4 portrait; 
       margin: 0; 
     }
     html, body {
-      font-family: 'Sarabun', sans-serif;
+      font-family: 'Anuphan', 'Noto Sans Thai', sans-serif;
       margin: 0; padding: 0;
       width: 100%;
       background: #fff;

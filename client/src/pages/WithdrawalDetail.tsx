@@ -296,7 +296,8 @@ const WithdrawalDetail: React.FC = () => {
             </div>
             <div>
               <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>วันที่เบิกจ่าย</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.95rem' }}><Calendar size={16} color="var(--primary)"/> {formatDateTimeThai(withdrawal.created_at)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.95rem' }}><Calendar size={16} color="var(--primary)"/> {withdrawal.withdrawal_date ? new Date(`${withdrawal.withdrawal_date}T00:00:00`).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : formatDateTimeThai(withdrawal.created_at)}</div>
+              {withdrawal.withdrawal_date && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '3px' }}>บันทึกเข้าระบบ {formatDateTimeThai(withdrawal.created_at)}</div>}
             </div>
             <div className="hide-on-tablet">
               <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>ชื่อโครงการ</label>

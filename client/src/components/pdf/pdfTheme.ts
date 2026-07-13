@@ -9,7 +9,7 @@
 export const pdfTheme = {
   // ─── Brand / Base ─────────────────────────────────────────
   colors: {
-    primary: '#1e3a8a',      // Deep corporate navy
+    primary: '#29b6f6',      // Sky blue operations
     text: '#0f172a',         // Near-black (body text)
     textMuted: '#475569',    // Slate gray (labels, secondary info)
     textLight: '#94a3b8',    // Light gray (footnotes)
@@ -31,8 +31,8 @@ export const pdfTheme = {
 
   // ─── Typography ──────────────────────────────────────────
   fonts: {
-    body: "'Sarabun', 'Inter', -apple-system, sans-serif",
-    mono: "'JetBrains Mono', 'Courier New', monospace",
+    body: "'Anuphan', 'Noto Sans Thai', -apple-system, sans-serif",
+    mono: "'Anuphan', 'Noto Sans Thai', -apple-system, sans-serif",
   },
 
   // ─── Font sizes (px) ─────────────────────────────────────

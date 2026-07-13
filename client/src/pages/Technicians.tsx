@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import { Input } from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import { Card } from '../components/ui/Card';
 import { getApiErrorMessage } from '../utils/apiError';
 import { Wrench, Plus, Pencil, X, User, Phone, Hash, Boxes } from 'lucide-react';
@@ -146,11 +147,11 @@ const Technicians: React.FC = () => {
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>ผูกกับบัญชีผู้ใช้ <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(ถ้ามี)</span></label>
-                <select value={edit.user_id} onChange={(e) => setEdit({ ...edit, user_id: e.target.value ? Number(e.target.value) : '' })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '0.9rem' }}>
-                  <option value="">— ไม่ผูกบัญชี —</option>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.full_name} ({u.username})</option>)}
-                </select>
+                <Select
+                  value={edit.user_id}
+                  options={[{ value: '', label: '— ไม่ผูกบัญชี —' }, ...users.map((u) => ({ value: u.id, label: `${u.full_name} (${u.username})` }))]}
+                  onChange={(value) => setEdit({ ...edit, user_id: value ? Number(value) : '' })}
+                />
               </div>
               {edit.id && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', cursor: 'pointer' }}>

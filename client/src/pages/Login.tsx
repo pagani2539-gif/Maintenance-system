@@ -109,7 +109,7 @@ const Login: React.FC = () => {
           left: 10%;
           width: 320px;
           height: 320px;
-          background: #60a5fa;
+          background: var(--primary);
           opacity: 0.14;
           animation: float-blob-1 12s infinite ease-in-out;
         }
@@ -118,16 +118,16 @@ const Login: React.FC = () => {
           right: 15%;
           width: 380px;
           height: 380px;
-          background: #2563eb;
+          background: var(--primary);
           opacity: 0.12;
           animation: float-blob-2 15s infinite ease-in-out;
         }
         [data-theme='dark'] .bg-blob-1 {
-          background: #1d4ed8;
+          background: var(--primary-action);
           opacity: 0.08;
         }
         [data-theme='dark'] .bg-blob-2 {
-          background: #1e40af;
+          background: var(--primary-deep);
           opacity: 0.08;
         }
       `}</style>
@@ -175,7 +175,7 @@ const Login: React.FC = () => {
             fontWeight: 800, 
             color: 'var(--text-main)',
             letterSpacing: '-0.02em',
-            fontFamily: '"Bai Jamjuree", "Sarabun", sans-serif'
+            fontFamily: 'var(--font-display)'
           }}>
             ระบบซ่อมบำรุงและคลังพัสดุ
           </h1>
@@ -186,7 +186,7 @@ const Login: React.FC = () => {
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
-            fontFamily: '"Bai Jamjuree", "Sarabun", sans-serif'
+            fontFamily: 'var(--font-display)'
           }}>
             Repair & Inventory Management
           </p>

@@ -157,7 +157,8 @@ function BaseDataTable<T>({
                 <th style={{ textAlign: 'center' }}>
                   <input 
                     type="checkbox" 
-                    checked={data.length > 0 && selection.selectedIds.length === data.length}
+                    aria-label="Select all rows"
+                    checked={data.length > 0 && data.every(row => selection.selectedIds.includes(selection.getRowId(row)))}
                     onChange={(e) => {
                       if (e.target.checked) selection.onSelectionChange(data.map(selection.getRowId));
                       else selection.onSelectionChange([]);
@@ -165,27 +166,35 @@ function BaseDataTable<T>({
                   />
                 </th>
               )}
-              {visibleColumns.map(col => (
-                <th 
-                  key={col.id}
-                  onClick={() => col.sortable && handleSort(col.id)}
-                  style={{ 
-                    textAlign: col.align || 'left',
-                    cursor: col.sortable ? 'pointer' : 'default',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 20,
-                    userSelect: 'none'
-                  }}
-                >
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    {col.header}
-                    {col.sortable && sort?.key === col.id && (
-                      sort.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+              {visibleColumns.map(col => {
+                const isSorted = sort?.key === col.id;
+                const sortDirection = isSorted ? sort.direction : undefined;
+                return (
+                  <th
+                    key={col.id}
+                    aria-sort={col.sortable ? (sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none') : undefined}
+                    style={{
+                      textAlign: col.align || 'left',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 20,
+                    }}
+                  >
+                    {col.sortable ? (
+                      <button
+                        type="button"
+                        className="data-table__sort-button"
+                        onClick={() => handleSort(col.id)}
+                      >
+                        <span>{col.header}</span>
+                        {isSorted && (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                      </button>
+                    ) : (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{col.header}</div>
                     )}
-                  </div>
-                </th>
-              ))}
+                  </th>
+                );
+              })}
               {actions.length > 0 && (
                 <th
                   title="จัดการ"
@@ -206,14 +215,21 @@ function BaseDataTable<T>({
               const isSelected = selectionId !== undefined && selection?.selectedIds.includes(selectionId);
 
               const accent = getRowAccent?.(row);
+              const isInteractiveRow = Boolean(renderDetailDrawer || onRowClick);
               return (
                 <tr
                   key={rowId as string | number}
-                  onClick={() => handleRowClick(row)}
+                  onClick={isInteractiveRow ? () => handleRowClick(row) : undefined}
+                  onKeyDown={isInteractiveRow ? (event) => {
+                    if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+                    event.preventDefault();
+                    handleRowClick(row);
+                  } : undefined}
+                  tabIndex={isInteractiveRow ? 0 : undefined}
                   className={`data-table-row ${isSelected ? 'is-selected' : ''}`}
                   style={{
                     height: 'var(--table-row-height)',
-                    cursor: 'pointer',
+                    cursor: isInteractiveRow ? 'pointer' : 'default',
                     backgroundColor: isSelected ? 'var(--primary-light)' : undefined,
                     transition: 'background-color 0.2s, transform 0.15s',
                     '--row-accent': accent || 'transparent'
@@ -223,6 +239,7 @@ function BaseDataTable<T>({
                     <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                       <input 
                         type="checkbox" 
+                        aria-label={`Select row ${rowIndex + 1}`}
                         checked={isSelected}
                         onChange={() => {
                           if (isSelected) selection.onSelectionChange(selection.selectedIds.filter(id => id !== selectionId));

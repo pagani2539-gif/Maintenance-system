@@ -186,7 +186,7 @@ const PendingReturns: React.FC = () => {
             fontSize: '0.78rem',
             fontWeight: 700,
             color: 'var(--primary)',
-            fontFamily: '"Bai Jamjuree", monospace',
+            fontFamily: 'var(--font-mono)',
             letterSpacing: '0.3px'
           }}>{val}</span>
         ) : (

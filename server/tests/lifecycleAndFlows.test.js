@@ -93,6 +93,151 @@ describe('Lifecycle and Flows', () => {
     expect(item.repair_count).toEqual(1);
   });
 
+  it('should include station-assigned items that do not have S/N yet', async () => {
+    const stationCode = 'STN-NOSN-' + Math.random().toString(36).substring(7);
+    const stationName = `Station Item Test ${stationCode}`;
+    const inventoryName = `Station Item Without S/N ${stationCode}`;
+    const { rows: stationRows } = await query(
+      `INSERT INTO stations (code, name, station_type, highway_no, direction, region, province)
+       VALUES ($1, $2, 'Type A', '9', 'Inbound', 'Central', 'Bangkok') RETURNING id`,
+      [stationCode, stationName]
+    );
+    const stationId = Number(stationRows[0].id);
+    const { rows: invRows } = await query(
+      `INSERT INTO inventory (name, quantity, min_stock, requires_sn)
+       VALUES ($1, 0, 0, 1) RETURNING id`,
+      [inventoryName]
+    );
+    const inventoryId = Number(invRows[0].id);
+
+    await query(
+      `INSERT INTO station_inventory (station_id, inventory_id, quantity, updated_by)
+       VALUES ($1, $2, 3, 'test')`,
+      [stationId, inventoryId]
+    );
+
+    const req = request(app).get('/api/inventory/lifecycle-report');
+    if (token) req.set('Authorization', `Bearer ${token}`);
+    const res = await req;
+
+    expect(res.statusCode).toEqual(200);
+    const item = res.body.find(row => Number(row.station_id) === stationId && Number(row.inventory_id) === inventoryId);
+    expect(item).toMatchObject({
+      asset_kind: 'station_stock',
+      instance_id: null,
+      quantity: 3,
+      untracked_quantity: 3,
+      requires_sn: 1,
+    });
+  });
+
+  it('should assign a withdrawal to its station even when S/N is added later', async () => {
+    const stationCode = 'STN-WITHDRAW-' + Math.random().toString(36).substring(7);
+    const stationName = `Withdrawal Assignment Test ${stationCode}`;
+    const inventoryName = `Later S/N Test Device ${stationCode}`;
+    const { rows: stationRows } = await query(
+      `INSERT INTO stations (code, name, station_type, highway_no, direction, region, province)
+       VALUES ($1, $2, 'Type A', '9', 'Inbound', 'Central', 'Bangkok') RETURNING id`,
+      [stationCode, stationName]
+    );
+    const stationId = Number(stationRows[0].id);
+    const { rows: invRows } = await query(
+      `INSERT INTO inventory (name, quantity, min_stock, requires_sn)
+       VALUES ($1, 5, 0, 1) RETURNING id`,
+      [inventoryName]
+    );
+    const inventoryId = Number(invRows[0].id);
+
+    const createRes = await request(app)
+      .post('/api/withdrawals')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type: 'ติดตั้งใหม่',
+        project_name: 'Station assignment test',
+        location: stationName,
+        station_id: stationId,
+        items: [{ inventory_id: inventoryId, quantity: 2, serial_numbers: [] }],
+      });
+
+    expect(createRes.statusCode).toEqual(201);
+    const { rows } = await query(
+      `SELECT quantity FROM station_inventory WHERE station_id = $1 AND inventory_id = $2`,
+      [stationId, inventoryId]
+    );
+    expect(Number(rows[0].quantity)).toEqual(2);
+  });
+
+  it('should expose station asset source data and transfer bulk assets without losing provenance', async () => {
+    const sourceCode = 'STN-ASSET-SOURCE-' + Math.random().toString(36).substring(7);
+    const targetCode = 'STN-ASSET-TARGET-' + Math.random().toString(36).substring(7);
+    const sourceName = 'Source Asset Station ' + sourceCode;
+    const targetName = 'Target Asset Station ' + targetCode;
+    const { rows: sourceRows } = await query(
+      `INSERT INTO stations (code, name, station_type, highway_no, direction, region, province)
+       VALUES ($1, $2, 'Type A', '9', 'Inbound', 'Central', 'Bangkok') RETURNING id`,
+      [sourceCode, sourceName]
+    );
+    const { rows: targetRows } = await query(
+      `INSERT INTO stations (code, name, station_type, highway_no, direction, region, province)
+       VALUES ($1, $2, 'Type A', '9', 'Inbound', 'Central', 'Bangkok') RETURNING id`,
+      [targetCode, targetName]
+    );
+    const sourceStationId = Number(sourceRows[0].id);
+    const targetStationId = Number(targetRows[0].id);
+    const { rows: invRows } = await query(
+      `INSERT INTO inventory (name, quantity, min_stock, requires_sn)
+       VALUES ('Transferable Bulk Asset', 10, 0, 0) RETURNING id`
+    );
+    const inventoryId = Number(invRows[0].id);
+
+    const createRes = await request(app)
+      .post('/api/withdrawals')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type: 'ติดตั้งใหม่',
+        project_name: 'Asset provenance test project',
+        location: sourceName,
+        station_id: sourceStationId,
+        withdrawal_date: '2026-07-01',
+        contract_reference_type: 'none',
+        contract_reference_note: 'ทดสอบของเดิม',
+        items: [{ inventory_id: inventoryId, quantity: 4, serial_numbers: [] }],
+      });
+    expect(createRes.statusCode).toEqual(201);
+
+    const detailsRes = await request(app)
+      .get(`/api/stations/details?station_id=${sourceStationId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(detailsRes.statusCode).toEqual(200);
+    expect(detailsRes.body.assets[0]).toMatchObject({ inventory_id: inventoryId, current_quantity: 4 });
+    expect(detailsRes.body.assets[0].source_lots[0]).toMatchObject({
+      quantity_remaining: 4,
+      project_name_snapshot: 'Asset provenance test project',
+    });
+
+    const moveRes = await request(app)
+      .post(`/api/stations/${sourceStationId}/assets/move`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ inventory_id: inventoryId, quantity: 2, to_station_id: targetStationId, note: 'ทดสอบย้ายสถานี' });
+    expect(moveRes.statusCode).toEqual(200);
+
+    const balances = await query(
+      `SELECT station_id, quantity FROM station_inventory WHERE inventory_id = $1 ORDER BY station_id`,
+      [inventoryId]
+    );
+    expect(balances.rows.map(row => [Number(row.station_id), Number(row.quantity)])).toEqual([
+      [sourceStationId, 2],
+      [targetStationId, 2],
+    ]);
+
+    const { rows: eventRows } = await query(
+      `SELECT event_type, project_name_snapshot FROM station_asset_events
+       WHERE inventory_id = $1 AND to_station_id = $2 ORDER BY id DESC LIMIT 1`,
+      [inventoryId, targetStationId]
+    );
+    expect(eventRows[0]).toMatchObject({ event_type: 'TRANSFER', project_name_snapshot: 'Asset provenance test project' });
+  });
+
   // Test 3 & 4: Create/complete repair/claim must change/restore instance status
   it('should change and restore instance status during repair lifecycle', async () => {
     // 1. Create a new In Stock instance

@@ -57,6 +57,7 @@ const TablePagination: React.FC<TablePaginationProps> = ({
               value={pageSize}
               options={pageSizeOptions.map(size => ({ label: String(size), value: size }))}
               onChange={(val) => onPageSizeChange(Number(val))}
+              ariaLabel="รายการต่อหน้า"
               style={{ width: '80px' }}
             />
           </div>

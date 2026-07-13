@@ -117,10 +117,17 @@ export interface Withdrawal {
   type: string;
   note?: string;
   return_due_date?: string;
+  withdrawal_date?: string;
+  contract_reference_type?: 'contract' | 'none' | 'legacy';
+  contract_reference_note?: string;
   contract_id?: number;
   contract_no?: string;
   contract_name?: string;
   contract_year?: number;
+  contract_company_name?: string;
+  contract_no_snapshot?: string;
+  contract_name_snapshot?: string;
+  contract_year_snapshot?: number;
   created_at: string;
   items_summary?: string;
   items_missing_sn?: number;
@@ -313,6 +320,9 @@ export interface Station {
   province: string;
   responsible_person?: string; // ชื่อผู้รับผิดชอบสถานี — optional ในเลเยอร์ type เพราะสถานีเก่าอาจไม่มี
   status: number;
+  operational_start_date?: string;
+  last_verified_at?: string;
+  decommissioned_at?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -342,6 +352,65 @@ export interface AssetManualStatus {
   updated_at?: string;
 }
 
+export interface StationAssetLot {
+  id: number;
+  station_id: number;
+  inventory_id: number;
+  withdrawal_id?: number;
+  withdrawal_item_id?: number;
+  quantity_received: number;
+  quantity_remaining: number;
+  untracked_remaining: number;
+  withdrawal_date?: string;
+  project_name_snapshot?: string;
+  contract_id?: number;
+  contract_no_snapshot?: string;
+  contract_name_snapshot?: string;
+  contract_year_snapshot?: number;
+  contract_company_snapshot?: string;
+  device_name: string;
+  model?: string;
+}
+
+export interface StationAssetSummary {
+  station_id: number;
+  inventory_id: number;
+  current_quantity: number;
+  device_name: string;
+  model?: string;
+  image_path?: string;
+  requires_sn?: number;
+  serial_count: number;
+  latest_serial_date?: string;
+  source_lots: StationAssetLot[];
+}
+
+export interface StationAssetEvent {
+  id: number;
+  station_id?: number;
+  inventory_id?: number;
+  instance_id?: number;
+  event_type: string;
+  event_at: string;
+  quantity: number;
+  from_station_id?: number;
+  to_station_id?: number;
+  source_withdrawal_id?: number;
+  project_name_snapshot?: string;
+  contract_id?: number;
+  contract_no_snapshot?: string;
+  contract_name_snapshot?: string;
+  contract_year_snapshot?: number;
+  old_serial_number?: string;
+  new_serial_number?: string;
+  note?: string;
+  performed_by?: string;
+  device_name?: string;
+  model?: string;
+  from_station_name?: string;
+  to_station_name?: string;
+}
+
 export interface StationDetailResponse {
   station: Station;
   stats: StationStats;
@@ -350,6 +419,8 @@ export interface StationDetailResponse {
   withdrawals: Withdrawal[];
   transactions: InventoryTransaction[];
   asset_statuses?: AssetManualStatus[];
+  assets?: StationAssetSummary[];
+  asset_events?: StationAssetEvent[];
   instances?: Array<{
     id: number;
     inventory_id: number;
@@ -357,6 +428,16 @@ export interface StationDetailResponse {
     condition: string;
     status: string;
     updated_at?: string;
+    created_at?: string;
+    station_id?: number;
+    source_withdrawal_id?: number;
+    withdrawal_date?: string;
+    project_name_snapshot?: string;
+    contract_id?: number;
+    contract_no_snapshot?: string;
+    contract_name_snapshot?: string;
+    contract_year_snapshot?: number;
+    contract_company_snapshot?: string;
   }>;
 }
 
@@ -494,8 +575,8 @@ export interface AuditLog {
 }
 
 export interface AssetLifecycleItem {
-  instance_id: number;
-  serial_number: string;
+  instance_id: number | null;
+  serial_number: string | null;
   status: string;
   current_location: string;
   station_id: number;
@@ -511,6 +592,10 @@ export interface AssetLifecycleItem {
   contract_year?: number;
   repair_count: number;
   age_months: number;
+  asset_kind: 'serial' | 'station_stock';
+  quantity: number;
+  untracked_quantity: number;
+  requires_sn: number | boolean;
 }
 
 export type AssetTimelineEventKind =

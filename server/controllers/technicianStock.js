@@ -70,6 +70,51 @@ const getActiveTechnician = async (client, technicianId) => {
 
 const cleanSerials = (arr) => (arr || []).map(s => String(s || '').trim()).filter(Boolean);
 
+const incrementStationInventory = async (client, stationId, inventoryId, quantity, user) => {
+  if (!stationId || !inventoryId || !quantity) return;
+  await client.query(`
+    INSERT INTO station_inventory (station_id, inventory_id, quantity, updated_by, updated_at)
+    VALUES ($1, $2, $3, $4, NOW())
+    ON CONFLICT (station_id, inventory_id) DO UPDATE
+      SET quantity = station_inventory.quantity + EXCLUDED.quantity,
+          updated_by = EXCLUDED.updated_by, updated_at = NOW()
+  `, [stationId, inventoryId, quantity, user]);
+};
+
+const decrementStationInventory = async (client, stationId, inventoryId, quantity) => {
+  if (!stationId || !inventoryId || !quantity) return;
+  await client.query(`
+    UPDATE station_inventory
+    SET quantity = GREATEST(0, quantity - $1), updated_at = NOW()
+    WHERE station_id = $2 AND inventory_id = $3
+  `, [quantity, stationId, inventoryId]);
+  await client.query(`DELETE FROM station_inventory WHERE station_id = $1 AND inventory_id = $2 AND quantity = 0`, [stationId, inventoryId]);
+};
+
+const recordStationEvent = async (client, data) => {
+  const {
+    stationId, inventoryId, instanceId = null, eventType, quantity = 0,
+    fromStationId = null, toStationId = null, sourceWithdrawalId = null,
+    projectName = null, contractId = null, contractNo = null,
+    contractName = null, contractYear = null, oldSerial = null,
+    newSerial = null, note = null, performedBy = null,
+  } = data;
+  await client.query(`
+    INSERT INTO station_asset_events (
+      station_id, inventory_id, instance_id, event_type, event_at, quantity,
+      from_station_id, to_station_id, source_withdrawal_id,
+      project_name_snapshot, contract_id, contract_no_snapshot,
+      contract_name_snapshot, contract_year_snapshot, old_serial_number,
+      new_serial_number, note, performed_by
+    )
+    VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+  `, [
+    stationId, inventoryId, instanceId, eventType, quantity, fromStationId,
+    toStationId, sourceWithdrawalId, projectName, contractId, contractNo,
+    contractName, contractYear, oldSerial, newSerial, note, performedBy
+  ]);
+};
+
 // ── Reads ────────────────────────────────────────────────────────────────
 
 // GET /holdings?technician_id=  → one technician's kit (items + serialized units)
@@ -255,11 +300,45 @@ exports.installStock = async (req, res) => {
       let removedAttached = false;
 
       if (removed_serial && String(removed_serial).trim()) {
-        const { rows } = await client.query('SELECT id FROM inventory_instances WHERE serial_number = $1', [String(removed_serial).trim()]);
+        const { rows } = await client.query(`
+          SELECT id, inventory_id, station_id, source_withdrawal_id,
+                 project_name_snapshot, contract_id, contract_no_snapshot,
+                 contract_name_snapshot, contract_year_snapshot
+          FROM inventory_instances WHERE serial_number = $1
+        `, [String(removed_serial).trim()]);
         if (rows[0]) {
+          const old = rows[0];
           await client.query(
-            `UPDATE inventory_instances SET status = $1, current_location = $2, updated_at = NOW() WHERE id = $3`,
-            [INSTANCE_STATUS.DAMAGED, `ถอดจาก: ${stationName || station_id}`, rows[0].id]);
+            `UPDATE inventory_instances SET status = $1, current_location = $2, station_id = NULL, updated_at = NOW() WHERE id = $3`,
+            [INSTANCE_STATUS.DAMAGED, `ถอดจาก: ${stationName || station_id}`, old.id]);
+          await decrementStationInventory(client, old.station_id || station_id, old.inventory_id, 1);
+          if (old.source_withdrawal_id) {
+            await client.query(`
+              UPDATE station_inventory_lots
+              SET quantity_remaining = GREATEST(0, quantity_remaining - 1),
+                  updated_at = NOW()
+              WHERE station_id = $1 AND inventory_id = $2 AND withdrawal_id = $3
+                AND quantity_remaining > 0
+            `, [old.station_id || station_id, old.inventory_id, old.source_withdrawal_id]);
+          }
+          await recordStationEvent(client, {
+            stationId: station_id,
+            inventoryId: old.inventory_id,
+            instanceId: old.id,
+            eventType: 'REPLACE',
+            quantity: 1,
+            fromStationId: old.station_id || station_id,
+            toStationId: station_id,
+            sourceWithdrawalId: old.source_withdrawal_id,
+            projectName: old.project_name_snapshot,
+            contractId: old.contract_id,
+            contractNo: old.contract_no_snapshot,
+            contractName: old.contract_name_snapshot,
+            contractYear: old.contract_year_snapshot,
+            oldSerial: String(removed_serial).trim(),
+            note,
+            performedBy: performed_by,
+          });
         }
       }
 
@@ -296,6 +375,43 @@ exports.installStock = async (req, res) => {
             `UPDATE inventory_instances SET status = $1, current_location = $2, station_id = $3, updated_at = NOW() WHERE id = $4`,
             [INSTANCE_STATUS.WITHDRAWN, stationName || String(station_id), station_id, inst.id]);
 
+          await incrementStationInventory(client, station_id, item.inventory_id, 1, performed_by);
+          await client.query(`
+            INSERT INTO station_inventory_lots (
+              station_id, inventory_id, quantity_received, quantity_remaining,
+              untracked_remaining, withdrawal_date, project_name_snapshot,
+              contract_id, contract_no_snapshot, contract_name_snapshot, contract_year_snapshot
+            )
+            SELECT $1, $2, 1, 1, 0, COALESCE(ii.withdrawal_date, CURRENT_DATE),
+                   ii.project_name_snapshot, ii.contract_id, ii.contract_no_snapshot,
+                   ii.contract_name_snapshot, ii.contract_year_snapshot
+            FROM inventory_instances ii WHERE ii.id = $3
+          `, [station_id, item.inventory_id, inst.id]);
+          const { rows: installedSource } = await client.query(`
+            SELECT source_withdrawal_id, project_name_snapshot, contract_id,
+                   contract_no_snapshot, contract_name_snapshot, contract_year_snapshot
+            FROM inventory_instances WHERE id = $1
+          `, [inst.id]);
+          const source = installedSource[0] || {};
+          await recordStationEvent(client, {
+            stationId: station_id,
+            inventoryId: item.inventory_id,
+            instanceId: inst.id,
+            eventType: removed_serial ? 'REPLACE' : 'INSTALL_FROM_TECHNICIAN',
+            quantity: 1,
+            toStationId: station_id,
+            sourceWithdrawalId: source.source_withdrawal_id,
+            projectName: source.project_name_snapshot,
+            contractId: source.contract_id,
+            contractNo: source.contract_no_snapshot,
+            contractName: source.contract_name_snapshot,
+            contractYear: source.contract_year_snapshot,
+            newSerial: sn,
+            oldSerial: removedAttached ? null : (removed_serial || null),
+            note,
+            performedBy: performed_by,
+          });
+
           const movement_no = await generateDocNo('TK', MOVEMENT_NO_OPTS);
           await insertMovement(client, {
             movement_no, technician_id, movement_type: 'INSTALL', inventory_id: item.inventory_id,
@@ -309,6 +425,23 @@ exports.installStock = async (req, res) => {
 
         const bulk = qty - serials.length;
         if (bulk > 0) {
+          await incrementStationInventory(client, station_id, item.inventory_id, bulk, performed_by);
+          await client.query(`
+            INSERT INTO station_inventory_lots (
+              station_id, inventory_id, quantity_received, quantity_remaining,
+              untracked_remaining, project_name_snapshot
+            ) VALUES ($1, $2, $3, $3, $3, NULL)
+          `, [station_id, item.inventory_id, bulk]);
+          await recordStationEvent(client, {
+            stationId: station_id,
+            inventoryId: item.inventory_id,
+            eventType: removed_serial ? 'REPLACE' : 'INSTALL_FROM_TECHNICIAN',
+            quantity: bulk,
+            toStationId: station_id,
+            oldSerial: removedAttached ? null : (removed_serial || null),
+            note,
+            performedBy: performed_by,
+          });
           const movement_no = await generateDocNo('TK', MOVEMENT_NO_OPTS);
           await insertMovement(client, {
             movement_no, technician_id, movement_type: 'INSTALL', inventory_id: item.inventory_id,

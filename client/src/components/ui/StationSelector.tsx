@@ -99,8 +99,8 @@ const StationSelector: React.FC<StationSelectorProps> = ({
   };
 
   // เปลี่ยนภาค
-  const handleAddRegionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setAddRegion(e.target.value);
+  const handleAddRegionChange = (value: string) => {
+    setAddRegion(value);
     clearFieldError('region');
   };
 
@@ -769,22 +769,23 @@ const StationSelector: React.FC<StationSelectorProps> = ({
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                   ประเภทสถานี <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
-                <select
+                <Select
                   value={addStationType}
-                  onChange={(e) => {
-                    setAddStationType(e.target.value);
-                    if (e.target.value !== 'OTHER') setCustomStationType('');
+                  options={[
+                    { value: 'WEIGH_STATION', label: 'สถานีตรวจสอบน้ำหนัก' },
+                    { value: 'CHECK_POINT', label: 'จุดตรวจน้ำหนัก (Check Point)' },
+                    { value: 'SPOT_CHECK', label: 'จุดสุ่มตรวจ (Spot Check)' },
+                    { value: 'REST_AREA', label: 'จุดจอดพักรถบรรทุก (Rest Area)' },
+                    { value: 'OTHER', label: 'อื่นๆ (ระบุด้วยตัวเอง)' },
+                  ]}
+                  onChange={(value) => {
+                    setAddStationType(String(value));
+                    if (value !== 'OTHER') setCustomStationType('');
                     clearFieldError('station_type');
                     clearFieldError('custom_type');
                   }}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: fieldErrors.station_type ? '1.5px solid var(--danger)' : '1px solid var(--border)', background: 'var(--bg-app)', color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600 }}
-                >
-                  <option value="WEIGH_STATION">สถานีตรวจสอบน้ำหนัก</option>
-                  <option value="CHECK_POINT">จุดตรวจน้ำหนัก (Check Point)</option>
-                  <option value="SPOT_CHECK">จุดสุ่มตรวจ (Spot Check)</option>
-                  <option value="REST_AREA">จุดจอดพักรถบรรทุก (Rest Area)</option>
-                  <option value="OTHER">อื่นๆ (ระบุด้วยตัวเอง)</option>
-                </select>
+                  style={{ width: '100%', ...(fieldErrors.station_type ? { border: '1.5px solid var(--danger)' } : {}) }}
+                />
                 {fieldErrors.station_type && (
                   <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.station_type}</p>
                 )}
@@ -832,18 +833,18 @@ const StationSelector: React.FC<StationSelectorProps> = ({
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                   จังหวัด <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
-                <select
+                <Select
                   value={addProvince}
-                  onChange={(e) => handleAddProvinceChange(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: fieldErrors.province ? '1.5px solid var(--danger)' : '1px solid var(--border)', background: 'var(--bg-app)', color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600 }}
-                >
-                  <option value="">-- เลือกจังหวัด --</option>
-                  {Object.entries(provincesByRegion).map(([regionName, provinces]) => (
-                    <optgroup key={regionName} label={regionName}>
-                      {provinces.map(p => <option key={p} value={p}>{p}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: '-- เลือกจังหวัด --' },
+                    ...Object.entries(provincesByRegion).flatMap(([regionName, provinces]) => [
+                      { value: `region-${regionName}`, label: `— ${regionName} —`, disabled: true },
+                      ...provinces.map((province) => ({ value: province, label: province })),
+                    ]),
+                  ]}
+                  onChange={(value) => handleAddProvinceChange(String(value))}
+                  style={{ width: '100%', ...(fieldErrors.province ? { border: '1.5px solid var(--danger)' } : {}) }}
+                />
                 {fieldErrors.province && (
                   <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.province}</p>
                 )}
@@ -859,19 +860,20 @@ const StationSelector: React.FC<StationSelectorProps> = ({
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                   ภูมิภาค <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
-                <select
+                <Select
                   value={addRegion}
-                  onChange={handleAddRegionChange}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: fieldErrors.region ? '1.5px solid var(--danger)' : '1px solid var(--border)', background: 'var(--bg-app)', color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600 }}
-                >
-                  <option value="">-- เลือกภูมิภาค --</option>
-                  <option value="ภาคเหนือ">ภาคเหนือ</option>
-                  <option value="ภาคตะวันออกเฉียงเหนือ">ภาคตะวันออกเฉียงเหนือ</option>
-                  <option value="ภาคกลาง">ภาคกลาง</option>
-                  <option value="ภาคตะวันออก">ภาคตะวันออก</option>
-                  <option value="ภาคตะวันตก">ภาคตะวันตก</option>
-                  <option value="ภาคใต้">ภาคใต้</option>
-                </select>
+                  options={[
+                    { value: '', label: '-- เลือกภูมิภาค --' },
+                    { value: 'ภาคเหนือ', label: 'ภาคเหนือ' },
+                    { value: 'ภาคตะวันออกเฉียงเหนือ', label: 'ภาคตะวันออกเฉียงเหนือ' },
+                    { value: 'ภาคกลาง', label: 'ภาคกลาง' },
+                    { value: 'ภาคตะวันออก', label: 'ภาคตะวันออก' },
+                    { value: 'ภาคตะวันตก', label: 'ภาคตะวันตก' },
+                    { value: 'ภาคใต้', label: 'ภาคใต้' },
+                  ]}
+                  onChange={(value) => handleAddRegionChange(String(value))}
+                  style={{ width: '100%', ...(fieldErrors.region ? { border: '1.5px solid var(--danger)' } : {}) }}
+                />
                 {fieldErrors.region && (
                   <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.region}</p>
                 )}
@@ -899,16 +901,17 @@ const StationSelector: React.FC<StationSelectorProps> = ({
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                     ทิศทาง <span style={{ color: 'var(--danger)' }}>*</span>
                   </label>
-                  <select
+                  <Select
                     value={addDirection}
-                    onChange={(e) => { setAddDirection(e.target.value as 'INBOUND' | 'OUTBOUND' | 'BOTH' | 'NONE'); clearFieldError('direction'); }}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: fieldErrors.direction ? '1.5px solid var(--danger)' : '1px solid var(--border)', background: 'var(--bg-app)', color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600 }}
-                  >
-                    <option value="INBOUND">ขาเข้า (INBOUND)</option>
-                    <option value="OUTBOUND">ขาออก (OUTBOUND)</option>
-                    <option value="BOTH">สองทิศทาง (BOTH)</option>
-                    <option value="NONE">ไม่มีทิศทาง (NONE)</option>
-                  </select>
+                    options={[
+                      { value: 'INBOUND', label: 'ขาเข้า (INBOUND)' },
+                      { value: 'OUTBOUND', label: 'ขาออก (OUTBOUND)' },
+                      { value: 'BOTH', label: 'สองทิศทาง (BOTH)' },
+                      { value: 'NONE', label: 'ไม่มีทิศทาง (NONE)' },
+                    ]}
+                    onChange={(value) => { setAddDirection(value as 'INBOUND' | 'OUTBOUND' | 'BOTH' | 'NONE'); clearFieldError('direction'); }}
+                    style={{ width: '100%', ...(fieldErrors.direction ? { border: '1.5px solid var(--danger)' } : {}) }}
+                  />
                   {fieldErrors.direction && (
                     <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.direction}</p>
                   )}
@@ -935,6 +938,7 @@ const StationSelector: React.FC<StationSelectorProps> = ({
                 </button>
                 <button
                   type="submit"
+                  className="pastel-primary-action"
                   disabled={isSubmitting}
                   style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1 }}
                 >

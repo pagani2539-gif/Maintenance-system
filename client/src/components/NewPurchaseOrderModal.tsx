@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { inventoryApi, purchaseOrderApi } from '../api';
 import { useNotification } from './Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/Button';
 import { Input, TextArea } from './ui/Input';
 import FormSection from './ui/FormSection';
+import AppDialog from './ui/AppDialog';
 import type { InventoryItem, PurchaseOrder } from '../types';
 import {
   ShoppingBag,
@@ -253,14 +253,21 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
 
   if (!isOpen) return null;
 
-  return createPortal(
-    <div className="modal-overlay" style={{ zIndex: 1100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem 1rem' }}>
-      <div className="modal-content" style={{ maxWidth: '800px', width: '100%', maxHeight: '92vh', overflow: 'auto' }}>
+  return (
+    <AppDialog
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={editingPo ? `แก้ไขใบสั่งซื้อ ${editingPo.po_no}` : 'สร้างใบสั่งซื้อใหม่'}
+      busy={submitting || creatingNewItem}
+      closeOnBackdrop={false}
+      className="modal-content"
+      panelStyle={{ maxWidth: '800px', width: '100%', maxHeight: '92vh', overflow: 'auto' }}
+    >
         <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShoppingBag size={22} color="var(--primary)" /> {editingPo ? `แก้ไขใบสั่งซื้อ ${editingPo.po_no}` : 'สร้างใบสั่งซื้อใหม่ (PO)'}
           </h3>
-          <button type="button" className="close-btn" onClick={handleClose}><X size={20} /></button>
+          <button type="button" className="close-btn" onClick={handleClose} disabled={submitting || creatingNewItem} aria-label="ปิด"><X size={20} /></button>
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); }}>
@@ -414,14 +421,14 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                 disabled={submitting}
                 style={{
                   width: '100%', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  background: 'var(--primary-light)', border: '1.5px dashed rgba(41, 182, 246, 0.4)', borderRadius: '10px',
+                  background: 'var(--primary-light)', border: '1.5px dashed color-mix(in srgb, var(--primary) 40%, transparent)', borderRadius: '10px',
                   color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer'
                 }}
               >
                 <Sparkles size={15} /> เพิ่มพัสดุใหม่ที่ยังไม่มีในคลัง
               </button>
             ) : (
-              <div style={{ padding: '14px', background: 'var(--primary-light)', border: '1.5px solid rgba(41, 182, 246, 0.3)', borderRadius: '10px' }}>
+              <div style={{ padding: '14px', background: 'var(--primary-light)', border: '1.5px solid color-mix(in srgb, var(--primary) 30%, transparent)', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Sparkles size={14} /> เพิ่มพัสดุใหม่
@@ -469,6 +476,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                   </div>
                   <button
                     type="button"
+                    className="pastel-primary-action"
                     onClick={handleCreateNewInventory}
                     disabled={creatingNewItem || !newItemName.trim()}
                     style={{
@@ -510,7 +518,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                                 <span>รุ่น: {it.model || '-'}</span>
                                 {it.is_new ? (
-                                  <span style={{ padding: '1px 6px', background: 'rgba(41, 182, 246, 0.12)', color: 'var(--primary)', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800 }}>
+                                  <span style={{ padding: '1px 6px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800 }}>
                                     ✨ ใหม่
                                   </span>
                                 ) : (
@@ -596,9 +604,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
         <style>{`
           .dropdown-item-hover:hover { background: rgba(59, 130, 246, 0.06) !important; }
         `}</style>
-      </div>
-    </div>,
-    document.body
+    </AppDialog>
   );
 };
 

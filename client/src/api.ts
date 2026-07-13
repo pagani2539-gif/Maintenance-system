@@ -33,13 +33,7 @@ api.interceptors.request.use((config) => {
 
 // On 401, clear token + redirect to /login (skip if already on auth pages)
 api.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.DEV && response.config.url?.includes('/repairs/stats')) {
-      console.log('--- STATS API RAW DATA ---');
-      console.log(JSON.stringify(response.data, null, 2));
-    }
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       tokenStorage.clear();
@@ -254,6 +248,9 @@ export const withdrawalApi = {
     station_id?: number;
     station_area_id?: number;
     contract_id?: number;
+    withdrawal_date?: string;
+    contract_reference_type?: 'contract' | 'none' | 'legacy';
+    contract_reference_note?: string;
     type: string;
     note?: string;
     return_due_date?: string;
@@ -423,6 +420,14 @@ export const stationApi = {
   update: async (stationId: number | string, data: Omit<Station, 'id' | 'status' | 'code'>) => {
     const response = await api.patch<Station>(`/stations/${stationId}`, data);
     return response.data;
+  },
+  verify: async (stationId: number | string) => {
+    const response = await api.post<Station>(`/stations/${stationId}/verify`);
+    return response.data;
+  },
+  moveAsset: async (stationId: number | string, data: { inventory_id: number; instance_id?: number; quantity?: number; to_station_id: number; note?: string }) => {
+    const response = await api.post(`/stations/${stationId}/assets/move`, data);
+    return response.data as { message: string; moved: Array<{ instance_id?: number; quantity: number }> };
   },
   setAssetStatus: async (
     stationId: number | string,
