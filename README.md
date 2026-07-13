@@ -91,3 +91,13 @@ project root to validate the environment before going live.
 
 ---
 *Last updated: 2026-06-24*
+
+## Fresh database and release checks
+
+For a new PostgreSQL installation, create an empty database and configure
+`DATABASE_URL` in `server/.env`. The server applies all migrations at startup;
+legacy data repair is not required for a fresh database.
+
+Before release, run `npm run production:check` from the project root. The CI
+workflow also runs client lint/tests/build, server integration/security tests,
+and the fresh-migration test.

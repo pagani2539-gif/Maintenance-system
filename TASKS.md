@@ -2,6 +2,14 @@
 
 This file tracks the progress of features, bug fixes, and maintenance tasks for the Repair & Equipment Replacement Management System.
 
+## Completed (2026-07-12)
+- [x] **UI/UX Step 1 — Accessible Dialog Foundation**: Added a shared `AppDialog` primitive for modal and drawer overlays. It provides semantic dialog metadata, Escape/backdrop closing when safe, keyboard focus containment, focus restoration to the invoking control, and reference-counted background-scroll locking. Migrated the reusable table detail drawer to this foundation, improving detail panels across every list that uses `BaseDataTable`. Client lint and production build pass.
+- [x] **UI/UX Sprint 1 — Interaction Foundation**: Completed the first usability pass. Migrated core Purchase Order, S/N registration/scanning, technician-stock, print, and table-detail overlays to `AppDialog`; the dialog stack now safely handles nested scanner overlays. Replaced the legacy pointer-only compact dropdown with an accessible native select for filters and inline settings. Added semantic sort buttons, keyboard row activation, labels, and mobile-responsive filter-toolbar behavior to shared data-table components. Client lint and production build pass.
+- [x] **UI/UX Sprint 2 — Task-first Operations**: Added desktop quick actions for repair, claim, withdrawal and global search; made form action bars usable on narrow screens with sticky mobile controls; and added visible removable filter chips so users can understand and clear active filters quickly.
+- [x] **UI/UX Sprint 3 — Shared Workflow Surfaces**: Applied the interaction improvements to all shared list/table surfaces used by repairs, claims, inventory, withdrawals, ledger, purchase orders, stock counts, technician stock, stations and reports. Added keyboard behavior to interactive cards and overflow action menus, including bounded viewport positioning.
+- [x] **UI/UX Sprint 4 — Quality and Regression Hardening**: Migrated global search and confirmation flows to the accessible dialog foundation, added menu/toolbar ARIA semantics, prevented closing busy operations, removed an expensive global mousemove effect, fixed cross-page select-all semantics, and made lifecycle-flow tests deterministic across repeated runs. Independent review completed; client lint/build/tests and server tests pass.
+- [x] **PostgreSQL Integrity Hardening**: Added fresh-database migrations, quantity and Serial validation, atomic return/cancel/replace/transfer flows, backup path verification, regression tests, and CI coverage for client and server checks. Legacy data reconciliation is intentionally excluded because deployments will start from a new database.
+
 ## Status Legend
 - 🟢 **Done**: Completed and verified.
 - 🟡 **In Progress**: Currently being worked on.
