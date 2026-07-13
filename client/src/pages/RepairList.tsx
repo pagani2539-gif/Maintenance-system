@@ -387,7 +387,7 @@ const RepairList: React.FC = () => {
 
   return (
     <div className="repair-board" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
         <BackButton />
         <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2.5rem' }}>
           <div className="page-title">

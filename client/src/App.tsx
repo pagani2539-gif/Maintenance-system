@@ -82,10 +82,24 @@ function App() {
               <Route path="purchase-orders" element={<PurchaseOrderList />} />
               <Route path="technician-stock" element={<TechnicianStockList />} />
               <Route path="technician-stock/movements" element={<TechnicianStockMovements />} />
-              <Route path="technicians" element={<Technicians />} />
+              <Route
+                path="technicians"
+                element={
+                  <ProtectedRoute requireFull>
+                    <Technicians />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="reports" element={<Reports />} />
               <Route path="stations" element={<StationSearch />} />
-              <Route path="settings" element={<Settings />} />
+              <Route
+                path="settings"
+                element={
+                  <ProtectedRoute requireFull>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="users"
                 element={

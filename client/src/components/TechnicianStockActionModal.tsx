@@ -350,7 +350,7 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
               <StationSelector selectedStationId={stationId} showArea required
                 onChange={(data) => { setStationId(data.stationId); setStationAreaId(data.areaId); }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1rem' }}>
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '1rem' }}>
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px', display: 'block' }}>S/N ตัวเก่าที่ถอดออก <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(ถ้ามี)</span></label>
                 <input value={removedSerial} onChange={(e) => setRemovedSerial(e.target.value)} placeholder="S/N ของเสีย..."

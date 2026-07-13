@@ -188,7 +188,7 @@
 - [ ] **I6** Performance: หน้า Dashboard และ StationSearch (ข้อมูล 1,000 สถานี) โหลดใน ~3 วิ บน LAN; หน้า list ใหญ่ เลื่อน/กรองไม่หน่วง
 - [ ] **I7** อัปโหลดรูปใหญ่ (>5MB) → ถูกบีบอัดฝั่ง client ก่อนส่ง; ยิงไฟล์ที่ไม่ใช่รูป/เกิน 5MB ตรงเข้า API → ถูกปฏิเสธ (multer MIME + size limit); ใบซ่อมแนบรูปได้สูงสุด 4 รูป
 - [ ] **I9** Error ฝั่ง server ใน production → response ไม่หลุดรายละเอียดภายใน (stack trace/SQL) ให้ผู้ใช้เห็น
-- [ ] **I8** เปิดเว็บบนมือถือ (ผ่าน LAN) → sidebar drawer, ตาราง responsive, ปุ่ม header ไม่ล้นจอ
+- [ ] **I8** Responsive release gate ตาม `docs/RESPONSIVE_QA.md` ผ่านครบ: automated viewport suite, protected-route sweep, browser zoom 200%, Android/iOS real-device และไม่มี P0/P1
 
 ---
 

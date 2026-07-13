@@ -211,7 +211,7 @@ const WithdrawalDetail: React.FC = () => {
         </div>
       </div>
       <Skeleton variant="rect" height="120px" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '2rem' }}>
+      <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '2rem' }}>
         <Skeleton variant="rect" height="300px" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <Skeleton variant="rect" height="150px" />
@@ -250,7 +250,7 @@ const WithdrawalDetail: React.FC = () => {
       />
 
       {/* Sticky Glass Header */}
-      <div className="glass-card" style={{ 
+      <div className="glass-card responsive-detail-toolbar" style={{
         position: 'sticky', 
         top: 0, 
         zIndex: 20, 
@@ -284,7 +284,7 @@ const WithdrawalDetail: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2.5rem' }}>
         {/* Metadata Strip */}
         <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', padding: '1.5rem 2rem', borderRadius: '20px' }}>
           <div style={{ display: 'flex', gap: '3rem' }}>

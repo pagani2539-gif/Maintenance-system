@@ -81,7 +81,7 @@ const Technicians: React.FC = () => {
 
   return (
     <div style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 2.5rem' }}>
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
@@ -99,7 +99,7 @@ const Technicians: React.FC = () => {
             <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>ยังไม่มีช่างในระบบ</p>
           </Card>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          <div className="responsive-card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
             {technicians.map((t) => (
               <Card key={t.id} style={{ padding: '1.25rem', opacity: t.is_active ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
@@ -141,7 +141,7 @@ const Technicians: React.FC = () => {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <Input label="ชื่อช่าง" required value={edit.full_name} onChange={(e) => setEdit({ ...edit, full_name: e.target.value })} placeholder="ชื่อ-นามสกุล" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <Input label="รหัสพนักงาน" value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value })} placeholder="(ถ้ามี)" />
                 <Input label="เบอร์โทร" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="(ถ้ามี)" />
               </div>

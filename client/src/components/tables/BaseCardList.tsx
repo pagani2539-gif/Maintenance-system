@@ -3,6 +3,7 @@ import type { MobileCardConfig, TableAction } from '../../types/table.types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { ChevronRight, Eye } from 'lucide-react';
+import ActionMenu from './ActionMenu';
 
 interface BaseCardListProps<T> {
   data: T[];
@@ -14,6 +15,7 @@ interface BaseCardListProps<T> {
 function BaseCardList<T>({
   data,
   config,
+  actions = [],
   onRowClick
 }: BaseCardListProps<T>) {
   return (
@@ -50,13 +52,19 @@ function BaseCardList<T>({
             )}
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
+          <div className="mobile-card-actions" style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             gap: '0.5rem', 
             borderTop: '1px solid var(--border)', 
             paddingTop: '0.75rem' 
           }}>
+            {actions.length > 0 ? (
+              <div onClick={(event) => event.stopPropagation()}>
+                <ActionMenu row={row} actions={actions} />
+              </div>
+            ) : <span />}
             <Button
               variant="text"
               size="sm"

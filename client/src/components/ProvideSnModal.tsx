@@ -156,7 +156,7 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
       >
         <h3>{title}</h3>
         
-        <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="responsive-form-grid" style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div style={{ padding: '12px', background: 'var(--bg-app)', borderRadius: '8px', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>จำนวนทั้งหมด</div>
             <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>{totalQuantity}</div>
@@ -263,7 +263,7 @@ export const ProvideSnModal: React.FC<ProvideSnModalProps> = ({
             </div>
 
             {snInputMode === 'individual' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }}>
+              <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }}>
                 {Array.from({ length: missingCount }).map((_, idx) => (
                   <input 
                     key={idx}

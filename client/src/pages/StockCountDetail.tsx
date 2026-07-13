@@ -219,7 +219,7 @@ const StockCountDetail: React.FC = () => {
 
   return (
     <div style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+      <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
 
         {/* Header */}
         <div className="page-header" style={{ marginBottom: '1.5rem' }}>

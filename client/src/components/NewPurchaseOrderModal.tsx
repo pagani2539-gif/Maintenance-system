@@ -273,7 +273,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
         <form onSubmit={(e) => { e.preventDefault(); }}>
           <FormSection title="ข้อมูลผู้สั่งซื้อ" icon={<User size={18} />} columns={1}>
           {/* PO Header — ผู้สั่งซื้อ & โครงการ */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <Input
               label="ผู้สั่งซื้อ"
               type="text"
@@ -305,7 +305,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
               <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>ข้อมูลผู้จัดซื้อ</span>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>(สำหรับติดต่อกลับจากผู้ขาย — ไม่บังคับ)</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '10px' }}>
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '10px' }}>
               <Input
                 label="แผนก / ฝ่าย"
                 type="text"
@@ -441,7 +441,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                     <X size={14} />
                   </button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px auto', gap: '8px', alignItems: 'end' }}>
+                <div className="responsive-po-item-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px auto', gap: '8px', alignItems: 'end' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '3px' }}>ชื่อพัสดุ *</label>
                     <input
@@ -496,7 +496,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
 
             {/* Items table */}
             {items.length > 0 ? (
-              <div style={{ marginTop: '14px', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+              <div className="responsive-table-scroll" style={{ marginTop: '14px', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-app)' }}>

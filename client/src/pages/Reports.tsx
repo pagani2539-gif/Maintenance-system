@@ -478,7 +478,7 @@ const Reports: React.FC = () => {
   );
 
   return (
-    <div className="reports-page" style={{ padding: '2rem 2.5rem', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
+    <div className="reports-page responsive-page-content" style={{ padding: '2rem 2.5rem', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
       <BackButton />
       <div className="page-header" style={{ marginBottom: '2rem' }}>
         <div className="page-title">

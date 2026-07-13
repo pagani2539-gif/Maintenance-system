@@ -108,6 +108,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
         return (
           <button
             key={action.id}
+            className="table-action-button"
             type="button"
             disabled={isDisabled}
             title={action.label}
@@ -150,6 +151,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
         <>
           <button
             ref={triggerRef}
+            className="table-action-button"
             type="button"
             title="ตัวเลือกเพิ่มเติม"
             aria-label="ตัวเลือกเพิ่มเติม"
@@ -232,6 +234,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
                 return (
                   <button
                     key={action.id}
+                    className="table-action-menuitem"
                     type="button"
                     role="menuitem"
                     disabled={isDisabled}

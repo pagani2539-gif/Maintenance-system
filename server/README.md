@@ -33,7 +33,8 @@
       (หรือ `node index.js`)
     - สำหรับ Production (แนะนำใช้ PM2):
       ```bash
-      pm2 start index.js --name "repair-backend"
+      cd ..
+      pm2 start ecosystem.config.cjs
       ```
 
 ## การตั้งค่า (Configuration)
