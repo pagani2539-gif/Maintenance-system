@@ -92,6 +92,7 @@ function App() {
               />
               <Route path="reports" element={<Reports />} />
               <Route path="stations" element={<StationSearch />} />
+              <Route path="operations" element={<div className="page-container"><h2>Operations V2 ปิดใช้งานชั่วคราว</h2><p>ระบบส่วนนี้ถูกพักการใช้งานไว้ก่อน</p></div>} />
               <Route
                 path="settings"
                 element={
