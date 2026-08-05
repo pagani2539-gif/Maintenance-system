@@ -96,9 +96,18 @@ const technicianStockRoutes = require('./routes/technicianStock');
 const reportsRoutes = require('./routes/reports');
 const errorHandler = require('./middlewares/errorHandler');
 const { requireAuth } = require('./middlewares/auth');
+const swaggerUi = require('swagger-ui-express');
+const openapiDocument = require('./docs/openapi');
 
 // Public auth routes — must be mounted BEFORE the global auth guard
 app.use('/api/auth', authRoutes);
+
+// Interactive API documentation. Authentication is still required when
+// trying protected endpoints from Swagger UI.
+app.use('/api-docs', (req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
+  next();
+}, swaggerUi.serve, swaggerUi.setup(openapiDocument, { explorer: true }));
 
 // A minimal readiness endpoint for PM2, reverse proxies, and external monitors.
 // It intentionally exposes no database, version, or environment details.
@@ -130,6 +139,8 @@ app.use('/api/users', requireAuth, usersRoutes);
 app.use('/api/technicians', requireAuth, techniciansRoutes);
 app.use('/api/technician-stock', requireAuth, technicianStockRoutes);
 app.use('/api/reports', requireAuth, reportsRoutes);
+// V2 API is temporarily disabled. The route modules remain in the repository
+// so the migration can be resumed later without losing the implementation.
 
 // Health check endpoint
 app.get('/api', (req, res) => {
