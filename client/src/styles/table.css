@@ -151,7 +151,9 @@
 
 .data-table tr:last-child td { border-bottom: 0; }
 
-.data-table__sort-button {
+.data-table th .data-table__sort-button {
+  -webkit-appearance: none;
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -169,17 +171,21 @@
   cursor: pointer;
 }
 
-.data-table__sort-button:hover {
+.data-table th .data-table__sort-button:hover {
   color: var(--primary);
 }
 
-.data-table__sort-button:focus {
+.data-table th .data-table__sort-button:focus {
+  border: 0;
   outline: none;
+  box-shadow: none;
 }
 
-.data-table__sort-button:focus-visible {
+.data-table th .data-table__sort-button:focus-visible {
+  border: 0;
   border-radius: 0;
   outline: none;
+  box-shadow: none;
   color: var(--primary);
   text-decoration: underline;
   text-decoration-thickness: 2px;
