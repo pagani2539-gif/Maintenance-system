@@ -178,9 +178,12 @@
 }
 
 .data-table__sort-button:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--primary);
-  outline-offset: 3px;
+  border-radius: 0;
+  outline: none;
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 .data-table__header-content {
