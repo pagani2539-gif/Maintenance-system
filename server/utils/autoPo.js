@@ -25,7 +25,7 @@ async function checkAndGenerateAutoPOs() {
   } else {
     // Create new Draft PO — same "PO-YYMMDD-NNN" format as manual POs
     // (the "auto" origin is shown via the note/badge, not a separate prefix)
-    const note = 'สั่งซื้ออัตโนมัติเนื่องจากสินค้าต่ำกว่าเกณฑ์ขั้นต่ำ';
+    const note = 'สั่งซื้ออัตโนมัติเนื่องจากอุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ';
     const poNo = await generateDocNo('PO', { table: 'purchase_orders', column: 'po_no' });
     const { rows } = await query(
       `INSERT INTO purchase_orders (po_no, status, created_by, note) VALUES ($1, 'Draft', 'System', $2) RETURNING id`,

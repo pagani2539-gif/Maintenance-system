@@ -33,9 +33,9 @@ interface Props {
 }
 
 const MODE_META: Record<TechnicianStockMode, { title: string; icon: React.ReactNode; cta: string; accent: string }> = {
-  load: { title: 'โหลดอะไหล่เข้าช่าง', icon: <Truck size={22} />, cta: 'บันทึกการโหลด', accent: 'var(--primary)' },
-  install: { title: 'ติดตั้ง / เปลี่ยนอะไหล่ที่หน้างาน', icon: <PackageOpen size={22} />, cta: 'บันทึกการติดตั้ง', accent: 'var(--primary)' },
-  return: { title: 'คืนอะไหล่เข้าคลัง', icon: <Undo2 size={22} />, cta: 'บันทึกการคืน', accent: 'var(--success)' },
+  load: { title: 'โหลดอุปกรณ์เข้าช่าง', icon: <Truck size={22} />, cta: 'บันทึกการโหลด', accent: 'var(--primary)' },
+  install: { title: 'ติดตั้ง / เปลี่ยนอุปกรณ์ที่หน้างาน', icon: <PackageOpen size={22} />, cta: 'บันทึกการติดตั้ง', accent: 'var(--primary)' },
+  return: { title: 'คืนอุปกรณ์เข้าคลัง', icon: <Undo2 size={22} />, cta: 'บันทึกการคืน', accent: 'var(--success)' },
 };
 
 const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, onSuccess, technicians, presetTechnicianId }) => {
@@ -241,7 +241,7 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
         {/* Item picker */}
         <div className="form-group" style={{ marginBottom: '1rem', position: 'relative' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>
-            {mode === 'load' ? 'เลือกอะไหล่จากคลัง' : 'เลือกอะไหล่ที่ช่างถืออยู่'}
+            {mode === 'load' ? 'เลือกอุปกรณ์จากคลัง' : 'เลือกอุปกรณ์ที่ช่างถืออยู่'}
           </label>
           <div
             onClick={() => { if (mode !== 'load' && !technicianId) { notify('กรุณาเลือกช่างก่อน', 'info'); return; } setPickerOpen((v) => !v); }}
@@ -274,7 +274,7 @@ const TechnicianStockActionModal: React.FC<Props> = ({ mode, isOpen, onClose, on
                   </div>
                 )) : (
                   <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    {mode === 'load' ? 'ไม่พบอุปกรณ์' : 'ช่างคนนี้ไม่มีอะไหล่ในมือ'}
+                    {mode === 'load' ? 'ไม่พบอุปกรณ์' : 'ช่างคนนี้ไม่มีอุปกรณ์ในมือ'}
                   </div>
                 )}
               </div>

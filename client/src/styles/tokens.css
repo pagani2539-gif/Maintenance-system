@@ -1,0 +1,22 @@
+/* Canonical design tokens introduced during the CSS migration. */
+:root {
+  /* Compatibility aliases for legacy selectors with no safe fallback. */
+  --bg-main: var(--bg-app);
+  --font-body: var(--font-ui);
+
+  /* Shared table/action contract. */
+  --table-cell-padding: 12px 16px;
+  --table-action-size: var(--table-action-height, 44px);
+  --table-action-gap: 2px;
+  --table-action-inline-padding: 16px;
+  --table-action-safety-space: 8px;
+  --table-sticky-divider: 1px solid var(--border);
+  --table-sticky-shadow: none;
+  --table-menu-width: 160px;
+
+  /* Shared stacking order for table surfaces. */
+  --z-table-cell: 10;
+  --z-table-header: 20;
+  --z-table-action: 21;
+  --z-table-menu: 9999;
+}

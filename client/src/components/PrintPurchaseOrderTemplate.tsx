@@ -129,13 +129,13 @@ const PrintPurchaseOrderTemplate: React.FC<Props> = ({ po, isPreview, company = 
   const itemColumns: PdfTableColumn<PurchaseOrderItem>[] = [
     {
       key: 'name',
-      header: 'รายการสินค้า',
+      header: 'รายการอุปกรณ์',
       render: (row) => (
         <>
           <div style={{ fontWeight: 700 }}>{row.item_name || '-'}</div>
           {row.item_model && (
             <div style={{ fontSize: pdfTheme.size.small, color: pdfTheme.colors.textMuted, marginTop: '2px' }}>
-              รุ่น: {row.item_model}
+              รุ่น (Model): {row.item_model}
             </div>
           )}
         </>
@@ -221,7 +221,7 @@ const PrintPurchaseOrderTemplate: React.FC<Props> = ({ po, isPreview, company = 
 
             <PdfTable
               docType="purchase"
-              title={pageIdx === 0 ? "รายการสินค้าที่สั่งซื้อ" : "รายการสินค้าที่สั่งซื้อ (ต่อ)"}
+              title={pageIdx === 0 ? "รายการอุปกรณ์ที่สั่งซื้อ" : "รายการอุปกรณ์ที่สั่งซื้อ (ต่อ)"}
               columns={itemColumns}
               rows={pageRows}
               emptyMessage="ไม่มีรายการสั่งซื้อ"
@@ -239,7 +239,7 @@ const PrintPurchaseOrderTemplate: React.FC<Props> = ({ po, isPreview, company = 
                       name: po.approved_by || undefined, 
                       date: po.approved_at ? formatDateThai(parseDate(po.approved_at)) : undefined 
                     },
-                    { role: 'ผู้รับสินค้า' },
+                    { role: 'ผู้รับอุปกรณ์' },
                   ]}
                 />
               </>

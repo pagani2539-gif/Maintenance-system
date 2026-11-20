@@ -47,10 +47,10 @@ describe('excelImporter Utility', () => {
     expect(oversized.errors[0]).toContain('เกิน 2MB');
   });
 
-  it('should reject more than 1,000 inventory rows', async () => {
-    const rows = Array.from({ length: 1001 }, (_, index) => [`Item ${index + 1}`, 1]);
+  it('should reject more than 500 inventory rows', async () => {
+    const rows = Array.from({ length: 501 }, (_, index) => [`Item ${index + 1}`, 1]);
     const result = await parseInventoryFile(createMockCsvFile(['ชื่ออุปกรณ์', 'จำนวน'], rows));
     expect(result.rows).toHaveLength(0);
-    expect(result.errors[0]).toContain('สูงสุด 1000 แถว');
+    expect(result.errors[0]).toContain('สูงสุด 500 แถว');
   });
 });

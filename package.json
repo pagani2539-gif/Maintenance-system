@@ -1,5 +1,6 @@
 {
   "scripts": {
-    "production:check": "node scripts/production_check.js"
+    "production:check": "node scripts/production_check.js",
+    "terminology:check": "node scripts/check_terminology.mjs"
   }
 }

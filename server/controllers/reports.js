@@ -43,6 +43,9 @@ const dash = (value) => {
   return str === '' ? '-' : str;
 };
 
+// Translate persisted workflow status values at the report presentation boundary.
+const repairStatusLabel = (status) => status === 'รออะไหล่' ? 'รออุปกรณ์' : status;
+
 // Build a station/location display string that mirrors the frontend format.
 const stationLabel = (row) => {
   const parts = [];
@@ -83,7 +86,8 @@ const TRANSACTION_TYPE_TH = {
   ADD_STOCK: 'รับเข้าคลัง',
   WITHDRAW: 'เบิกออก',
   BORROW: 'ยืมใช้งาน',
-  RETURN: 'รับคืน'
+  RETURN: 'รับคืน',
+  ADJUSTMENT: 'ปรับยอดคงเหลือ'
 };
 
 // --- Report builders --------------------------------------------------------
@@ -107,7 +111,7 @@ const buildRepairsReport = async ({ startDate, endDate }, type) => {
     dash(r.problem),
     stationLabel(r),
     dash(r.priority),
-    dash(r.status),
+    repairStatusLabel(dash(r.status)),
     dash(r.technician),
     formatThaiDate(r.created_at)
   ]);
@@ -139,7 +143,7 @@ const buildTransactionsReport = async ({ startDate, endDate }) => {
     ORDER BY created_at DESC, id DESC
   `, params);
 
-  const headers = ['วันที่', 'ประเภทรายการ', 'พัสดุ/อุปกรณ์', 'รุ่น (Model)', 'จำนวน', 'สถานที่/โครงการ', 'ผู้ทำรายการ'];
+  const headers = ['วันที่', 'ประเภทรายการ', 'อุปกรณ์', 'รุ่น (Model)', 'จำนวน', 'สถานที่/โครงการ', 'ผู้ทำรายการ'];
   const rows = rowsData.map(t => {
     const qty = Number(t.quantity_added) - Number(t.quantity_withdrawn) - Number(t.quantity_borrowed) + Number(t.quantity_returned);
     const qtyStr = qty > 0 ? `+${qty}` : `${qty}`;
@@ -158,7 +162,7 @@ const buildTransactionsReport = async ({ startDate, endDate }) => {
   });
 
   return {
-    title: 'รายงานประวัติการเคลื่อนไหวพัสดุคลัง (Stock Movement Ledger)',
+    title: 'รายงานประวัติการเคลื่อนไหวอุปกรณ์ในคลัง (Stock Movement Ledger)',
     headers,
     rows,
     colWidths: ['12%', '14%', '20%', '15%', '11%', '18%', '10%'],
@@ -196,7 +200,7 @@ const buildTechnicianStockReport = async ({ startDate, endDate }) => {
     ORDER BY m.created_at DESC, m.id DESC
   `, params);
 
-  const headers = ['วันที่', 'เลขที่เอกสาร', 'ประเภทรายการ', 'ช่าง', 'พัสดุ/อุปกรณ์', 'S/N', 'จำนวน', 'สถานที่ติดตั้ง', 'ผู้ทำรายการ'];
+  const headers = ['วันที่', 'เลขที่เอกสาร', 'ประเภทรายการ', 'ช่าง', 'อุปกรณ์', 'S/N', 'จำนวน', 'สถานที่ติดตั้ง', 'ผู้ทำรายการ'];
   const rows = rowsData.map(m => {
     const qty = Number(m.quantity);
     return [
@@ -213,7 +217,7 @@ const buildTechnicianStockReport = async ({ startDate, endDate }) => {
   });
 
   return {
-    title: 'รายงานการเคลื่อนไหวอะไหล่ในมือช่าง (Technician Kit Ledger)',
+    title: 'รายงานการเคลื่อนไหวอุปกรณ์ประจำตัวช่าง (Technician Kit Ledger)',
     headers,
     rows,
     colWidths: ['9%', '12%', '13%', '12%', '17%', '10%', '8%', '11%', '8%'],
@@ -235,7 +239,7 @@ const buildPendingReturnsReport = async () => {
   `);
 
   const now = Date.now();
-  const headers = ['ผู้ยืม/ผู้เบิก', 'พัสดุ/อุปกรณ์', 'รุ่น (Model)', 'S/N', 'ประเภท', 'วันที่นำออก', 'กำหนดคืน', 'ค้างมาแล้ว', 'สถานะ'];
+  const headers = ['ผู้ยืม/ผู้เบิก', 'อุปกรณ์', 'รุ่น (Model)', 'S/N', 'ประเภท', 'วันที่นำออก', 'กำหนดคืน', 'ค้างมาแล้ว', 'สถานะ'];
   let overdueCount = 0;
   const rows = rowsData.map(t => {
     const outMs = t.created_at ? new Date(t.created_at).getTime() : now;
@@ -258,7 +262,7 @@ const buildPendingReturnsReport = async () => {
   });
 
   return {
-    title: 'รายงานพัสดุยืม/เบิกค้างคืน (Outstanding Returns)',
+    title: 'รายงานอุปกรณ์ยืม/เบิกค้างคืน (Outstanding Returns)',
     headers,
     rows,
     colWidths: ['13%', '17%', '13%', '11%', '11%', '9%', '9%', '8%', '9%'],
@@ -285,7 +289,7 @@ const buildTechnicianWorkloadReport = async ({ startDate, endDate }) => {
     ORDER BY total DESC
   `, params);
 
-  const headers = ['ช่างผู้รับผิดชอบ', 'งานทั้งหมด', 'เสร็จสิ้น', 'กำลังดำเนินการ', 'รออะไหล่', 'อัตรางานสำเร็จ'];
+  const headers = ['ช่างผู้รับผิดชอบ', 'งานทั้งหมด', 'เสร็จสิ้น', 'กำลังดำเนินการ', 'รออุปกรณ์', 'อัตรางานสำเร็จ'];
   let grandTotal = 0;
   let grandCompleted = 0;
   const rows = rowsData.map(r => {
@@ -354,7 +358,7 @@ const buildStockCountReport = async ({ startDate, endDate }) => {
 
   const totalVariance = rowsData.reduce((sum, sc) => sum + Number(sc.variance_items), 0);
   return {
-    title: 'รายงานสรุปการตรวจนับสต็อก (Stock Count Summary)',
+    title: 'รายงานสรุปการตรวจนับอุปกรณ์ (Stock Count Summary)',
     headers,
     rows,
     colWidths: ['15%', '12%', '12%', '13%', '13%', '11%', '11%', '13%'],
@@ -403,11 +407,11 @@ const buildAssetLifecycleReport = async () => {
   });
 
   return {
-    title: 'รายงานวงจรชีวิตสินทรัพย์ติดตั้ง (Asset Lifecycle)',
+    title: 'รายงานวงจรชีวิตอุปกรณ์ติดตั้ง (Asset Lifecycle)',
     headers,
     rows,
     colWidths: ['11%', '14%', '11%', '15%', '11%', '14%', '13%', '8%', '8%'],
-    totals: [{ label: 'จำนวนสินทรัพย์ที่ติดตั้งใช้งาน:', value: `${rowsData.length} หน่วย` }],
+    totals: [{ label: 'จำนวนอุปกรณ์ติดตั้งที่ใช้งาน:', value: `${rowsData.length} หน่วย` }],
     count: rowsData.length
   };
 };
@@ -455,12 +459,12 @@ const buildInventorySummaryReport = async () => {
     ORDER BY name ASC, id ASC
   `);
 
-  const headers = ['รหัส', 'ชื่อพัสดุ', 'รุ่น (Model)', 'คงเหลือในคลัง', 'เกณฑ์ขั้นต่ำ', 'สถานะสต็อก', 'อัปเดตล่าสุด'];
+  const headers = ['รหัส', 'ชื่ออุปกรณ์', 'รุ่น (Model)', 'ยอดคงเหลือ', 'เกณฑ์แจ้งเตือนขั้นต่ำ', 'สถานะอุปกรณ์', 'อัปเดตล่าสุด'];
   const rows = rowsData.map(i => {
     const qty = Number(i.quantity);
     const min = Number(i.min_stock);
     // These exact status strings drive the red/orange cell coloring in the print template.
-    const status = qty === 0 ? 'สินค้าหมด' : qty < min ? 'สต็อกต่ำกว่าเกณฑ์' : 'ปกติ';
+    const status = qty === 0 ? 'อุปกรณ์หมด' : qty < min ? 'อุปกรณ์ต่ำกว่าเกณฑ์' : 'ปกติ';
     return [
       i.id,
       dash(i.name),
@@ -473,11 +477,11 @@ const buildInventorySummaryReport = async () => {
   });
 
   return {
-    title: 'รายงานสรุปพัสดุคงคลังทั้งหมด (Inventory Balance)',
+    title: 'รายงานสรุปยอดคงเหลืออุปกรณ์ทั้งหมด (Inventory Balance)',
     headers,
     rows,
     colWidths: ['8%', '25%', '19%', '13%', '13%', '13%', '9%'],
-    totals: [{ label: 'จำนวนรายการพัสดุรวม:', value: `${rowsData.length} รายการ` }],
+    totals: [{ label: 'จำนวนรายการอุปกรณ์รวม:', value: `${rowsData.length} รายการ` }],
     count: rowsData.length
   };
 };
@@ -491,7 +495,7 @@ const buildLowStockReport = async () => {
     ORDER BY (min_stock - quantity) DESC, name ASC
   `);
 
-  const headers = ['รหัส', 'ชื่อพัสดุอะไหล่', 'รุ่น (Model)', 'คงคลังปัจจุบัน', 'เกณฑ์ขั้นต่ำ', 'แนะนำสั่งซื้อเพิ่ม'];
+  const headers = ['รหัส', 'ชื่ออุปกรณ์', 'รุ่น (Model)', 'ยอดคงเหลือปัจจุบัน', 'เกณฑ์แจ้งเตือนขั้นต่ำ', 'แนะนำสั่งซื้อเพิ่ม'];
   const rows = rowsData.map(i => {
     const qty = Number(i.quantity);
     const min = Number(i.min_stock);
@@ -506,11 +510,11 @@ const buildLowStockReport = async () => {
   });
 
   return {
-    title: 'รายงานรายการพัสดุสต็อกต่ำที่จำเป็นต้องสั่งซื้อ (Low Stock Reorder)',
+    title: 'รายงานรายการอุปกรณ์ต่ำกว่าเกณฑ์ที่จำเป็นต้องสั่งซื้อ (Low Stock Reorder)',
     headers,
     rows,
     colWidths: ['10%', '25%', '20%', '15%', '15%', '15%'],
-    totals: [{ label: 'จำนวนรายการพัสดุที่วิกฤต:', value: `${rowsData.length} รายการ` }],
+    totals: [{ label: 'จำนวนรายการอุปกรณ์ที่ต่ำกว่าเกณฑ์:', value: `${rowsData.length} รายการ` }],
     count: rowsData.length
   };
 };
@@ -529,7 +533,7 @@ const buildWithdrawalsReport = async ({ startDate, endDate }) => {
     ORDER BY w.created_at DESC, w.id DESC
   `, params);
 
-  const headers = ['รหัสเบิก', 'ผู้รับ/ผู้เบิก', 'ประเภทเบิก', 'โครงการ/สถานที่', 'รายการพัสดุที่เบิก', 'วันที่เบิก'];
+  const headers = ['รหัสเบิก', 'ผู้รับ/ผู้เบิก', 'ประเภทเบิก', 'โครงการ/สถานที่', 'รายการอุปกรณ์ที่เบิก', 'วันที่เบิก'];
   const rows = rowsData.map(w => {
     const place = w.project_name ? `${w.project_name} (${stationLabel(w)})` : stationLabel(w);
     return [
@@ -543,7 +547,7 @@ const buildWithdrawalsReport = async ({ startDate, endDate }) => {
   });
 
   return {
-    title: 'รายงานสรุปการเบิกจ่ายพัสดุคลัง (Stock Withdrawals)',
+    title: 'รายงานสรุปการเบิกจ่ายอุปกรณ์ในคลัง (Stock Withdrawals)',
     headers,
     rows,
     colWidths: ['8%', '14%', '13%', '28%', '27%', '10%'],
@@ -572,7 +576,7 @@ const buildPurchaseOrdersReport = async ({ startDate, endDate }) => {
     ORDER BY po.created_at DESC, po.id DESC
   `, params);
 
-  const headers = ['เลขที่ใบสั่งซื้อ', 'ออกโดย', 'จำนวนสินค้า', 'สถานะจัดซื้อ', 'ปรับปรุงล่าสุด', 'หมายเหตุ'];
+  const headers = ['เลขที่ใบสั่งซื้อ', 'ออกโดย', 'จำนวนอุปกรณ์', 'สถานะจัดซื้อ', 'ปรับปรุงล่าสุด', 'หมายเหตุ'];
   const rows = rowsData.map(po => [
     dash(po.po_no),
     po.created_by === 'System' ? 'ระบบอัตโนมัติ' : 'เจ้าหน้าที่คลัง',
@@ -583,7 +587,7 @@ const buildPurchaseOrdersReport = async ({ startDate, endDate }) => {
   ]);
 
   return {
-    title: 'รายงานสรุปประวัติจัดสั่งซื้อสินค้าคลัง (Purchase Orders)',
+    title: 'รายงานสรุปประวัติการจัดซื้ออุปกรณ์ในคลัง (Purchase Orders)',
     headers,
     rows,
     colWidths: ['16%', '15%', '12%', '18%', '12%', '27%'],
@@ -608,7 +612,7 @@ const BUILDERS = {
   audit_log: buildAuditLogReport
 };
 
-// GET /api/reports/:type?startDate=&endDate=
+// GET /api/v2/reports/:type?startDate=&endDate=
 exports.generateReport = async (req, res) => {
   const { type } = req.params;
   const { startDate, endDate } = req.query;
@@ -627,7 +631,7 @@ exports.generateReport = async (req, res) => {
   }
 };
 
-// GET /api/reports/summary/counts?startDate=&endDate=
+// GET /api/v2/reports/summary/counts?startDate=&endDate=
 // Returns { [type]: count } for every report — powers the live "found N rows"
 // preview on the cards. Snapshot reports ignore the dates by design.
 exports.getReportCounts = async (req, res) => {

@@ -12,6 +12,8 @@ export interface TableColumn<T> {
   width?: string;
   minWidth?: string;
   maxWidth?: string;
+  cellMode?: 'nowrap' | 'wrap-2' | 'wrap';
+  getCellText?: (row: T) => string;
   sortable?: boolean;
   searchable?: boolean;
   exportable?: boolean;

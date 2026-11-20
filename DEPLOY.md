@@ -30,6 +30,8 @@
    ```ini
    NODE_ENV=production
    PORT=5221
+   # เปิด API ทุก endpoint โดยไม่ต้องใช้ token (มีความเสี่ยงสูงมาก)
+   PUBLIC_API_MODE=1
 
    # ต้องเป็นค่าสุ่มยาว (เช่น openssl rand -base64 48) — ห้ามใช้ค่า default
    JWT_SECRET=<ใส่ค่าสุ่มยาวของคุณเอง>
@@ -45,8 +47,8 @@
    # ระบบจะ copy และตรวจสอบขนาดไฟล์ทุกครั้งที่ backup สำเร็จ
    OFFSITE_BACKUP_DIR=\\backup-server\maintenance-system
 
-   # เว้นว่างได้ถ้าเข้าผ่าน origin เดียวกับ Server (กรณีปกติ)
-   CORS_ORIGIN=
+   # PUBLIC_API_MODE=1 อนุญาตทุก origin; ถ้าปิดโหมดนี้ให้ระบุ origin ที่อนุญาต
+   CORS_ORIGIN=*
 
    # รหัสผ่าน admin เริ่มต้น (seed เฉพาะตอนฐานข้อมูลยังไม่มี user)
    # ถ้าเว้นว่าง ระบบจะสุ่มรหัสให้และพิมพ์ลง log ตอน boot ครั้งแรก
@@ -65,7 +67,23 @@ cd client
 npm install
 npm run build
 ```
-*ระบบจะสร้างโฟลเดอร์ `client/dist` ซึ่ง Server จะเรียกใช้ไฟล์จากที่นี่*
+*ระบบจะสร้าง/อัปเดตไฟล์ใน `client/dist` ซึ่ง Server จะเรียกใช้ไฟล์จากที่นี่*
+
+> **สำคัญเรื่องไฟล์หน้าเว็บค้างหลัง deploy:** ห้ามลบ `client/dist` ก่อน build และ
+> ห้ามใช้การ copy แบบ mirror (`robocopy /MIR`) กับโฟลเดอร์นี้ ระบบตั้งให้ Vite
+> เก็บไฟล์ JavaScript/CSS ที่มี hash ของ release เก่าไว้ เพราะแท็บที่เปิดค้างอาจ
+> ยังเรียกไฟล์เดิมอยู่ หากลบไฟล์ทันทีจะเกิด `Failed to fetch dynamically imported module`
+> และหน้า error ได้ ไฟล์เก่าควร prune แยกเป็นงานบำรุงรักษาหลังพ้นช่วงการใช้งานของ
+> release นั้นแล้วเท่านั้น
+
+หลัง build ให้ตรวจว่าไม่มี asset ที่ถูกอ้างถึงหายไป:
+
+```bash
+npm run production:check
+```
+
+คำสั่งนี้ตรวจ `client/dist` และรายงานชื่อไฟล์ที่ขาด หาก deploy ไปยังเครื่องอื่นให้
+คัดลอกแบบ merge (`robocopy /E`) เพื่อคง hashed assets รุ่นเก่าไว้
 
 > ฐานข้อมูลและตารางทั้งหมดจะถูกสร้าง/อัปเกรดอัตโนมัติ (auto-migration) ตอน Server สตาร์ทครั้งแรก ไม่ต้องรัน `init-db` แยก
 
@@ -122,13 +140,18 @@ npm run production:check
 2. รันคำสั่งติดตั้ง: `pm2-startup install`
 3. บันทึกสถานะปัจจุบัน: `pm2 save`
 
+> หากพบ `EADDRINUSE: port 5221` ให้ตรวจ `pm2 status` ก่อน อย่าเปิด
+> `node server/index.js` ซ้อนกับ process `maintenance-system`; ให้มี server ที่
+> ฟัง port 5221 เพียงหนึ่งตัวเท่านั้น
+
 ---
 
 ## 🌐 8. การเข้าใช้งานจากเครื่องอื่นในเครือข่าย (LAN)
 1. ตรวจสอบ IP ของเครื่อง Server (เช่น `192.168.1.50`)
 2. เปิด Port **5221** ที่ Windows Firewall
 3. ให้เครื่องอื่นเข้าผ่าน: `http://[IP-ของ-Server]:5221`
-   - ถ้าเข้าจาก origin อื่น (เช่น โดเมน/พอร์ตต่าง) ให้ใส่ origin นั้นใน `CORS_ORIGIN`
+   - เมื่อ `PUBLIC_API_MODE=1` เว็บจากทุก origin สามารถเรียก API ได้โดยไม่ต้องใช้ token
+   - ถ้าปิดโหมด public ให้ใส่ origin ที่อนุญาตใน `CORS_ORIGIN` แล้ว restart server
 
 ---
 

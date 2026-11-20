@@ -19,6 +19,42 @@ const resolveOffsiteBackupDir = (configuredDir = DEFAULT_OFFSITE_BACKUP_DIR) => 
 
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath));
 
+const listFiles = (directory) => {
+  if (!fs.existsSync(directory)) return [];
+
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? listFiles(fullPath) : [fullPath];
+  });
+};
+
+const checkFrontendAssets = () => {
+  const distRoot = path.join(root, 'client', 'dist');
+  const sourceFiles = listFiles(distRoot).filter((filePath) => (
+    /\.(?:html|js|css)$/.test(filePath)
+  ));
+  const assetReferences = new Set();
+  const referencePattern = /(?:\.\/|\/)?assets\/[A-Za-z0-9._-]+\.(?:js|css)/g;
+
+  for (const filePath of sourceFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    for (const reference of content.match(referencePattern) || []) {
+      assetReferences.add(reference.replace(/^\.\//, '').replace(/^\//, ''));
+    }
+  }
+
+  const missing = [...assetReferences].filter((relativePath) => (
+    !fs.existsSync(path.join(distRoot, relativePath))
+  ));
+
+  return {
+    ok: missing.length === 0,
+    detail: missing.length === 0
+      ? `Checked ${assetReferences.size} referenced JavaScript/CSS assets`
+      : `Missing: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` (+${missing.length - 5} more)` : ''}`,
+  };
+};
+
 async function main() {
   addCheck('NODE_ENV=production', process.env.NODE_ENV === 'production', `NODE_ENV=${process.env.NODE_ENV || '(empty)'}`);
   addCheck('JWT_SECRET is set', Boolean(process.env.JWT_SECRET), 'Required for production auth tokens');
@@ -29,6 +65,10 @@ async function main() {
   );
   addCheck('server/.env exists', exists('server/.env'), 'Local production environment file');
   addCheck('client/dist exists', exists('client/dist/index.html'), 'Run npm.cmd run build in client');
+  if (exists('client/dist/index.html')) {
+    const assetCheck = checkFrontendAssets();
+    addCheck('frontend assets are complete', assetCheck.ok, assetCheck.detail);
+  }
   addCheck('DATABASE_URL is set', Boolean(process.env.DATABASE_URL), 'PostgreSQL connection string required');
   addCheck(
     'DATABASE_URL is not placeholder',

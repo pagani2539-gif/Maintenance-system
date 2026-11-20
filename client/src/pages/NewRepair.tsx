@@ -267,7 +267,7 @@ const NewRepair: React.FC = () => {
               }}
             />
             <Input
-              label="ชื่ออุปกรณ์ / รุ่น"
+              label="ชื่ออุปกรณ์ / รุ่น (Model)"
               required
               maxLength={100}
               placeholder="เช่น เครื่องพิมพ์ HP LaserJet, จอ Monitor"

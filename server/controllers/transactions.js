@@ -293,14 +293,9 @@ exports.getLatestTransaction = async (req, res) => {
 };
 
 exports.deleteTransaction = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await dbQuery('DELETE FROM inventory_transactions WHERE id = $1', [id]);
-    if (result.rowCount === 0) return res.status(404).json({ message: 'ไม่พบรายการที่ต้องการลบ' });
-    res.json({ message: 'ลบรายการเรียบร้อยแล้ว' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  return res.status(409).json({
+    message: 'บัญชีคุมยอดเป็นหลักฐานแบบถาวรและไม่สามารถลบได้ หากยอดไม่ถูกต้องให้ทำรายการปรับยอดพร้อมระบุเหตุผล'
+  });
 };
 
 exports.logTransaction = logTransaction; // Export for use in other controllers

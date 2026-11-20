@@ -39,6 +39,7 @@ import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
 import { exportToCsv } from '../utils/csvExporter';
 import { getApiErrorMessage } from '../utils/apiError';
+import { getRepairStatusLabel } from '../constants/terminology';
 
 const RepairList: React.FC = () => {
   const { notify, confirm } = useNotification();
@@ -140,7 +141,7 @@ const RepairList: React.FC = () => {
         repair_note: modalData.note,
         note: modalData.note
       });
-      notify(status === 'เสร็จสิ้น' ? 'บันทึกการซ่อมเสร็จสิ้นเรียบร้อยแล้ว' : `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`);
+      notify(status === 'เสร็จสิ้น' ? 'บันทึกการซ่อมเสร็จสิ้นเรียบร้อยแล้ว' : `เปลี่ยนสถานะเป็น "${getRepairStatusLabel(status)}" เรียบร้อยแล้ว`);
       setShowModal(null);
       setModalData({ technician: '', note: '' });
       fetchData();
@@ -199,14 +200,15 @@ const RepairList: React.FC = () => {
       )
     },
     {
-      id: 'device', header: 'อุปกรณ์ / ปัญหา', accessor: 'device_name', priority: 1, width: '240px',
+      id: 'device', header: 'อุปกรณ์ / ปัญหา', accessor: 'device_name', priority: 1, width: '240px', minWidth: '240px', cellMode: 'wrap-2',
+      getCellText: (row) => [row.device_name, row.problem].filter(Boolean).join(' — '),
       render: (val, row) => {
         const probShort = row.problem ? (row.problem.length > 50 ? row.problem.slice(0, 50) + '…' : row.problem) : '';
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-            <span style={{ fontWeight: 700, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val}>{val}</span>
+            <span style={{ fontWeight: 700, fontSize: '0.88rem', overflowWrap: 'anywhere' }}>{val}</span>
             {probShort && (
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.problem}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500, overflowWrap: 'anywhere' }}>
                 {probShort}
               </span>
             )}
@@ -240,7 +242,7 @@ const RepairList: React.FC = () => {
       }
     },
     {
-      id: 'status', header: 'สถานะ', accessor: 'status', priority: 1, width: '120px', align: 'center',
+      id: 'status', header: 'สถานะ', accessor: 'status', priority: 1, width: '150px', minWidth: '150px', align: 'center', cellMode: 'wrap-2',
       render: (val) => <span className={`badge badge-${val}`} style={{ minWidth: '90px', justifyContent: 'center' }}>{val}</span>
     },
     {
@@ -296,7 +298,7 @@ const RepairList: React.FC = () => {
     },
     {
       id: 'hold',
-      label: 'รออะไหล่',
+      label: 'รออุปกรณ์',
       icon: <CirclePause size={14} />,
       onClick: (row) => setShowModal({ id: row.id, type: 'hold' }),
       hidden: (row) => row.status !== 'กำลังซ่อม',
@@ -317,7 +319,7 @@ const RepairList: React.FC = () => {
   const renderDetailDrawer = useCallback((row: Repair) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className={`badge badge-${row.status}`}>{row.status}</span>
+        <span className={`badge badge-${row.status}`}>{getRepairStatusLabel(row.status)}</span>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{formatDateTimeThai(row.received_at)}</span>
       </div>
 
@@ -406,7 +408,7 @@ const RepairList: React.FC = () => {
           { label: 'งานทั้งหมด', val: stats.repair.total, icon: Sliders, status: 'All' },
           { label: 'รอดำเนินการ', val: stats.repair.pending, icon: ShieldAlert, status: 'รอดำเนินการ' },
           { label: 'กำลังซ่อม', val: stats.repair.in_progress, icon: Sliders, status: 'กำลังซ่อม' },
-          { label: 'รออะไหล่', val: stats.repair.on_hold, icon: Hourglass, status: 'รออะไหล่' },
+          { label: 'รออุปกรณ์', val: stats.repair.on_hold, icon: Hourglass, status: 'รออะไหล่' },
           { label: 'เสร็จสิ้น', val: stats.repair.completed, icon: CheckCircle2, status: 'เสร็จสิ้น' }
         ].map((s, i) => {
           let breatheClass = '';
@@ -430,7 +432,7 @@ const RepairList: React.FC = () => {
           searchValue={urlState.search}
           onSearchChange={(val) => setTableState({ search: val, page: 1 })}
           filters={[
-            { id: 'status', label: 'สถานะ', type: 'select', options: [{ label: 'รอดำเนินการ', value: 'รอดำเนินการ' }, { label: 'กำลังซ่อม', value: 'กำลังซ่อม' }, { label: 'รออะไหล่', value: 'รออะไหล่' }, { label: 'เสร็จสิ้น', value: 'เสร็จสิ้น' }] },
+            { id: 'status', label: 'สถานะ', type: 'select', options: [{ label: 'รอดำเนินการ', value: 'รอดำเนินการ' }, { label: 'กำลังซ่อม', value: 'กำลังซ่อม' }, { label: 'รออุปกรณ์', value: 'รออะไหล่' }, { label: 'เสร็จสิ้น', value: 'เสร็จสิ้น' }] },
             { id: 'priority', label: 'ความสำคัญ', type: 'select', options: [{ label: 'ปกติ', value: 'ปกติ' }, { label: 'ด่วน', value: 'ด่วน' }, { label: 'ด่วนมาก', value: 'ด่วนมาก' }, { label: 'วิกฤต', value: 'วิกฤต' }] },
             { id: 'location', label: 'สถานที่', type: 'select', options: locations }
           ]}
@@ -457,7 +459,7 @@ const RepairList: React.FC = () => {
           mobileConfig={{
             title: (r) => r.device_name,
             subtitle: (r) => `${r.ticket_no} · ${r.reporter}`,
-            statusBadge: (r) => <span className={`badge badge-${r.status}`}>{r.status}</span>
+            statusBadge: (r) => <span className={`badge badge-${r.status}`}>{getRepairStatusLabel(r.status)}</span>
           }}
         />
 
@@ -487,7 +489,7 @@ const RepairList: React.FC = () => {
               {showModal.type === 'complete' ? (
                 <TextArea label="บันทึกการแก้ไข (Repair Note)" required rows={3} placeholder="สรุปการแก้ไขปัญหา..." value={modalData.note} onChange={e => setModalData({...modalData, note: e.target.value})} />
               ) : showModal.type === 'hold' ? (
-                <TextArea label="เหตุผลที่ระงับงาน" required rows={2} placeholder="เช่น รออะไหล่, ติดปัญหาหน้างาน..." value={modalData.note} onChange={e => setModalData({...modalData, note: e.target.value})} />
+                <TextArea label="เหตุผลที่ระงับงาน" required rows={2} placeholder="เช่น รออุปกรณ์, ติดปัญหาหน้างาน..." value={modalData.note} onChange={e => setModalData({...modalData, note: e.target.value})} />
               ) : null}
               <div className="modal-actions">
                 <Button type="button" variant="outline" onClick={() => setShowModal(null)}>ยกเลิก</Button>

@@ -86,7 +86,7 @@ const Technicians: React.FC = () => {
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Wrench size={24} /> จัดการรายชื่อช่าง</h2>
-            <p>รายชื่อช่างที่ถืออะไหล่สำรองประจำตัว (ผูกกับบัญชีผู้ใช้ได้ถ้ามี)</p>
+            <p>รายชื่อช่างที่ถืออุปกรณ์สำรองประจำตัว (ผูกกับบัญชีผู้ใช้ได้ถ้ามี)</p>
           </div>
           {canManageTechnicianStock && <Button variant="primary" icon={<Plus size={18} />} onClick={openCreate}>เพิ่มช่าง</Button>}
         </div>
@@ -120,7 +120,7 @@ const Technicians: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Boxes size={13} /> ถืออะไหล่ {t.item_count ?? 0} รายการ
+                    <Boxes size={13} /> ถืออุปกรณ์ {t.item_count ?? 0} รายการ
                   </span>
                   {t.is_active
                     ? <span className="badge" style={{ background: 'var(--success-light)', color: 'var(--success)' }}>ใช้งาน</span>

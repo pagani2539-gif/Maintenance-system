@@ -1,3 +1,32 @@
+export interface ApiV2Meta {
+  requestId: string;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  totalPages?: number;
+  hasNextPage?: boolean;
+  message?: string;
+}
+
+export interface ApiV2Envelope<T> {
+  data: T;
+  meta: ApiV2Meta;
+}
+
+export interface ApiV2ErrorDetail {
+  field?: string;
+  reason: string;
+}
+
+export interface ApiV2ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    details: ApiV2ErrorDetail[];
+    requestId: string;
+  };
+}
+
 export interface Repair {
   id: number;
   ticket_no: string;
@@ -182,35 +211,38 @@ export interface DashboardData {
   };
   withdrawalBreakdown: { name: string; count: number }[];
   stockMovements: { month: string; added: number; withdrawn: number; borrowed: number; returned: number }[];
-  people?: {
+  people: {
     topRecipients: { name: string; count: number; items: number; last_withdrawal: string }[];
     pendingReturns: { name: string; product_name: string; serial_number?: string; transaction_type: string; withdrawal_type?: string; days_out: number }[];
     pendingReturnsCount: number;
   };
-  purchaseOrders?: {
+  purchaseOrders: {
     total_po: number;
     pending_po: number;
     received_po: number;
   };
-  supervisors?: {
+  supervisors: {
     name: string;
     station_count: number;
     stations_list: string;
     total_repairs: number;
     active_repairs: number;
   }[];
-  unassignedStationsCount?: number;
-  claimsKpis?: {
+  unassignedStationsCount: number;
+  claimsKpis: {
     total: number;
     pending: number;
     in_progress: number;
     completed: number;
   };
-  inventoryConditions?: {
+  inventoryConditions: {
     condition: string;
     count: number;
   }[];
 }
+
+/** Raw / partial response accepted by the dashboard API adapter. */
+export type DashboardApiPayload = Record<string, unknown>;
 
 export interface GlobalSearchResults {
   inventory: InventoryItem[];
@@ -233,7 +265,7 @@ export interface InventoryTransaction {
   id: number;
   inventory_id: number;
   instance_id?: number;
-  transaction_type: 'ADD_STOCK' | 'WITHDRAW' | 'BORROW' | 'RETURN';
+  transaction_type: 'ADD_STOCK' | 'WITHDRAW' | 'BORROW' | 'RETURN' | 'ADJUSTMENT';
   quantity_added: number;
   quantity_withdrawn: number;
   quantity_borrowed: number;
@@ -262,6 +294,28 @@ export interface InventoryTransaction {
   contract_no?: string;
   contract_name?: string;
   contract_year?: number;
+}
+
+export interface InventoryAdjustment {
+  id: number;
+  inventory_id: number;
+  inventory_name: string;
+  inventory_model?: string;
+  operation: 'ADD' | 'REMOVE';
+  quantity: number;
+  reason: string;
+  note?: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requested_by_id?: number | null;
+  requested_by: string;
+  requested_at: string;
+  reviewed_by_id?: number | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  current_quantity?: number;
+  old_quantity?: number | null;
+  new_quantity?: number | null;
 }
 
 export interface PurchaseOrderItem {
@@ -318,6 +372,8 @@ export interface Station {
   direction: 'INBOUND' | 'OUTBOUND' | 'BOTH' | 'NONE';
   region: string;
   province: string;
+  latitude?: number | null;
+  longitude?: number | null;
   responsible_person?: string; // ชื่อผู้รับผิดชอบสถานี — optional ในเลเยอร์ type เพราะสถานีเก่าอาจไม่มี
   status: number;
   operational_start_date?: string;

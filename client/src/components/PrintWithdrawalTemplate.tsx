@@ -188,7 +188,7 @@ const PrintWithdrawalTemplate: React.FC<Props> = ({ withdrawal, isPreview, compa
             <div style={{ fontWeight: 700 }}>{row.name}</div>
             {row.model && (
               <div style={{ fontSize: pdfTheme.size.small, color: pdfTheme.colors.textMuted, marginTop: '1px' }}>
-                รุ่น: {row.model}
+                รุ่น (Model): {row.model}
               </div>
             )}
           </div>

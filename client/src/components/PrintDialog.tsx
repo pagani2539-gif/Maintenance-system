@@ -296,7 +296,7 @@ export const PrintDialog: React.FC<Props> = ({ open, onClose, templateId, docTit
                                 padding: '4px',
                               }}>
                                 <img
-                                  src={`${UPLOAD_URL}/uploads/${logo.file_path}`}
+                                  src={`${UPLOAD_URL}/uploads/${logo.file_path}?v=${logo.id}`}
                                   alt={logo.label}
                                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                                 />

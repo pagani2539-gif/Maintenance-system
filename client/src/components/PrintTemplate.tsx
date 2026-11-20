@@ -9,6 +9,7 @@ import PdfFooter from './pdf/PdfFooter';
 import PdfInfoGrid from './pdf/PdfInfoGrid';
 import PdfTable, { type PdfTableColumn } from './pdf/PdfTable';
 import PdfSignatureBlock from './pdf/PdfSignatureBlock';
+import { getRepairStatusLabel } from '../constants/terminology';
 
 interface Props {
   repair: RepairDetail;
@@ -157,7 +158,7 @@ const PrintTemplate: React.FC<Props> = ({ repair, isPreview, company = null, log
           docDate={docDate}
           company={company}
           logo={logo}
-          statusBadge={{ label: repair.status, tone: statusToTone(repair.status) }}
+          statusBadge={{ label: getRepairStatusLabel(repair.status), tone: statusToTone(repair.status) }}
         />
 
         {/* 1. Operational Info Grid (3 columns) */}

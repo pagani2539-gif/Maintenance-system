@@ -92,7 +92,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
           setItems(mappedItems);
         }
       } catch {
-        notify('ไม่สามารถโหลดข้อมูลพัสดุได้', 'error');
+        notify('ไม่สามารถโหลดข้อมูลอุปกรณ์ได้', 'error');
       } finally {
         setLoadingInventory(false);
       }
@@ -161,7 +161,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
   const handleCreateNewInventory = async () => {
     const name = newItemName.trim();
     if (!name) {
-      notify('กรุณากรอกชื่อพัสดุใหม่', 'error');
+      notify('กรุณากรอกชื่ออุปกรณ์ใหม่', 'error');
       return;
     }
     if (newItemQty <= 0) {
@@ -194,13 +194,13 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
       // เพิ่มเข้า inventory state ด้วย (เผื่อ user เพิ่มซ้ำในรอบเดียวกัน)
       setInventory(prev => [...prev, created]);
 
-      notify('สร้างพัสดุใหม่และเพิ่มเข้าใบสั่งซื้อเรียบร้อย');
+      notify('สร้างอุปกรณ์ใหม่และเพิ่มเข้าใบสั่งซื้อเรียบร้อย');
       setShowNewItemForm(false);
       setNewItemName('');
       setNewItemModel('');
       setNewItemQty(1);
     } catch (err: any) {
-      notify(err?.response?.data?.message || err?.message || 'ไม่สามารถสร้างพัสดุใหม่ได้', 'error');
+      notify(err?.response?.data?.message || err?.message || 'ไม่สามารถสร้างอุปกรณ์ใหม่ได้', 'error');
     } finally {
       setCreatingNewItem(false);
     }
@@ -208,7 +208,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
 
   const handleSave = async (submitStatus: 'Draft' | 'Pending') => {
     if (items.length === 0) {
-      notify('กรุณาเลือกหรือเพิ่มพัสดุอย่างน้อย 1 รายการ', 'error');
+      notify('กรุณาเลือกหรือเพิ่มอุปกรณ์อย่างน้อย 1 รายการ', 'error');
       return;
     }
 
@@ -227,7 +227,6 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
         project_name: projectName.trim() || undefined,
         note: note.trim() || undefined,
         status: submitStatus,
-        created_by: user?.full_name || 'System',
         items: items.map(it => ({
           inventory_id: it.inventory_id,
           quantity: it.quantity
@@ -339,8 +338,8 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
 
           {/* Items section */}
           <FormSection
-            title="รายการพัสดุที่ต้องการสั่งซื้อ"
-            subtitle={`เลือกจากคลังหรือเพิ่มพัสดุใหม่ · ${items.length} รายการ`}
+            title="รายการอุปกรณ์ที่ต้องการสั่งซื้อ"
+            subtitle={`เลือกจากคลังหรือเพิ่มอุปกรณ์ใหม่ · ${items.length} รายการ`}
             icon={<Package size={18} />}
             columns={1}
           >
@@ -364,7 +363,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                 }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <Search size={14} /> {isPickerOpen ? 'กำลังค้นหา...' : '-- เลือกพัสดุจากคลัง --'}
+                  <Search size={14} /> {isPickerOpen ? 'กำลังค้นหา...' : '-- เลือกอุปกรณ์จากคลัง --'}
                 </span>
                 <ChevronDown size={16} style={{ transform: isPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </div>
@@ -379,7 +378,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                     <Search size={14} color="var(--text-muted)" />
                     <input
                       autoFocus
-                      placeholder="พิมพ์ชื่อพัสดุหรือรุ่น..."
+                      placeholder="พิมพ์ชื่ออุปกรณ์หรือรุ่น..."
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                       style={{ border: 'none', background: 'transparent', width: '100%', outline: 'none', color: 'var(--text-main)', fontSize: '0.85rem' }}
@@ -405,7 +404,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                       ))
                     ) : (
                       <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        {searchTerm ? 'ไม่พบพัสดุที่ค้นหา' : 'ไม่มีพัสดุให้เลือก'}
+                        {searchTerm ? 'ไม่พบอุปกรณ์ที่ค้นหา' : 'ไม่มีอุปกรณ์ให้เลือก'}
                       </div>
                     )}
                   </div>
@@ -425,13 +424,13 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                   color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer'
                 }}
               >
-                <Sparkles size={15} /> เพิ่มพัสดุใหม่ที่ยังไม่มีในคลัง
+                <Sparkles size={15} /> เพิ่มอุปกรณ์ใหม่ที่ยังไม่มีในคลัง
               </button>
             ) : (
               <div style={{ padding: '14px', background: 'var(--primary-light)', border: '1.5px solid color-mix(in srgb, var(--primary) 30%, transparent)', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Sparkles size={14} /> เพิ่มพัสดุใหม่
+                    <Sparkles size={14} /> เพิ่มอุปกรณ์ใหม่
                   </span>
                   <button
                     type="button"
@@ -443,7 +442,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                 </div>
                 <div className="responsive-po-item-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px auto', gap: '8px', alignItems: 'end' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '3px' }}>ชื่อพัสดุ *</label>
+                  <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '3px' }}>ชื่ออุปกรณ์ *</label>
                     <input
                       type="text"
                       maxLength={100}
@@ -489,7 +488,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                   </button>
                 </div>
                 <p style={{ marginTop: '6px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  💡 ระบบจะสร้างพัสดุใหม่ในคลัง (quantity = 0) แล้วเพิ่มเข้า PO นี้อัตโนมัติ จำนวนจริงจะถูกบวกเข้าตอนตรวจรับของ
+                      💡 ระบบจะสร้างอุปกรณ์ใหม่ในคลัง (quantity = 0) แล้วเพิ่มเข้า PO นี้อัตโนมัติ จำนวนจริงจะถูกบวกเข้าตอนตรวจรับอุปกรณ์
                 </p>
               </div>
             )}
@@ -501,7 +500,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                   <thead>
                     <tr style={{ background: 'var(--bg-app)' }}>
                       <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)' }}>ลำดับ</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)' }}>รายการพัสดุ</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)' }}>รายการอุปกรณ์</th>
                       <th style={{ padding: '8px 10px', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', width: '110px' }}>จำนวน</th>
                       <th style={{ padding: '8px 10px', width: '40px' }}></th>
                     </tr>
@@ -516,7 +515,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                             <div>
                               <div style={{ fontWeight: 700 }}>{it.name}</div>
                               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                                <span>รุ่น: {it.model || '-'}</span>
+                                <span>รุ่น (Model): {it.model || '-'}</span>
                                 {it.is_new ? (
                                   <span style={{ padding: '1px 6px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800 }}>
                                     ✨ ใหม่
@@ -534,7 +533,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
                                         fontWeight: 600,
                                         fontSize: '0.7rem'
                                       }}>
-                                        (คงคลัง: {invItem.quantity} / ขั้นต่ำ: {invItem.min_stock})
+                                        (ยอดคงเหลือ: {invItem.quantity} / ขั้นต่ำ: {invItem.min_stock})
                                       </span>
                                     );
                                   })()
@@ -572,7 +571,7 @@ const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({ isOpen, o
             ) : (
               <div style={{ marginTop: '14px', padding: '24px', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: '10px', background: 'var(--bg-app)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 <Package size={28} style={{ opacity: 0.3, marginBottom: '6px' }} />
-                <div>ยังไม่มีรายการ — เลือกจาก dropdown หรือเพิ่มพัสดุใหม่</div>
+                <div>ยังไม่มีรายการ — เลือกจาก dropdown หรือเพิ่มอุปกรณ์ใหม่</div>
               </div>
             )}
           </div>

@@ -6,11 +6,11 @@ import { useApi } from '../hooks/useApi';
 import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import { Card } from '../components/ui/Card';
-import { Input, TextArea } from '../components/ui/Input';
+import { Input, TextArea, Select as FormSelect } from '../components/ui/Input';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { formatDateTimeThai } from '../utils/formatDate';
-import type { InventoryItem, InventoryTransaction } from '../types';
-import type { TableColumn, TableAction } from '../types/table.types';
+import type { InventoryAdjustment, InventoryItem, InventoryTransaction } from '../types';
+import type { SortConfig, TableColumn, TableAction } from '../types/table.types';
 import {
   Boxes,
   Plus,
@@ -32,23 +32,29 @@ import {
   Tag,
   Clock,
   FileSpreadsheet,
-  AlertTriangle
+  AlertTriangle,
+  SlidersHorizontal,
+  ShieldCheck,
+  CheckCircle2,
+  UserCheck
 } from 'lucide-react';
 import { exportToCsv } from '../utils/csvExporter';
 import { parseInventoryFile, type ParsedInventoryRow } from '../utils/excelImporter';
 import { getApiErrorMessage } from '../utils/apiError';
 import { compressImage } from '../utils/imageCompressor';
-import { getStockStatus, STOCK_STATUS_OPTIONS } from '../utils/stockStatus';
+import { getStockStatus, getStockStatusLabel, STOCK_STATUS_OPTIONS } from '../utils/stockStatus';
 import BaseDataTable from '../components/tables/BaseDataTable';
 import TableToolbar from '../components/tables/TableToolbar';
 import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
 import { ProvideSnModal } from '../components/ProvideSnModal';
+import { compareInventoryItems } from '../utils/inventorySort';
 
 const InventoryList: React.FC = () => {
   const { notify, confirm, refreshUnreadCounts } = useNotification();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canManageInventory = hasPermission('manage.inventory');
+  const canAdjustInventory = Boolean(user?.is_full);
   const { urlState, setTableState } = useTableUrlState(20);
 
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -66,6 +72,19 @@ const InventoryList: React.FC = () => {
     open: false, rows: [], errors: [], importing: false
   });
 
+  const [adjustmentModal, setAdjustmentModal] = useState<{ open: boolean; item: InventoryItem | null }>({ open: false, item: null });
+  const [adjustmentForm, setAdjustmentForm] = useState<{ operation: 'ADD' | 'REMOVE'; quantity: number; reason: string; note: string }>({
+    operation: 'ADD', quantity: 1, reason: '', note: ''
+  });
+  const [adjusting, setAdjusting] = useState(false);
+  const [approvalPanelOpen, setApprovalPanelOpen] = useState(false);
+  const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>([]);
+  const [loadingAdjustments, setLoadingAdjustments] = useState(false);
+  const [reviewModal, setReviewModal] = useState<{ open: boolean; adjustment: InventoryAdjustment | null; action: 'approve' | 'reject'; note: string }>({
+    open: false, adjustment: null, action: 'approve', note: ''
+  });
+  const [reviewing, setReviewing] = useState(false);
+
   const handleInventoryImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -81,6 +100,90 @@ const InventoryList: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
+    }
+  };
+
+  const openAdjustmentModal = (item: InventoryItem) => {
+    setAdjustmentModal({ open: true, item });
+    setAdjustmentForm({ operation: 'ADD', quantity: 1, reason: '', note: '' });
+  };
+
+  const closeAdjustmentModal = () => {
+    setAdjustmentModal({ open: false, item: null });
+  };
+
+  const handleCreateAdjustment = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!adjustmentModal.item) return;
+    if (!adjustmentForm.reason) {
+      notify('กรุณาระบุเหตุผลการปรับยอด', 'error');
+      return;
+    }
+    if (!Number.isSafeInteger(adjustmentForm.quantity) || adjustmentForm.quantity <= 0) {
+      notify('จำนวนที่ปรับต้องเป็นจำนวนเต็มมากกว่า 0', 'error');
+      return;
+    }
+    if (adjustmentForm.operation === 'REMOVE' && adjustmentForm.quantity > adjustmentModal.item.quantity) {
+      notify('จำนวนที่ปรับลดมากกว่ายอดคงเหลือปัจจุบัน', 'error');
+      return;
+    }
+
+    setAdjusting(true);
+    try {
+      await inventoryApi.createAdjustment(adjustmentModal.item.id, adjustmentForm);
+      notify('ปรับยอดคงเหลือเรียบร้อยแล้ว และบันทึกเหตุผลลงบัญชีคุมยอดแล้ว');
+      closeAdjustmentModal();
+    } catch (error) {
+      notify(getApiErrorMessage(error, 'ปรับยอดคงเหลือไม่สำเร็จ'), 'error');
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  const fetchAdjustmentRequests = useCallback(async () => {
+    if (!user?.is_full) return;
+    setLoadingAdjustments(true);
+    try {
+      setAdjustments(await inventoryApi.getAdjustments('PENDING'));
+    } catch (error) {
+      notify(getApiErrorMessage(error, 'ไม่สามารถโหลดคำขอปรับยอดได้'), 'error');
+    } finally {
+      setLoadingAdjustments(false);
+    }
+  }, [notify, user?.is_full]);
+
+  const openApprovalPanel = async () => {
+    setApprovalPanelOpen(true);
+    await fetchAdjustmentRequests();
+  };
+
+  const openReviewModal = (adjustment: InventoryAdjustment, action: 'approve' | 'reject') => {
+    setReviewModal({ open: true, adjustment, action, note: '' });
+  };
+
+  const handleReviewAdjustment = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!reviewModal.adjustment) return;
+    if (reviewModal.action === 'reject' && !reviewModal.note.trim()) {
+      notify('กรุณาระบุเหตุผลที่ไม่อนุมัติ', 'error');
+      return;
+    }
+    setReviewing(true);
+    try {
+      if (reviewModal.action === 'approve') {
+        await inventoryApi.approveAdjustment(reviewModal.adjustment.id, reviewModal.note.trim() || undefined);
+        notify('อนุมัติและปรับยอดคงเหลือเรียบร้อยแล้ว');
+      } else {
+        await inventoryApi.rejectAdjustment(reviewModal.adjustment.id, reviewModal.note.trim());
+        notify('ไม่อนุมัติคำขอปรับยอดแล้ว');
+      }
+      setReviewModal({ open: false, adjustment: null, action: 'approve', note: '' });
+      await fetchAdjustmentRequests();
+      await fetchData();
+    } catch (error) {
+      notify(getApiErrorMessage(error, 'ดำเนินการกับคำขอปรับยอดไม่สำเร็จ'), 'error');
+    } finally {
+      setReviewing(false);
     }
   };
   const [snModal, setSnModal] = useState<{
@@ -118,6 +221,11 @@ const InventoryList: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  const activeSort = useMemo<SortConfig>(() => ({
+    key: 'name',
+    direction: urlState.sortBy === 'name' ? urlState.sortDir : 'asc',
+  }), [urlState.sortBy, urlState.sortDir]);
+
   const filteredData = useMemo(() => {
     const list = items || [];
     return list.filter(item => {
@@ -130,8 +238,13 @@ const InventoryList: React.FC = () => {
         if (getStockStatus(item.quantity, item.min_stock) !== urlState.filters.stockStatus) return false;
       }
       return true;
-    }).sort((a, b) => b.id - a.id);
-  }, [items, urlState]);
+    }).sort((a, b) => compareInventoryItems(a, b, activeSort.direction));
+  }, [activeSort.direction, items, urlState]);
+
+  const handleSort = useCallback((config: SortConfig) => {
+    if (config.key !== 'name') return;
+    setTableState({ sortBy: 'name', sortDir: config.direction, page: 1 });
+  }, [setTableState]);
 
   const indexOfLastItem = urlState.page * urlState.pageSize;
   const indexOfFirstItem = indexOfLastItem - urlState.pageSize;
@@ -220,7 +333,7 @@ const InventoryList: React.FC = () => {
 
   const handleExportExcel = () => {
     const headers = [
-      'ชื่ออุปกรณ์', 'รุ่น/Model', 'คำอธิบาย', 'ที่เก็บอุปกรณ์', 'จำนวนคงเหลือ', 'จุดเตือนสต็อกขั้นต่ำ', 'ต้องมี S/N'
+      'ชื่ออุปกรณ์', 'รุ่น (Model)', 'คำอธิบาย', 'สถานที่เก็บอุปกรณ์', 'จำนวนคงเหลือ', 'เกณฑ์แจ้งเตือนขั้นต่ำ', 'ต้องมี S/N'
     ];
     const rows = filteredData.map(item => [
       item.name,
@@ -236,7 +349,7 @@ const InventoryList: React.FC = () => {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['ชื่ออุปกรณ์', 'รุ่น/Model', 'คำอธิบาย', 'ที่เก็บอุปกรณ์', 'จำนวนคงเหลือ', 'จุดเตือนสต็อกขั้นต่ำ', 'ต้องมี S/N'];
+    const headers = ['ชื่ออุปกรณ์', 'รุ่น (Model)', 'คำอธิบาย', 'สถานที่เก็บอุปกรณ์', 'จำนวนคงเหลือ', 'เกณฑ์แจ้งเตือนขั้นต่ำ', 'ต้องมี S/N'];
     const sample = [
       ['Power Supply 24V', 'Omron S8VK-G', 'ใช้กับตู้ควบคุม', 'คลังกลาง / ชั้น A3', 10, 5, 'ใช่'],
       ['สาย LAN CAT6', '', 'สำรองหน้างาน', 'คลังกลาง / ชั้น B1', 50, 20, 'ไม่']
@@ -341,11 +454,11 @@ const InventoryList: React.FC = () => {
     switch (status) {
       case 'หมดสต๊อก':
       case 'วิกฤต':
-        return <StatusBadge tone="danger" dot>{status}</StatusBadge>;
+        return <StatusBadge tone="danger" dot>{getStockStatusLabel(status)}</StatusBadge>;
       case 'ใกล้หมด':
-        return <StatusBadge tone="warning" dot>{status}</StatusBadge>;
+        return <StatusBadge tone="warning" dot>{getStockStatusLabel(status)}</StatusBadge>;
       case 'พร้อมใช้งาน':
-        return <StatusBadge tone="success" dot>{status}</StatusBadge>;
+        return <StatusBadge tone="success" dot>{getStockStatusLabel(status)}</StatusBadge>;
     }
   };
 
@@ -358,7 +471,9 @@ const InventoryList: React.FC = () => {
 
   const columns: TableColumn<InventoryItem>[] = [
     {
-      id: 'image', header: 'รูป', accessor: 'image_path', priority: 1, width: '64px', align: 'center',
+      // The table cell has 16px horizontal padding on each side, so reserve
+      // enough column width for the full 44px thumbnail without clipping it.
+      id: 'image', header: 'รูป', accessor: 'image_path', priority: 1, width: '84px', minWidth: '84px', align: 'center',
       render: (val, row) => (
         <div style={{ width: '44px', height: '44px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
           {val ? <img src={`${UPLOAD_URL}/uploads/${val}`} alt={row.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <ImageIcon size={20} color="var(--border-hover)" />}
@@ -366,10 +481,11 @@ const InventoryList: React.FC = () => {
       )
     },
     {
-      id: 'name', header: 'ชื่ออุปกรณ์', accessor: 'name', priority: 1, width: 'auto',
+      id: 'name', header: 'ชื่ออุปกรณ์', accessor: 'name', priority: 1, width: 'auto', minWidth: '260px', sortable: true, cellMode: 'wrap-2',
+      getCellText: (row) => [row.name, row.model].filter(Boolean).join(' — '),
       render: (val, row) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-          <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+          <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem', overflowWrap: 'anywhere' }}>{val}</span>
           {row.model && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{row.model}</span>}
         </div>
       )
@@ -415,7 +531,8 @@ const InventoryList: React.FC = () => {
       }
     },
     {
-      id: 'status', header: 'สถานะ', accessor: 'quantity', priority: 1, width: '130px', align: 'center',
+      id: 'status', header: 'สถานะ', accessor: 'quantity', priority: 1, width: '170px', minWidth: '170px', align: 'center', cellMode: 'wrap-2',
+      getCellText: (row) => getStockStatusLabel(getStockStatus(row.quantity, row.min_stock)),
       render: (val, row) => getStockStatusBadge(val, row.min_stock)
     },
     {
@@ -438,6 +555,7 @@ const InventoryList: React.FC = () => {
 
   const actions: TableAction<InventoryItem>[] = [
     { id: 'edit', label: 'แก้ไขข้อมูล', icon: <SquarePen size={14} />, onClick: (row) => handleOpenModal(row), inline: true, hidden: () => !canManageInventory },
+    { id: 'adjust', label: 'ปรับยอดคงเหลือ', icon: <SlidersHorizontal size={14} />, onClick: (row) => openAdjustmentModal(row), variant: 'primary', inline: true, hidden: () => !canAdjustInventory },
     { id: 'sn', label: 'จัดการ S/N', icon: <Barcode size={14} />, onClick: (row) => handleOpenSnModal(row), inline: true },
     { id: 'delete', label: 'ลบอุปกรณ์', icon: <Trash2 size={14} />, variant: 'danger', onClick: (row) => handleDelete(row.id), hidden: () => !hasPermission('delete.inventory') }
   ];
@@ -486,8 +604,8 @@ const InventoryList: React.FC = () => {
                 <div key={tx.id} style={{ padding: '0.75rem', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ fontWeight: 700 }}>
-                      {tx.transaction_type === 'ADD_STOCK' ? <ArrowUpCircle size={12} color="var(--success)" /> : tx.transaction_type === 'WITHDRAW' ? <ArrowDownCircle size={12} color="var(--danger)" /> : <RefreshCcw size={12} color="var(--warning)" />}
-                      {' '}{tx.transaction_type === 'ADD_STOCK' ? 'นำเข้า' : tx.transaction_type === 'WITHDRAW' ? 'เบิกจ่าย' : 'ยืม/คืน'}
+                      {tx.transaction_type === 'ADD_STOCK' ? <ArrowUpCircle size={12} color="var(--success)" /> : tx.transaction_type === 'WITHDRAW' ? <ArrowDownCircle size={12} color="var(--danger)" /> : tx.transaction_type === 'ADJUSTMENT' ? <SlidersHorizontal size={12} color="var(--primary)" /> : <RefreshCcw size={12} color="var(--warning)" />}
+                      {' '}{tx.transaction_type === 'ADD_STOCK' ? 'นำเข้า' : tx.transaction_type === 'WITHDRAW' ? 'เบิกจ่าย' : tx.transaction_type === 'ADJUSTMENT' ? 'ปรับยอด' : 'ยืม/คืน'}
                     </span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{formatDateTimeThai(tx.created_at)}</span>
                   </div>
@@ -526,15 +644,16 @@ const InventoryList: React.FC = () => {
   }, [historyData, loadingHistory, historyExpanded, canManageInventory]);
 
   return (
-    <div className="inventory-page" style={{ padding: '0 0 4rem 0', backgroundColor: 'var(--bg-app)', minHeight: '100vh' }}>
-      <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
+    <div className="inventory-page">
+      <div className="responsive-page-content">
         <BackButton />
-        <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2rem' }}>
-          <div className="page-title"><h2>จัดการอุปกรณ์และสต็อก</h2><p>เพิ่ม แก้ไข และติดตามจำนวนอุปกรณ์คงเหลือในระบบ</p></div>
+        <div className="page-header boot-animate stagger-0">
+          <div className="page-title"><h2>จัดการอุปกรณ์และยอดคงเหลือ</h2><p>เพิ่ม แก้ไข และติดตามจำนวนอุปกรณ์คงเหลือในระบบ</p></div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <Button variant="outline" icon={<FileSpreadsheet size={20} />} onClick={handleDownloadTemplate}>เทมเพลต</Button>
             {canManageInventory && <Button variant="outline" icon={<Upload size={20} />} onClick={() => importInputRef.current?.click()}>นำเข้า CSV</Button>}
             <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก CSV</Button>
+            {user?.is_full && <Button variant="outline" icon={<ShieldCheck size={20} />} onClick={openApprovalPanel}>ตรวจคำขอค้างเดิม</Button>}
             {canManageInventory && <Button variant="primary" icon={<Plus size={20} />} onClick={() => handleOpenModal()}>เพิ่มอุปกรณ์ใหม่</Button>}
             <input
               ref={importInputRef}
@@ -549,10 +668,10 @@ const InventoryList: React.FC = () => {
       <div className="stats-grid boot-animate stagger-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         {stats && [
           { label: 'อุปกรณ์ทั้งหมด', val: stats.total_items, icon: Boxes, status: 'All', color: 'var(--primary)' },
-          { label: 'หมดสต๊อก', val: stats.out_of_stock, icon: XCircle, status: 'หมดสต๊อก', color: 'var(--danger)' },
-          { label: 'วิกฤต', val: stats.critical, icon: AlertTriangle, status: 'วิกฤต', color: 'var(--danger)' },
-          { label: 'ใกล้หมด', val: stats.warning, icon: Zap, status: 'ใกล้หมด', color: 'var(--warning)' },
-          { label: 'พร้อมใช้งาน', val: stats.optimal, icon: Check, status: 'พร้อมใช้งาน', color: 'var(--success)' }
+          { label: getStockStatusLabel('หมดสต๊อก'), val: stats.out_of_stock, icon: XCircle, status: 'หมดสต๊อก', color: 'var(--danger)' },
+          { label: getStockStatusLabel('วิกฤต'), val: stats.critical, icon: AlertTriangle, status: 'วิกฤต', color: 'var(--danger)' },
+          { label: getStockStatusLabel('ใกล้หมด'), val: stats.warning, icon: Zap, status: 'ใกล้หมด', color: 'var(--warning)' },
+          { label: getStockStatusLabel('พร้อมใช้งาน'), val: stats.optimal, icon: Check, status: 'พร้อมใช้งาน', color: 'var(--success)' }
         ].map((s, i) => {
           let breatheClass = '';
           if (s.val && s.val > 0) {
@@ -571,11 +690,11 @@ const InventoryList: React.FC = () => {
         <TableToolbar
           searchValue={urlState.search}
           onSearchChange={(val) => setTableState({ search: val, page: 1 })}
-          filters={[{ id: 'stockStatus', label: 'สถานะ', type: 'select', options: STOCK_STATUS_OPTIONS.map(v => ({ label: v, value: v })) }]}
+          filters={[{ id: 'stockStatus', label: 'สถานะ', type: 'select', options: STOCK_STATUS_OPTIONS.map(v => ({ label: getStockStatusLabel(v), value: v })) }]}
           activeFilters={urlState.filters}
           onFilterChange={(f) => setTableState({ filters: f, page: 1 })}
-          onReset={() => setTableState({ search: '', filters: {}, page: 1 })}
-          searchPlaceholder="ค้นหาชื่อ, รุ่น หรือสถานที่เก็บ..."
+          onReset={() => setTableState({ search: '', filters: {}, sortBy: '', sortDir: 'asc', page: 1 })}
+          searchPlaceholder="ค้นหาชื่ออุปกรณ์, รุ่น (Model) หรือสถานที่เก็บ..."
         />
 
         <BaseDataTable
@@ -588,6 +707,8 @@ const InventoryList: React.FC = () => {
             noResults: { message: 'ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
           }}
           actions={actions}
+          sort={activeSort}
+          onSort={handleSort}
           onRetry={fetchData}
           drawerTitle={(item) => item.name}
           renderDetailDrawer={renderDetailDrawer}
@@ -627,7 +748,7 @@ const InventoryList: React.FC = () => {
                     placeholder="เช่น Power Supply 24V"
                   />
                   <Input
-                    label="รุ่น / แบรนด์"
+                    label="รุ่น (Model)"
                     value={formData.model}
                     onChange={e => setFormData({ ...formData, model: e.target.value })}
                     disabled={saving}
@@ -664,12 +785,12 @@ const InventoryList: React.FC = () => {
               </div>
               <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
                 <Input
-                  label="จำนวนคงเหลือ"
+                  label={editingItem ? 'จำนวนคงเหลือ (ปรับผ่านปุ่มปรับยอด)' : 'จำนวนเริ่มต้น'}
                   type="number"
                   min={0}
                   value={formData.quantity}
                   onChange={e => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                  disabled={saving}
+                  disabled={saving || !!editingItem}
                 />
                 <Input
                   label="จุดแจ้งเตือนขั้นต่ำ"
@@ -725,6 +846,153 @@ const InventoryList: React.FC = () => {
         </div>
       )}
 
+      {adjustmentModal.open && adjustmentModal.item && (
+        <div className="modal-overlay" style={{ zIndex: 1050 }}>
+          <div className="modal-content" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <SlidersHorizontal size={20} color="var(--primary)" /> ปรับยอดคงเหลือ
+                </h3>
+                <p style={{ margin: '5px 0 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  {adjustmentModal.item.name} · ยอดปัจจุบัน {adjustmentModal.item.quantity} ชิ้น
+                </p>
+              </div>
+              <button type="button" className="close-btn" onClick={closeAdjustmentModal} disabled={adjusting}><XCircle size={20} /></button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', padding: '12px 14px', marginBottom: '1.25rem', background: 'linear-gradient(135deg, var(--primary-light), var(--bg-app))', border: '1px solid var(--border)', borderRadius: '12px' }}>
+              <div style={{ flex: 1 }}><div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>ยอดก่อนปรับ</div><strong style={{ fontSize: '1.35rem' }}>{adjustmentModal.item.quantity}</strong></div>
+              <div style={{ width: '1px', background: 'var(--border)' }} />
+              <div style={{ flex: 1 }}><div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>ยอดหลังปรับ</div><strong style={{ fontSize: '1.35rem', color: adjustmentForm.operation === 'ADD' ? 'var(--success)' : 'var(--danger)' }}>{adjustmentModal.item.quantity + (adjustmentForm.operation === 'ADD' ? adjustmentForm.quantity : -adjustmentForm.quantity)}</strong></div>
+            </div>
+
+            <form onSubmit={handleCreateAdjustment}>
+              <div className="form-grid">
+                <FormSelect
+                  label="ประเภทการปรับ"
+                  value={adjustmentForm.operation}
+                  options={[{ value: 'ADD', label: 'ปรับเพิ่มเข้าคลัง' }, { value: 'REMOVE', label: 'ปรับลดออกจากคลัง' }]}
+                  onChange={e => setAdjustmentForm(prev => ({ ...prev, operation: e.target.value as 'ADD' | 'REMOVE' }))}
+                  disabled={adjusting}
+                />
+                <Input
+                  label="จำนวนที่ปรับ"
+                  type="number"
+                  min={1}
+                  step={1}
+                  required
+                  value={adjustmentForm.quantity}
+                  onChange={e => setAdjustmentForm(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+                  disabled={adjusting}
+                />
+              </div>
+              <FormSelect
+                label="เหตุผลการปรับยอด"
+                value={adjustmentForm.reason}
+                options={[
+                  { value: '', label: 'เลือกเหตุผล' },
+                  { value: 'ตรวจนับอุปกรณ์', label: 'ตรวจนับอุปกรณ์' },
+                  { value: 'รับของนอก PO', label: 'รับของนอก PO' },
+                  { value: 'ของชำรุด/เสื่อมสภาพ', label: 'ของชำรุด/เสื่อมสภาพ' },
+                  { value: 'สูญหาย', label: 'สูญหาย' },
+                  { value: 'แก้ไขข้อมูลเดิม', label: 'แก้ไขข้อมูลเดิม' },
+                  { value: 'อื่น ๆ', label: 'อื่น ๆ' }
+                ]}
+                onChange={e => setAdjustmentForm(prev => ({ ...prev, reason: String(e.target.value) }))}
+                disabled={adjusting}
+              />
+              <TextArea
+                label="รายละเอียดเพิ่มเติม"
+                value={adjustmentForm.note}
+                onChange={e => setAdjustmentForm(prev => ({ ...prev, note: e.target.value }))}
+                maxLength={1000}
+                rows={3}
+                placeholder="ระบุหลักฐานหรือรายละเอียดประกอบการปรับยอด..."
+                disabled={adjusting}
+              />
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '10px 12px', background: 'var(--warning-light)', color: 'var(--warning)', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700 }}>
+                <ShieldCheck size={16} /> ดำเนินการได้เฉพาะ Admin และระบบจะบันทึกเหตุผลลงบัญชีคุมยอดทันที
+              </div>
+              <div className="modal-actions">
+                <Button type="button" variant="outline" onClick={closeAdjustmentModal} disabled={adjusting}>ยกเลิก</Button>
+                <Button type="submit" variant="primary" loading={adjusting} icon={<SlidersHorizontal size={17} />}>ยืนยันปรับยอด</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {approvalPanelOpen && user?.is_full && (
+        <div className="modal-overlay" style={{ zIndex: 1060 }}>
+          <div className="modal-content" style={{ maxWidth: '900px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}><ShieldCheck size={21} color="var(--primary)" /> คำขอปรับยอดค้างเดิม</h3>
+                <p style={{ margin: '5px 0 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>ใช้สำหรับจัดการคำขอที่สร้างไว้ก่อนเปลี่ยนเป็นการปรับยอดโดย Admin เท่านั้น</p>
+              </div>
+              <button type="button" className="close-btn" onClick={() => setApprovalPanelOpen(false)}><XCircle size={20} /></button>
+            </div>
+            {loadingAdjustments ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>กำลังโหลดคำขอ...</div>
+            ) : adjustments.length === 0 ? (
+              <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}><CheckCircle2 size={34} style={{ opacity: 0.35, marginBottom: '8px' }} /><div>ไม่มีคำขอปรับยอดที่รออนุมัติ</div></div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '58vh', overflowY: 'auto' }}>
+                {adjustments.map(adjustment => {
+                  const isAdd = adjustment.operation === 'ADD';
+                  return (
+                    <Card key={adjustment.id} style={{ padding: '1rem', borderLeft: `4px solid ${isAdd ? 'var(--success)' : 'var(--danger)'}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{adjustment.inventory_name} {adjustment.inventory_model ? `· ${adjustment.inventory_model}` : ''}</div>
+                          <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.78rem' }}>
+                            <span style={{ color: isAdd ? 'var(--success)' : 'var(--danger)', fontWeight: 800 }}>{isAdd ? 'ปรับเพิ่ม' : 'ปรับลด'} {adjustment.quantity} ชิ้น</span>
+                            <span style={{ color: 'var(--text-muted)' }}>เหตุผล: {adjustment.reason}</span>
+                          </div>
+                          {adjustment.note && <div style={{ marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>{adjustment.note}</div>}
+                          <div style={{ marginTop: '8px', color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '5px' }}><UserCheck size={13} /> ขอโดย {adjustment.requested_by} · {formatDateTimeThai(adjustment.requested_at)}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '7px', flexShrink: 0 }}>
+                          <Button size="sm" variant="success" icon={<CheckCircle2 size={14} />} onClick={() => openReviewModal(adjustment, 'approve')}>อนุมัติ</Button>
+                          <Button size="sm" variant="danger" icon={<XCircle size={14} />} onClick={() => openReviewModal(adjustment, 'reject')}>ไม่อนุมัติ</Button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {reviewModal.open && reviewModal.adjustment && (
+        <div className="modal-overlay" style={{ zIndex: 1080 }}>
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <h3>{reviewModal.action === 'approve' ? 'ยืนยันการอนุมัติปรับยอด' : 'ไม่อนุมัติคำขอปรับยอด'}</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.6 }}>
+              {reviewModal.adjustment.inventory_name} · {reviewModal.adjustment.operation === 'ADD' ? 'ปรับเพิ่ม' : 'ปรับลด'} {reviewModal.adjustment.quantity} ชิ้น
+            </p>
+            <form onSubmit={handleReviewAdjustment}>
+              <TextArea
+                label={reviewModal.action === 'approve' ? 'หมายเหตุผู้อนุมัติ (ถ้ามี)' : 'เหตุผลที่ไม่อนุมัติ'}
+                required={reviewModal.action === 'reject'}
+                value={reviewModal.note}
+                onChange={e => setReviewModal(prev => ({ ...prev, note: e.target.value }))}
+                maxLength={1000}
+                rows={3}
+                disabled={reviewing}
+              />
+              <div className="modal-actions">
+                <Button type="button" variant="outline" onClick={() => setReviewModal({ open: false, adjustment: null, action: 'approve', note: '' })} disabled={reviewing}>ยกเลิก</Button>
+                <Button type="submit" variant={reviewModal.action === 'approve' ? 'success' : 'danger'} loading={reviewing}>{reviewModal.action === 'approve' ? 'ยืนยันอนุมัติ' : 'ยืนยันไม่อนุมัติ'}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {importModal.open && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '860px' }}>
@@ -750,7 +1018,7 @@ const InventoryList: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-app)', zIndex: 1 }}>
                   <tr>
-                    {['ชื่ออุปกรณ์', 'รุ่น/แบรนด์', 'ที่เก็บ', 'จำนวน', 'ขั้นต่ำ', 'S/N'].map(h => (
+                    {['ชื่ออุปกรณ์', 'รุ่น (Model)', 'ที่เก็บ', 'จำนวน', 'ขั้นต่ำ', 'S/N'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontWeight: 800, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>

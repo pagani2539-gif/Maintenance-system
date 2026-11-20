@@ -23,11 +23,11 @@ describe('API Basic Endpoints', () => {
 
     // Login to get token
     const res = await request(app)
-      .post('/api/auth/login')
+      .post('/api/v2/auth/login')
       .send({ username: testUsername, password: testPassword });
 
-    if (res.body && res.body.token) {
-      token = res.body.token;
+    if (res.body?.data?.token) {
+      token = res.body.data.token;
     }
   });
 
@@ -52,22 +52,22 @@ describe('API Basic Endpoints', () => {
   });
 
   it('should get inventory items', async () => {
-    const req = request(app).get('/api/inventory');
+    const req = request(app).get('/api/v2/inventory');
     if (token) {
       req.set('Authorization', `Bearer ${token}`);
     }
     const res = await req;
     expect(res.statusCode).toEqual(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('should get inventory stats', async () => {
-    const req = request(app).get('/api/inventory/stats');
+    const req = request(app).get('/api/v2/inventory/stats');
     if (token) {
       req.set('Authorization', `Bearer ${token}`);
     }
     const res = await req;
     expect(res.statusCode).toEqual(200);
-    expect(res.body).toHaveProperty('total_items');
+    expect(res.body.data).toHaveProperty('totalItems');
   });
 });

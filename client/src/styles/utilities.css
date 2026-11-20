@@ -1,0 +1,63 @@
+/* Small utilities used by shared components. Keep these free of page-specific styling. */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Outlined content surfaces. Operational grids historically mix shared card
+   classes with inline neutral backgrounds; neutral layers become transparent
+   while borders, semantic status tints, inputs, menus, and modals stay intact. */
+/* stylelint-disable declaration-no-important -- overrides legacy inline surfaces */
+.main-content :where(
+  .card,
+  .card-legacy,
+  .glass-card,
+  .inventory-card,
+  .transaction-summary-card,
+  .dashboard-metric-card,
+  .dashboard-panel,
+  .dashboard-action-panel,
+  .dashboard-list-row,
+  .dash-row-link,
+  .dash-action-row,
+  .control-metric-strip,
+  .control-panel,
+  .brief-metric,
+  .brief-card,
+  .quick-action,
+  .table-toolbar,
+  .table-empty-state,
+  .table-skeleton
+) {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.floating-surface,
+.app-select__menu,
+.custom-date-picker__popover,
+.table-action-menu,
+.profile-dropdown-animate,
+.search-modal,
+.modal-content,
+.app-dialog__panel {
+  background: var(--bg-floating) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+/* stylelint-enable declaration-no-important */

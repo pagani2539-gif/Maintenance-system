@@ -176,7 +176,7 @@ const StockCountDetail: React.FC = () => {
     if (!id) return;
     const ok = await confirm({
       title: 'ยกเลิกรอบตรวจนับ',
-      message: 'ผลการนับทั้งหมดในรอบนี้จะไม่ถูกนำไปปรับยอดคงคลัง ยืนยันการยกเลิกหรือไม่?',
+      message: 'ผลการนับทั้งหมดในรอบนี้จะไม่ถูกนำไปปรับยอดคงเหลือ ยืนยันการยกเลิกหรือไม่?',
       variant: 'danger',
       confirmText: 'ยืนยันยกเลิกรอบ',
       cancelText: 'กลับไปนับต่อ',
@@ -422,7 +422,7 @@ const StockCountDetail: React.FC = () => {
 
         {isOpen && !canManage && (
           <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <AlertTriangle size={14} /> การปิดรอบและปรับยอดคงคลังต้องใช้สิทธิ์ผู้ดูแลระบบหรือผู้ได้รับมอบหมาย
+            <AlertTriangle size={14} /> การปิดรอบและปรับยอดคงเหลือต้องใช้สิทธิ์ผู้ดูแลระบบหรือผู้ได้รับมอบหมาย
           </div>
         )}
       </div>
@@ -485,7 +485,7 @@ const StockCountDetail: React.FC = () => {
               )}
 
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                เมื่อยืนยัน ระบบจะปรับยอดคงคลังตามส่วนต่าง บันทึกลงบัญชีคุมยอดพัสดุ (Ledger)
+                เมื่อยืนยัน ระบบจะปรับยอดคงเหลือตามส่วนต่าง บันทึกลงบัญชีคุมยอดอุปกรณ์ (Ledger)
                 พร้อมประวัติการใช้งาน (Audit) และแจ้งเตือนทีมทาง LINE โดยอัตโนมัติ — การกระทำนี้ย้อนกลับไม่ได้
               </div>
             </div>
@@ -516,7 +516,7 @@ const StockCountDetail: React.FC = () => {
               </div>
               {completeResult.adjustments.length > 0 ? (
                 <div style={{ fontSize: '0.85rem' }}>
-                  ปรับยอดทั้งหมด <strong>{completeResult.adjustments.length}</strong> รายการ — ตรวจสอบได้ในบัญชีคุมยอดพัสดุ (Ledger)
+                  ปรับยอดทั้งหมด <strong>{completeResult.adjustments.length}</strong> รายการ — ตรวจสอบได้ในบัญชีคุมยอดอุปกรณ์ (Ledger)
                 </div>
               ) : (
                 <div style={{ fontSize: '0.85rem', color: 'var(--success)', fontWeight: 700 }}>ยอดตรงทั้งหมด ไม่มีการปรับยอด</div>

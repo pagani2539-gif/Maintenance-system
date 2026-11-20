@@ -1,0 +1,21 @@
+/* Inventory-specific layout guard; table behavior remains in table.css. */
+.inventory-page {
+  min-height: 100vh;
+  padding: 0 0 4rem;
+  background: var(--bg-app);
+}
+
+.inventory-page .responsive-page-content {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 2rem 2.5rem;
+}
+
+.inventory-page .page-header {
+  margin-bottom: 2rem;
+}
+
+.inventory-page .data-table-container {
+  max-width: 100%;
+}

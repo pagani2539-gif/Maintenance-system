@@ -133,13 +133,13 @@ const NewWithdrawal: React.FC = () => {
     const returnableTypes = ['สำรองใช้งาน', 'ทดสอบ', 'ยืมใช้งาน'];
 
     if (selectedItems.length === 0) errors.items = 'เลือกอุปกรณ์อย่างน้อย 1 รายการ';
-    if (!projectName.trim()) errors.projectName = 'ระบุชื่อโครงการหรืองานที่ใช้พัสดุ';
+    if (!projectName.trim()) errors.projectName = 'ระบุชื่อโครงการหรืองานที่ใช้อุปกรณ์';
     if (!stationId) errors.stationId = 'เลือกสถานที่หรือด่านปลายทาง';
     if (!withdrawalDate) errors.withdrawalDate = 'ระบุวันที่เบิกจริง';
     if (contractReferenceType === 'contract' && !contractId) errors.contractId = 'เลือกสัญญาที่ใช้อ้างอิง หรือเลือกไม่มีสัญญา';
     if (contractReferenceType === 'none' && !contractReferenceNote.trim()) errors.contractReferenceNote = 'ระบุเหตุผลกรณีไม่ผูกสัญญา';
     if (selectedType === 'อื่นๆ...' && !customType.trim()) errors.customType = 'ระบุประเภทการเบิก';
-    if (selectedItems.some(item => item.quantity <= 0 || item.quantity > item.max_quantity)) errors.quantities = 'ตรวจสอบจำนวนพัสดุให้ไม่เกินคงเหลือ';
+    if (selectedItems.some(item => item.quantity <= 0 || item.quantity > item.max_quantity)) errors.quantities = 'ตรวจสอบจำนวนอุปกรณ์ให้ไม่เกินยอดคงเหลือ';
     if (returnableTypes.includes(type.trim()) && borrowDuration === 'custom' && !customDueDate) errors.dueDate = 'เลือกวันกำหนดส่งคืน';
 
     setFieldErrors(errors);
@@ -308,7 +308,7 @@ const NewWithdrawal: React.FC = () => {
       return true;
     }
 
-    notify(`ไม่สามารถสแกนเพิ่มได้เนื่องจากจำนวนพัสดุในคลังมีเพียง ${si.max_quantity} ชิ้น`, 'error');
+      notify(`ไม่สามารถสแกนเพิ่มได้เนื่องจากจำนวนอุปกรณ์ในคลังมีเพียง ${si.max_quantity} ชิ้น`, 'error');
     return false;
   };
 
@@ -327,7 +327,7 @@ const NewWithdrawal: React.FC = () => {
       if (firstField) {
         window.setTimeout(() => document.getElementById(`withdrawal-${firstField}`)?.focus(), 0);
       }
-      notify('กรุณาตรวจสอบข้อมูลที่ระบบไฮไลต์ไว้', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('กรุณาตรวจสอบข้อมูลที่ระบบไฮไลต์ไว้', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
@@ -336,32 +336,32 @@ const NewWithdrawal: React.FC = () => {
     if (!stationId) return;
 
     if (!trimmedRecipient) {
-      notify('กรุณากรอกชื่อผู้เบิก / หน่วยงาน', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('กรุณากรอกชื่อผู้เบิก / หน่วยงาน', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
     if (trimmedRecipient.length > 100) {
-      notify('ชื่อผู้เบิกยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('ชื่อผู้เบิกยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
     if (trimmedProjectName.length > 100) {
-      notify('ชื่อโครงการยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('ชื่อโครงการยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
     if (trimmedLocation.length > 150) {
-      notify('ชื่อสถานที่ยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('ชื่อสถานที่ยาวเกินไป (ไม่เกิน 150 ตัวอักษร)', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
     if (trimmedType.length > 100) {
-      notify('ประเภทการเบิกยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('ประเภทการเบิกยาวเกินไป (ไม่เกิน 100 ตัวอักษร)', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
     if (trimmedNote.length > 1000) {
-      notify('หมายเหตุยาวเกินไป (ไม่เกิน 1000 ตัวอักษร)', 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify('หมายเหตุยาวเกินไป (ไม่เกิน 1000 ตัวอักษร)', 'error', 'ระบบคลังอุปกรณ์', 'inventory');
       return;
     }
 
@@ -407,10 +407,10 @@ const NewWithdrawal: React.FC = () => {
         items_detail: selectedItems
       });
       setIsSubmitted(true);
-      notify('บันทึกการเบิกอุปกรณ์เรียบร้อยแล้ว', 'success', 'ระบบคลังพัสดุ', 'inventory');
+      notify('บันทึกการเบิกอุปกรณ์เรียบร้อยแล้ว', 'success', 'ระบบคลังอุปกรณ์', 'inventory');
       playNotificationSound();
     } catch (error) {
-      notify(getApiErrorMessage(error, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error', 'ระบบคลังพัสดุ', 'inventory');
+      notify(getApiErrorMessage(error, 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error', 'ระบบคลังอุปกรณ์', 'inventory');
     } finally {
       setLoading(false);
     }
@@ -445,7 +445,7 @@ const NewWithdrawal: React.FC = () => {
           </div>
           <h2 className="success-title" style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '1rem' }}>บันทึกการเบิกสำเร็จ!</h2>
           <p className="success-desc" style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-            ระบบได้ทำการตัดสต็อกอัตโนมัติเรียบร้อยแล้ว <br />
+            ระบบได้ทำการตัดยอดคงเหลืออัตโนมัติเรียบร้อยแล้ว <br />
             คุณสามารถดาวน์โหลดใบเบิกอุปกรณ์เพื่อเป็นหลักฐานได้ที่ปุ่มด้านล่าง
           </p>
 
@@ -496,7 +496,7 @@ const NewWithdrawal: React.FC = () => {
                 ดาวน์โหลดใบเบิกอุปกรณ์ (PDF)
               </Button>
               <Button variant="outline" onClick={() => navigate('/inventory')}>
-                กลับไปยังหน้าคลังพัสดุ
+                กลับไปยังหน้าคลังอุปกรณ์
               </Button>
             </div>
             <Button variant="text" onClick={() => {
@@ -548,7 +548,7 @@ const NewWithdrawal: React.FC = () => {
       <div className="page-header" style={{ marginBottom: '2.5rem' }}>
         <div className="page-title">
           <h2>เบิกอุปกรณ์จากคลัง (หลายรายการ)</h2>
-          <p>เลือกรายการอุปกรณ์ ระบุประเภทการใช้งาน และกรอกรายละเอียดเพื่อเบิกสินค้า</p>
+          <p>เลือกรายการอุปกรณ์ ระบุประเภทการใช้งาน และกรอกรายละเอียดเพื่อเบิกอุปกรณ์</p>
         </div>
       </div>
 

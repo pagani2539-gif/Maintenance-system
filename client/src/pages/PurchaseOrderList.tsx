@@ -61,11 +61,11 @@ const PurchaseOrderList: React.FC = () => {
     setIsGenerating(true);
     try {
       await purchaseOrderApi.autoGenerate();
-      notify('สแกนและสร้างใบสั่งซื้อสำหรับพัสดุสต็อกต่ำเรียบร้อยแล้ว');
+      notify('สแกนและสร้างใบสั่งซื้อสำหรับอุปกรณ์ต่ำกว่าเกณฑ์เรียบร้อยแล้ว');
       fetchPOs();
     } catch (err) {
       const error = err as Error;
-      notify(error.message || 'เกิดข้อผิดพลาดในการสแกนสต็อก', 'error');
+      notify(error.message || 'เกิดข้อผิดพลาดในการตรวจสอบยอดคงเหลือ', 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -116,14 +116,14 @@ const PurchaseOrderList: React.FC = () => {
 
   const handleReceive = useCallback(async (id: number | string) => {
     const isConfirmed = await confirm({
-      title: 'ยืนยันการตรวจรับสินค้า',
-      message: 'ยืนยันการตรวจรับพัสดุเข้าคลังสำหรับใบสั่งซื้อนี้?\nระบบจะอัปเดตสต็อกตามรายการอัตโนมัติ',
+      title: 'ยืนยันการตรวจรับอุปกรณ์',
+      message: 'ยืนยันการตรวจรับอุปกรณ์เข้าคลังสำหรับใบสั่งซื้อนี้?\nระบบจะอัปเดตยอดคงเหลือตามรายการอัตโนมัติ',
       variant: 'primary'
     });
     if (isConfirmed) {
       try {
         await purchaseOrderApi.receive(id);
-        notify('ตรวจรับพัสดุเข้าคลังเรียบร้อยแล้ว');
+        notify('ตรวจรับอุปกรณ์เข้าคลังเรียบร้อยแล้ว');
         fetchPOs();
       } catch (err) {
         const error = err as Error;
@@ -248,7 +248,7 @@ const PurchaseOrderList: React.FC = () => {
       )
     },
     {
-      id: 'status', header: 'สถานะ', accessor: 'status', priority: 1, width: '120px', align: 'center',
+      id: 'status', header: 'สถานะ', accessor: 'status', priority: 1, width: '150px', minWidth: '150px', align: 'center', cellMode: 'wrap-2',
       render: (val) => getStatusBadge(val)
     },
     {
@@ -356,8 +356,8 @@ const PurchaseOrderList: React.FC = () => {
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
-            <h2>การจัดซื้อพัสดุและอุปกรณ์ (PO)</h2>
-            <p>จัดการใบสั่งซื้อ ตรวจรับพัสดุ และสแกนสต็อกต่ำเพื่อสั่งซื้ออัตโนมัติ</p>
+            <h2>การจัดซื้ออุปกรณ์ (PO)</h2>
+            <p>จัดการใบสั่งซื้อ ตรวจรับอุปกรณ์ และตรวจสอบรายการต่ำกว่าเกณฑ์เพื่อสั่งซื้ออัตโนมัติ</p>
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {canManagePurchaseOrders && <Button
@@ -366,7 +366,7 @@ const PurchaseOrderList: React.FC = () => {
               onClick={handleAutoGenerate}
               disabled={isGenerating}
             >
-              {isGenerating ? 'กำลังสแกน...' : 'สแกนสต็อกต่ำ'}
+              {isGenerating ? 'กำลังตรวจสอบ...' : 'ตรวจสอบอุปกรณ์ต่ำกว่าเกณฑ์'}
             </Button>}
             {canManagePurchaseOrders && <Button
               variant="primary"
@@ -395,7 +395,7 @@ const PurchaseOrderList: React.FC = () => {
       <TableToolbar
         searchValue={urlState.search}
         onSearchChange={(val) => setTableState({ search: val, page: 1 })}
-        filters={[{ id: 'status', label: 'สถานะ', type: 'select', options: [{ label: 'แบบร่าง', value: 'Draft' }, { label: 'รออนุมัติ', value: 'Pending' }, { label: 'อนุมัติแล้ว', value: 'Approved' }, { label: 'รับของแล้ว', value: 'Received' }, { label: 'ยกเลิก', value: 'Cancelled' }] }]}
+        filters={[{ id: 'status', label: 'สถานะ', type: 'select', options: [{ label: 'แบบร่าง', value: 'Draft' }, { label: 'รออนุมัติ', value: 'Pending' }, { label: 'อนุมัติแล้ว', value: 'Approved' }, { label: 'สั่งซื้อแล้ว', value: 'Ordered' }, { label: 'รับของแล้ว', value: 'Received' }, { label: 'ยกเลิก', value: 'Cancelled' }] }]}
         activeFilters={urlState.filters}
         onFilterChange={(f) => setTableState({ filters: f, page: 1 })}
         onReset={() => setTableState({ search: '', filters: {}, page: 1 })}
@@ -408,7 +408,7 @@ const PurchaseOrderList: React.FC = () => {
         state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
         totalCount={pos?.length ?? 0}
         emptyState={{
-          noData: { message: 'ยังไม่มีใบสั่งซื้อในระบบ', hint: 'ระบบจะสร้างใบสั่งซื้ออัตโนมัติเมื่อพัสดุต่ำกว่าเกณฑ์ หรือกด "สร้างใบสั่งซื้อ" เพื่อสร้างเอง' },
+          noData: { message: 'ยังไม่มีใบสั่งซื้อในระบบ', hint: 'ระบบจะสร้างใบสั่งซื้ออัตโนมัติเมื่ออุปกรณ์ต่ำกว่าเกณฑ์ หรือกด "สร้างใบสั่งซื้อ" เพื่อสร้างเอง' },
           noResults: { message: 'ไม่พบใบสั่งซื้อที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
         }}
         actions={actions}
@@ -475,7 +475,7 @@ function PurchaseOrderStepper({ status }: { status: string }) {
     { key: 'Pending', label: 'ส่งขออนุมัติ' },
     { key: 'Approved', label: 'อนุมัติสั่งซื้อ' },
     { key: 'Ordered', label: 'ส่งสั่งซื้อให้ผู้ขาย' },
-    { key: 'Received', label: 'รับพัสดุเข้าคลัง' }
+    { key: 'Received', label: 'รับอุปกรณ์เข้าคลัง' }
   ];
 
   const currentIdx = steps.findIndex(s => s.key === status);
@@ -581,11 +581,11 @@ function PurchaseOrderStepper({ status }: { status: string }) {
           lineHeight: '1.4'
         }}>
           💡 <strong>คำแนะนำ:</strong> {
-            status === 'Draft' ? 'อยู่ระหว่างเตรียมข้อมูลพัสดุและผู้ขาย สามารถกดแก้ไขปรับจำนวนสั่งซื้อด้านล่างได้' :
+            status === 'Draft' ? 'อยู่ระหว่างเตรียมข้อมูลอุปกรณ์และผู้ขาย สามารถกดแก้ไขปรับจำนวนสั่งซื้อด้านล่างได้' :
             status === 'Pending' ? 'ส่งเสนอผู้บริหารตรวจสอบ อยู่ระหว่างรอการลงนามอนุมัติสั่งซื้อ' :
             status === 'Approved' ? 'อนุมัติเรียบร้อยแล้ว กรุณาพิมพ์ใบสั่งซื้อส่งให้ผู้ขาย (ร้านค้า) และกดยืนยันการส่งสั่งซื้อด้านล่าง' :
-            status === 'Ordered' ? 'สั่งซื้อสินค้าเรียบร้อยแล้ว อยู่ระหว่างรอคู่ค้าจัดส่งสินค้า เมื่อได้รับสินค้าให้กดตรวจรับเข้าคลัง' :
-            'ตรวจรับสินค้าเรียบร้อย สต็อกพัสดุได้รับการอัปเดตอัตโนมัติแล้ว'
+            status === 'Ordered' ? 'สั่งซื้ออุปกรณ์เรียบร้อยแล้ว อยู่ระหว่างรอคู่ค้าจัดส่งอุปกรณ์ เมื่อได้รับอุปกรณ์ให้กดตรวจรับเข้าคลัง' :
+            'ตรวจรับอุปกรณ์เรียบร้อย ยอดคงเหลือได้รับการอัปเดตอัตโนมัติแล้ว'
           }
         </div>
       )}
@@ -638,7 +638,7 @@ function PurchaseOrderDetailDrawerContent({
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '3rem', flexDirection: 'column', gap: '12px' }}>
         <Loader2 className="animate-spin" size={24} color="var(--primary)" />
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>กำลังโหลดรายการพัสดุ...</span>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>กำลังโหลดรายการอุปกรณ์...</span>
       </div>
     );
   }
@@ -670,11 +670,11 @@ function PurchaseOrderDetailDrawerContent({
       </section>
 
       <section>
-        <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--primary)' }}><Package size={18} /> รายการพัสดุ ({currentPo.item_count || items.length} รายการ)</h4>
+        <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--primary)' }}><Package size={18} /> รายการอุปกรณ์ ({currentPo.item_count || items.length} รายการ)</h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {currentPo.status === 'Received' && (
             <div style={{ padding: '1rem', backgroundColor: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', color: 'var(--success)', fontSize: '0.85rem', fontWeight: 700, textAlign: 'center', border: '1px dashed var(--success)', marginBottom: '0.5rem' }}>
-              ตรวจรับพัสดุเข้าคลังเรียบร้อยแล้ว
+              ตรวจรับอุปกรณ์เข้าคลังเรียบร้อยแล้ว
             </div>
           )}
           
@@ -683,7 +683,7 @@ function PurchaseOrderDetailDrawerContent({
               <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', backgroundColor: 'var(--bg-app)', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>รายการสินค้า</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>รายการอุปกรณ์</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center', width: '80px', fontWeight: 700 }}>จำนวน</th>
                   </tr>
                 </thead>
@@ -707,7 +707,7 @@ function PurchaseOrderDetailDrawerContent({
                                   padding: '1px 6px',
                                   borderRadius: '4px'
                                 }}>
-                                  คงคลัง: {item.current_stock} / เกณฑ์ขั้นต่ำ: {item.min_stock}
+                                  ยอดคงเหลือ: {item.current_stock} / เกณฑ์ขั้นต่ำ: {item.min_stock}
                                 </span>
                               );
                             })()
@@ -724,7 +724,7 @@ function PurchaseOrderDetailDrawerContent({
             </div>
           ) : (
             <div style={{ padding: '1rem', backgroundColor: 'var(--bg-app)', borderRadius: '12px', color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
-              ไม่มีรายการพัสดุในใบสั่งซื้อนี้
+              ไม่มีรายการอุปกรณ์ในใบสั่งซื้อนี้
             </div>
           )}
         </div>
@@ -760,7 +760,7 @@ function PurchaseOrderDetailDrawerContent({
       {canManage && currentPo.status === 'Ordered' && (
         <div style={{ marginTop: 'auto', paddingTop: '1rem', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
           <Button variant="success" size="sm" icon={<PackageCheck size={16} />} onClick={() => handleReceive(currentPo.id)}>
-            ตรวจรับพัสดุเข้าคลัง
+            ตรวจรับอุปกรณ์เข้าคลัง
           </Button>
         </div>
       )}

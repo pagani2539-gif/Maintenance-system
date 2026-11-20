@@ -1,0 +1,13 @@
+/* Dashboard pages own their visual variants without changing shared primitives. */
+.brief-dashboard,
+.dashboard-redesign,
+.control-room {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.brief-dashboard > *,
+.dashboard-redesign > *,
+.control-room > * {
+  min-width: 0;
+}

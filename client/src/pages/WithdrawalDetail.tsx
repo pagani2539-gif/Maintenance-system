@@ -174,13 +174,13 @@ const WithdrawalDetail: React.FC = () => {
     if (!id) return;
     const isConfirmed = await confirm({
       title: 'ยืนยันการลบประวัติการเบิก',
-      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนสต็อกอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ\nการลบประวัตินี้ไม่สามารถย้อนกลับได้',
+      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนยอดคงเหลือของอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ\nการลบประวัตินี้ไม่สามารถย้อนกลับได้',
       variant: 'danger'
     });
     if (!isConfirmed) return;
     try {
       await withdrawalApi.delete(id);
-      notify('ลบประวัติและคืนสต็อกเรียบร้อยแล้ว');
+      notify('ลบประวัติและคืนอุปกรณ์เข้าคลังเรียบร้อยแล้ว');
       navigate('/withdrawal');
     } catch (err) {
       notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
@@ -266,7 +266,7 @@ const WithdrawalDetail: React.FC = () => {
             <BackButton />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                <Package size={14} /> บันทึกการเบิกพัสดุ
+                <Package size={14} /> บันทึกการเบิกอุปกรณ์
               </div>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>WD-{withdrawal.id.toString().padStart(6, '0')}</h2>
             </div>
@@ -403,7 +403,7 @@ const WithdrawalDetail: React.FC = () => {
             {/* Related Transactions Section */}
             <div className="card glass-card" style={{ borderRadius: '24px', padding: '2.5rem' }}>
               <h3 style={{ margin: '0 0 2rem 0', fontSize: '1.5rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Clock size={28} color="var(--primary)" /> รายการธุรกรรมที่เกี่ยวข้อง
+                <Clock size={28} color="var(--primary)" /> รายการเคลื่อนไหวที่เกี่ยวข้อง
               </h3>
               
               <div className="data-table-container" style={{ width: '100%', overflowX: 'auto', borderRadius: '16px', border: '1px solid var(--border-hover)' }}>
@@ -419,11 +419,11 @@ const WithdrawalDetail: React.FC = () => {
                   </thead>
                   <tbody>
                     {loadingTx ? (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>กำลังโหลดข้อมูลธุรกรรม...</td></tr>
-                    ) : transactions.length === 0 ? (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>ไม่พบข้อมูลธุรกรรมที่เกี่ยวข้อง</td></tr>
+                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>กำลังโหลดรายการเคลื่อนไหว...</td></tr>
+                    ) : (transactions ?? []).length === 0 ? (
+                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>ไม่พบรายการเคลื่อนไหวที่เกี่ยวข้อง</td></tr>
                     ) : (
-                      transactions.map((tx: InventoryTransaction, idx: number) => (
+                      (transactions ?? []).map((tx: InventoryTransaction, idx: number) => (
                         <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
                           <td style={{ padding: '1rem' }}>
                             <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{formatDateTimeThai(tx.created_at)}</div>
@@ -473,7 +473,7 @@ const WithdrawalDetail: React.FC = () => {
                   <User size={24} color="var(--primary)" />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ผู้รับพัสดุ</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ผู้รับอุปกรณ์</div>
                   <div style={{ fontWeight: 800, fontSize: '1.25rem' }}>{withdrawal.recipient}</div>
                 </div>
               </div>

@@ -61,12 +61,13 @@ const TechnicianStockMovements: React.FC = () => {
       render: (val) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.85rem' }}><User size={13} color="var(--text-muted)" /> {val}</span>,
     },
     {
-      id: 'product', header: 'อะไหล่', accessor: 'product_name', priority: 1, width: 'auto',
+      id: 'product', header: 'อุปกรณ์', accessor: 'product_name', priority: 1, width: 'auto', minWidth: '240px', cellMode: 'wrap-2',
+      getCellText: (row) => [row.product_name, row.serial_number, row.removed_serial, row.removed_model].filter(Boolean).join(' — '),
       render: (_, row) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <Package size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.product_name}</div>
+            <div style={{ fontWeight: 700, fontSize: '0.85rem', overflowWrap: 'anywhere' }}>{row.product_name}</div>
             {row.serial_number && <div style={{ fontSize: '0.72rem', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Tag size={10} /> {row.serial_number}</div>}
             {row.removed_serial && <div style={{ fontSize: '0.7rem', color: 'var(--danger)' }}>ถอดออก: {row.removed_serial}{row.removed_model ? ` (${row.removed_model})` : ''}</div>}
           </div>
@@ -114,8 +115,8 @@ const TechnicianStockMovements: React.FC = () => {
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileClock size={24} /> ประวัติการใช้อะไหล่สำรอง</h2>
-            <p>บันทึกว่าใครโหลด/เอาอะไหล่ไปเปลี่ยนที่สถานีไหน และคืนคลังเมื่อไหร่</p>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileClock size={24} /> ประวัติการใช้อุปกรณ์สำรอง</h2>
+            <p>บันทึกว่าใครโหลดหรือนำอุปกรณ์ไปเปลี่ยนที่สถานีไหน และคืนคลังเมื่อไหร่</p>
           </div>
         </div>
 
@@ -139,7 +140,7 @@ const TechnicianStockMovements: React.FC = () => {
           activeFilters={urlState.filters}
           onFilterChange={(f) => setTableState({ filters: f, page: 1 })}
           onReset={() => setTableState({ search: '', filters: {}, page: 1 })}
-          searchPlaceholder="ค้นหาอะไหล่, ช่าง, S/N, สถานี..."
+          searchPlaceholder="ค้นหาอุปกรณ์, ช่าง, S/N, สถานี..."
         />
 
         <BaseDataTable
@@ -148,7 +149,7 @@ const TechnicianStockMovements: React.FC = () => {
           state={{ loading, error: error?.message || null, empty: !loading && paginated.length === 0 }}
           totalCount={movements?.length ?? 0}
           emptyState={{
-            noData: { message: 'ยังไม่มีประวัติการใช้อะไหล่สำรอง', hint: 'เริ่มด้วยการโหลดอะไหล่เข้าช่าง' },
+            noData: { message: 'ยังไม่มีประวัติการใช้อุปกรณ์สำรอง', hint: 'เริ่มด้วยการโหลดอุปกรณ์เข้าช่าง' },
             noResults: { message: 'ไม่พบรายการที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรอง' },
           }}
           onRetry={() => fetchMovements({ technician_id: technicianId })}

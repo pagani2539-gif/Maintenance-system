@@ -6,6 +6,7 @@ import { Input } from '../components/ui/Input';
 import { useNotification } from '../components/Layout';
 import { userApi } from '../api';
 import type { AuditLog } from '../types';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 import {
   Activity,
   Search,
@@ -18,7 +19,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-const ITEMS_PER_PAGE = 25;
+const DESKTOP_ITEMS_PER_PAGE = 25;
+const MOBILE_ITEMS_PER_PAGE = 10;
 
 const AuditLogs: React.FC = () => {
   const { notify } = useNotification();
@@ -27,13 +29,15 @@ const AuditLogs: React.FC = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const breakpoint = useBreakpoint();
+  const itemsPerPage = breakpoint === 'mobile' ? MOBILE_ITEMS_PER_PAGE : DESKTOP_ITEMS_PER_PAGE;
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const offset = (page - 1) * ITEMS_PER_PAGE;
+      const offset = (page - 1) * itemsPerPage;
       const res = await userApi.getAuditLogs({
-        limit: ITEMS_PER_PAGE,
+        limit: itemsPerPage,
         offset,
         search: search.trim() || undefined
       });
@@ -44,7 +48,7 @@ const AuditLogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, notify]);
+  }, [page, search, notify, itemsPerPage]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -58,7 +62,7 @@ const AuditLogs: React.FC = () => {
     setPage(1); // Reset to page 1 on new search
   };
 
-  const totalPages = Math.ceil(total / ITEMS_PER_PAGE) || 1;
+  const totalPages = Math.ceil(total / itemsPerPage) || 1;
 
   const parseData = (data?: string | Record<string, unknown> | null): Record<string, unknown> => {
     if (!data) return {};
@@ -132,8 +136,15 @@ const AuditLogs: React.FC = () => {
     }
   };
 
+  const renderDiffDetails = (log: AuditLog) => (
+    <details className="audit-diff">
+      <summary>ดูรายละเอียดการเปลี่ยนแปลง</summary>
+      <div className="audit-diff__content">{renderDiff(log.old_data, log.new_data)}</div>
+    </details>
+  );
+
   return (
-    <div className="responsive-page-content" style={{ padding: '2rem 2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="responsive-page-content audit-logs-page">
       <BackButton />
       <div className="page-header" style={{ marginBottom: '2rem' }}>
         <div className="page-title">
@@ -159,7 +170,7 @@ const AuditLogs: React.FC = () => {
       </Card>
 
       {/* Main Logs Table */}
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <Card className="audit-logs-surface" style={{ padding: 0 }}>
         {loading ? (
           <div style={{ padding: '6rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             <Loader2 size={32} className="spinner" /> กำลังโหลดประวัติการใช้งาน...
@@ -171,8 +182,29 @@ const AuditLogs: React.FC = () => {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+            {breakpoint === 'mobile' ? (
+              <div className="audit-mobile-list">
+                {logs.map((log) => {
+                  const badge = getEntityBadgeColor(log.entity_type);
+                  return (
+                    <article className="audit-mobile-card" key={log.id}>
+                      <div className="audit-mobile-card__topline">
+                        <span className="audit-entity-badge" style={{ background: badge.bg, color: badge.fg }}>{log.entity_type}</span>
+                        <span className="audit-mobile-card__date"><Calendar size={14} />{new Date(log.created_at).toLocaleString('th-TH')}</span>
+                      </div>
+                      <h3>{log.action}</h3>
+                      <div className="audit-mobile-card__meta">
+                        <span><User size={14} />{log.user_name || 'System/Cron'}</span>
+                        <span className="audit-record-id">#{log.entity_id}</span>
+                      </div>
+                      {renderDiffDetails(log)}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+            <div className="audit-table-scroll">
+              <table className="audit-table">
                 <thead>
                   <tr style={{ background: 'var(--bg-app)', borderBottom: '1px solid var(--border)' }}>
                     <th style={th}>วันเวลาที่บันทึก</th>
@@ -180,7 +212,7 @@ const AuditLogs: React.FC = () => {
                     <th style={th}>หัวข้อการกระทำ</th>
                     <th style={th}>โมดูลระบบ</th>
                     <th style={th}>รหัสรายการ</th>
-                    <th style={{ ...th, width: '40%' }}>รายละเอียดการเปลี่ยนแปลง (Diff)</th>
+                    <th style={th}>รายละเอียดการเปลี่ยนแปลง</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,7 +255,7 @@ const AuditLogs: React.FC = () => {
                           </span>
                         </td>
                         <td style={{ ...td, padding: '12px 16px' }}>
-                          {renderDiff(log.old_data, log.new_data)}
+                          {renderDiffDetails(log)}
                         </td>
                       </tr>
                     );
@@ -231,6 +263,7 @@ const AuditLogs: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
@@ -243,7 +276,7 @@ const AuditLogs: React.FC = () => {
                 background: 'var(--bg-card)'
               }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  แสดงผล {(page - 1) * ITEMS_PER_PAGE + 1} - {Math.min(page * ITEMS_PER_PAGE, total)} จากทั้งหมด {total} รายการ
+                  แสดงผล {(page - 1) * itemsPerPage + 1} - {Math.min(page * itemsPerPage, total)} จากทั้งหมด {total} รายการ
                 </span>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -252,6 +285,8 @@ const AuditLogs: React.FC = () => {
                     icon={<ChevronLeft size={16} />}
                     onClick={() => setPage(prev => Math.max(prev - 1, 1))}
                     disabled={page === 1}
+                    aria-label="ไปหน้าก่อนหน้า"
+                    title="หน้าก่อนหน้า"
                     style={{ padding: '8px' }}
                   />
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', padding: '0 8px' }}>
@@ -262,6 +297,8 @@ const AuditLogs: React.FC = () => {
                     icon={<ChevronRight size={16} />}
                     onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={page === totalPages}
+                    aria-label="ไปหน้าถัดไป"
+                    title="หน้าถัดไป"
                     style={{ padding: '8px' }}
                   />
                 </div>

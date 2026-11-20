@@ -17,3 +17,14 @@ export const getStockStatus = (quantity: number, minStock: number): StockStatus 
 };
 
 export const STOCK_STATUS_OPTIONS: StockStatus[] = ['หมดสต๊อก', 'วิกฤต', 'ใกล้หมด', 'พร้อมใช้งาน'];
+
+/** Keep persisted/filter status values stable while showing canonical UI labels. */
+export const getStockStatusLabel = (status: StockStatus | string): string => {
+  switch (status) {
+    case 'หมดสต๊อก': return 'อุปกรณ์หมด';
+    case 'วิกฤต': return 'อุปกรณ์ต่ำกว่าเกณฑ์';
+    case 'ใกล้หมด': return 'อุปกรณ์ใกล้ถึงเกณฑ์';
+    case 'พร้อมใช้งาน': return 'อุปกรณ์พร้อมใช้งาน';
+    default: return status;
+  }
+};

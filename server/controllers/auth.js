@@ -48,6 +48,22 @@ exports.login = async (req, res) => {
 };
 
 exports.me = async (req, res) => {
+  if (req.user?.is_public) {
+    return res.json({
+      user: {
+        id: null,
+        username: 'public-api',
+        full_name: 'Public API',
+        is_full: true,
+        permissions: {},
+        force_password_change: false,
+        is_active: true,
+        last_login: null,
+        is_public: true,
+      },
+    });
+  }
+
   try {
     const { rows } = await query(
       `SELECT id, username, full_name, is_full, permissions, force_password_change, is_active, last_login
@@ -63,6 +79,10 @@ exports.me = async (req, res) => {
 };
 
 exports.changePassword = async (req, res) => {
+  if (req.user?.is_public) {
+    return res.status(400).json({ error: 'ไม่รองรับการเปลี่ยนรหัสผ่านในโหมด Public API' });
+  }
+
   const { current_password, new_password } = req.body || {};
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'กรุณาระบุรหัสผ่านปัจจุบันและรหัสผ่านใหม่' });

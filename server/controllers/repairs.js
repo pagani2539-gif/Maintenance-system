@@ -5,6 +5,8 @@ const { sendLineNotify } = require('../utils/lineNotify');
 const { generateDocNo } = require('../utils/docNumber');
 const { REPAIR_STATUS, INSTANCE_STATUS } = require('../utils/constants');
 
+const repairStatusLabel = (status) => status === 'รออะไหล่' ? 'รออุปกรณ์' : status;
+
 const queryAll = async (sql, params = []) => (await query(sql, params)).rows;
 const queryGet = async (sql, params = []) => (await query(sql, params)).rows[0];
 
@@ -619,7 +621,7 @@ exports.updateStatus = async (req, res) => {
 
     // Send LINE Notify Alert
     const typeLabel = oldRepair.type === 'claim' ? 'งานเคลม' : 'งานซ่อม';
-    const lineMsg = `\n🔧 *อัปเดตสถานะ${typeLabel}*\n🔢 เลขใบงาน: ${oldRepair.ticket_no}\n💻 อุปกรณ์: ${oldRepair.device_name}\n📈 สถานะใหม่: ${status}\n👤 ผู้รับผิดชอบ: ${actor}\n💬 หมายเหตุ: ${repair_note || note || 'ไม่มี'}`;
+    const lineMsg = `\n🔧 *อัปเดตสถานะ${typeLabel}*\n🔢 เลขใบงาน: ${oldRepair.ticket_no}\n💻 อุปกรณ์: ${oldRepair.device_name}\n📈 สถานะใหม่: ${repairStatusLabel(normalizedStatus)}\n👤 ผู้รับผิดชอบ: ${actor}\n💬 หมายเหตุ: ${repair_note || note || 'ไม่มี'}`;
     sendLineNotify('repair', lineMsg);
 
     res.json({ message: 'อัปเดตสถานะเรียบร้อย' });
@@ -830,11 +832,11 @@ exports.replaceDevice = async (req, res) => {
       `, [id, oldSerial, old_model, newSerial, new_model, actor]);
       await client.query(
         'INSERT INTO repair_logs (repair_id, action, "user", note) VALUES ($1, $2, $3, $4)',
-        [id, 'เปลี่ยนอะไหล่/อุปกรณ์', actor, `เปลี่ยน ${old_model} (${oldSerial}) เป็น ${new_model} (${newSerial})`]
+        [id, 'เปลี่ยนอุปกรณ์', actor, `เปลี่ยน ${old_model} (${oldSerial}) เป็น ${new_model} (${newSerial})`]
       );
     });
 
-    res.json({ message: 'บันทึกการเปลี่ยนอะไหล่เรียบร้อย' });
+    res.json({ message: 'บันทึกการเปลี่ยนอุปกรณ์เรียบร้อย' });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

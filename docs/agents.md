@@ -10,6 +10,9 @@ This document provides instructions and context for AI agents (like Gemini CLI) 
    - **Frontend**: Use `PascalCase` for React components and `camelCase` for hooks and utilities.
 3. **Task Tracking**: Whenever a feature is implemented or a bug is fixed, update `TASKS.md` to reflect the progress.
 4. **Safety**: Never log or commit sensitive information. `.env` files and SQLite artifacts (`.db`) should be ignored by git.
+5. **Database Safety (Critical)**: The database and its data are currently being used for testing and real-world operation. **Never delete, drop, truncate, reset, recreate, overwrite, or clear the database, tables, or existing records.** Do not run destructive cleanup scripts such as `server/scripts/clear_all_data.js` unless the user explicitly requests it and confirms the exact target. Use only safe, non-destructive migrations for schema changes. If a requested change could risk data loss, stop and ask for explicit confirmation.
+
+> **Mandatory read:** Read this document before every code change.
 
 ## Workflow Rules
 

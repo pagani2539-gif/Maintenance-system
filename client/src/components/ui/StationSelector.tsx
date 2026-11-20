@@ -5,6 +5,7 @@ import type { Station, StationArea } from '../../types';
 import { MapPin, Map, Sliders, X } from 'lucide-react';
 import { useNotification } from '../Layout';
 import { provincesByRegion, getRegionFromProvince } from '../../utils/thaiProvinces';
+import { validateGpsCoordinates } from '../../utils/gpsCoordinates';
 import FormSection from './FormSection';
 
 interface StationSelectorProps {
@@ -64,6 +65,7 @@ const StationSelector: React.FC<StationSelectorProps> = ({
   const [addDirection, setAddDirection] = useState<'INBOUND' | 'OUTBOUND' | 'BOTH' | 'NONE'>('INBOUND');
   const [addRegion, setAddRegion] = useState('');
   const [addProvince, setAddProvince] = useState('');
+  const [addGpsCoordinates, setAddGpsCoordinates] = useState('');
   const [addResponsiblePerson, setAddResponsiblePerson] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // field-level validation errors (ข้อความสีแดงใต้แต่ละช่อง)
@@ -83,6 +85,7 @@ const StationSelector: React.FC<StationSelectorProps> = ({
     setAddStationType('WEIGH_STATION');
     setCustomStationType('');
     setAddDirection('INBOUND');
+    setAddGpsCoordinates('');
     setAddResponsiblePerson('');
     setFieldErrors({});
     setIsAddModalOpen(true);
@@ -339,6 +342,9 @@ const StationSelector: React.FC<StationSelectorProps> = ({
     if (!highwayTrim) errors.highway_no = 'กรุณาระบุทางหลวงหมายเลข';
     else if (highwayTrim.length > 20) errors.highway_no = 'ทางหลวงหมายเลขยาวเกินไป';
 
+    const gpsError = validateGpsCoordinates(addGpsCoordinates, true);
+    if (gpsError) errors.gps_coordinates = gpsError;
+
     if (!addDirection) errors.direction = 'กรุณาเลือกทิศทาง';
 
     if (Object.keys(errors).length > 0) {
@@ -358,6 +364,7 @@ const StationSelector: React.FC<StationSelectorProps> = ({
         direction: addDirection,
         region: addRegion,
         province: addProvince.trim(),
+        gps_coordinates: addGpsCoordinates.trim(),
         responsible_person: responsibleTrim
       });
 
@@ -508,7 +515,7 @@ const StationSelector: React.FC<StationSelectorProps> = ({
 
           {/* Autocomplete Dropdown list */}
           {showDropdown && filteredStationsList.length > 0 && (
-            <div style={{
+            <div className="floating-surface" style={{
               position: 'absolute',
               top: '100%',
               left: 0,
@@ -803,6 +810,26 @@ const StationSelector: React.FC<StationSelectorProps> = ({
                       <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.custom_type}</p>
                     )}
                   </>
+                )}
+              </div>
+
+              {/* พิกัด GPS */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
+                  พิกัด GPS <span style={{ color: 'var(--danger)' }}>*</span>
+                  <span style={{ marginLeft: '8px', fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)' }}>(ละติจูด,ลองจิจูด)</span>
+                </label>
+                <input
+                  type="text"
+                  maxLength={80}
+                  placeholder="เช่น 14.1083611,99.7096389"
+                  value={addGpsCoordinates}
+                  onChange={(e) => { setAddGpsCoordinates(e.target.value); clearFieldError('gps_coordinates'); }}
+                  inputMode="decimal"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: fieldErrors.gps_coordinates ? '1.5px solid var(--danger)' : '1px solid var(--border)', background: 'var(--bg-app)', color: 'var(--text-main)', fontSize: '0.9rem' }}
+                />
+                {fieldErrors.gps_coordinates && (
+                  <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.gps_coordinates}</p>
                 )}
               </div>
 

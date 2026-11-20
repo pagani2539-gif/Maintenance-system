@@ -24,7 +24,7 @@ const HEADER_ALIASES: Record<string, keyof ParsedInventoryRow> = {
 };
 
 const MAX_IMPORT_FILE_SIZE = 2 * 1024 * 1024;
-const MAX_IMPORT_ROWS = 1000;
+const MAX_IMPORT_ROWS = 500;
 const MAX_IMPORT_COLUMNS = 32;
 const MAX_FIELD_LENGTH = 500;
 

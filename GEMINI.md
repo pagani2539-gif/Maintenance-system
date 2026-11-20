@@ -83,3 +83,9 @@ The system follows a Client-Server model.
 - **Research**: Always check `types.ts` and existing routes before proposing changes.
 - **Validation**: Run `npm run lint` in `/client` and ensure the server starts after backend changes.
 - **Security**: Do not log or commit sensitive data or `.db` files.
+
+## 8. Database Safety (Critical — Read Before Every Code Change)
+- The database and its data are currently being used for testing and real-world operation. **Never delete, drop, truncate, reset, recreate, overwrite, or clear the database, tables, or existing records.**
+- Do not run destructive data-cleanup scripts such as `server/scripts/clear_all_data.js` unless the user explicitly requests it and confirms the exact target.
+- Database schema changes must use safe, non-destructive migrations. Preserve existing data and verify the migration before applying it.
+- If a requested change could risk data loss, stop and ask for explicit confirmation before making the change.

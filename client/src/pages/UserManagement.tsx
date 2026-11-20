@@ -49,29 +49,28 @@ const DEFAULT_REGULAR_PERMISSIONS: Permissions = {
 };
 
 const DELETE_LABELS: Array<{ key: keyof NonNullable<Permissions['delete']>; label: string }> = [
-  { key: 'repairs', label: 'ลบใบแจ้งซ่อม' },
-  { key: 'claims', label: 'ลบใบเคลม' },
-  { key: 'withdrawals', label: 'ลบใบเบิก' },
-  { key: 'inventory', label: 'ลบอุปกรณ์ในสต็อก' },
-  { key: 'purchase_orders', label: 'ลบใบสั่งซื้อ' },
-  { key: 'transactions', label: 'ลบประวัติธุรกรรม' },
-  { key: 'stations', label: 'ลบสถานี' },
-  { key: 'contracts', label: 'ลบสัญญา' },
-  { key: 'technicianStock', label: 'ลบรายการสต็อกช่าง' },
+  { key: 'repairs', label: 'ทะเบียนงานซ่อม — ลบรายการ' },
+  { key: 'claims', label: 'ทะเบียนงานเคลม — ลบรายการ' },
+  { key: 'withdrawals', label: 'ประวัติการเบิกจ่าย — ลบรายการ' },
+  { key: 'inventory', label: 'รายการอุปกรณ์คงเหลือ — ลบอุปกรณ์' },
+  { key: 'purchase_orders', label: 'ใบสั่งซื้อ (PO) — ลบรายการ' },
+  { key: 'stations', label: 'ค้นหาข้อมูลสถานี — ลบสถานี' },
+  { key: 'contracts', label: 'สัญญาในใบเบิก — ลบสัญญา' },
+  { key: 'technicianStock', label: 'อุปกรณ์สำรองประจำตัวช่าง — ลบรายการ' },
 ];
 
 const MANAGE_LABELS: Array<{ key: keyof NonNullable<Permissions['manage']>; label: string }> = [
-  { key: 'repairs', label: 'จัดการงานซ่อม' },
-  { key: 'claims', label: 'จัดการงานเคลม' },
-  { key: 'inventory', label: 'จัดการคลังพัสดุ' },
-  { key: 'withdrawals', label: 'จัดการใบเบิก' },
-  { key: 'transactions', label: 'จัดการรับคืน' },
-  { key: 'purchase_orders', label: 'จัดการใบสั่งซื้อ' },
-  { key: 'contracts', label: 'จัดการสัญญา' },
-  { key: 'stations', label: 'จัดการสถานี' },
-  { key: 'companies', label: 'จัดการบริษัทและโลโก้' },
-  { key: 'stock_counts', label: 'จัดการตรวจนับสต็อก' },
-  { key: 'technicianStock', label: 'จัดการสต็อกช่าง' },
+  { key: 'repairs', label: 'ทะเบียนงานซ่อม / บันทึกแจ้งซ่อม' },
+  { key: 'claims', label: 'ทะเบียนงานเคลม / บันทึกแจ้งเคลม' },
+  { key: 'inventory', label: 'รายการอุปกรณ์คงเหลือ' },
+  { key: 'withdrawals', label: 'ใบเบิกจ่ายอุปกรณ์' },
+  { key: 'transactions', label: 'บัญชีคุมยอด / ตรวจรับของคืนคลัง' },
+  { key: 'purchase_orders', label: 'ใบสั่งซื้อ (PO)' },
+  { key: 'contracts', label: 'สัญญาในใบเบิก' },
+  { key: 'stations', label: 'ค้นหาข้อมูลสถานี' },
+  { key: 'companies', label: 'ตั้งค่าระบบ — บริษัทและโลโก้' },
+  { key: 'stock_counts', label: 'ตรวจนับอุปกรณ์' },
+  { key: 'technicianStock', label: 'อุปกรณ์สำรองประจำตัวช่าง' },
 ];
 
 interface UserFormState {
@@ -426,7 +425,7 @@ const UserManagement: React.FC = () => {
                   placeholder="ช่างสมชาย ใจดี"
                 />
                 <Input
-                  label={editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : 'รหัสผ่าน (≥ 6 ตัวอักษร)'}
+                  label={editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : 'รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)'}
                   type="password"
                   required={!editing}
                   value={form.password}

@@ -35,7 +35,7 @@ const MAX_ROWS = 9;
 
 const CATEGORY_LINKS: Record<ActionItem['category'], { label: string; to: string }> = {
   sla: { label: 'งานซ่อมทั้งหมด', to: '/repairs' },
-  stock: { label: 'คลังพัสดุ', to: '/inventory' },
+  stock: { label: 'คลังอุปกรณ์', to: '/inventory' },
   return: { label: 'รายการค้างคืน', to: '/pending-returns' }
 };
 
@@ -66,7 +66,7 @@ const ActionQueue: React.FC<ActionQueueProps> = ({
       key: `stock-${i}`,
       category: 'stock',
       severity: 'danger',
-      badge: 'สต็อกวิกฤต',
+      badge: 'อุปกรณ์ต่ำกว่าเกณฑ์',
       title: item.name,
       metric: `เหลือ ${item.quantity}/${item.min_stock}`,
       urgency: Math.max(0, item.min_stock - item.quantity),
@@ -108,7 +108,7 @@ const ActionQueue: React.FC<ActionQueueProps> = ({
   }, [items, visible]);
 
   const chips = [
-    { label: 'สต็อกวิกฤต', count: criticalStockCount, severity: 'danger' as const, icon: <ShieldAlert size={17} />, to: '/inventory' },
+    { label: 'อุปกรณ์ต่ำกว่าเกณฑ์', count: criticalStockCount, severity: 'danger' as const, icon: <ShieldAlert size={17} />, to: '/inventory' },
     { label: 'ค้างคืน', count: pendingReturnsCount, severity: 'warning' as const, icon: <Hourglass size={17} />, to: '/pending-returns' },
     { label: 'งานเกิน SLA', count: overdue?.length || 0, severity: 'danger' as const, icon: <AlertCircle size={17} />, to: '/repairs' },
     { label: 'ด่านไม่มีผู้ดูแล', count: unassignedStationsCount, severity: 'warning' as const, icon: <MapPin size={17} />, to: '/stations' }
@@ -123,7 +123,7 @@ const ActionQueue: React.FC<ActionQueueProps> = ({
           <h3 className="dash-card-title" style={{ fontSize: '1.05rem' }}>
             <ClipboardList size={18} color="var(--primary)" /> ต้องจัดการ
           </h3>
-          <p className="dash-card-subtitle">งานเกินกำหนด สต็อกวิกฤต และของค้างคืน · สถานะปัจจุบัน ไม่ขึ้นกับตัวกรองช่วงเวลา</p>
+          <p className="dash-card-subtitle">งานเกินกำหนด อุปกรณ์ต่ำกว่าเกณฑ์ และของค้างคืน · สถานะปัจจุบัน ไม่ขึ้นกับตัวกรองช่วงเวลา</p>
         </div>
       </div>
 

@@ -8,16 +8,6 @@ interface ActionMenuProps<T> {
   actions: TableAction<T>[];
 }
 
-const variantColor = (variant?: TableAction<unknown>['variant']): string => {
-  switch (variant) {
-    case 'primary': return 'var(--primary)';
-    case 'danger':  return 'var(--danger)';
-    case 'success': return 'var(--success)';
-    case 'outline': return 'var(--text-main)';
-    default:        return 'var(--text-muted)';
-  }
-};
-
 function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -94,21 +84,14 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
   if (visibleActions.length === 0) return null;
 
   return (
-    <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '2px',
-        justifyContent: 'flex-end',
-      }}
-    >
+    <div className="table-action-group">
       {inlineActions.map((action) => {
         const isDisabled = typeof action.disabled === 'function' ? action.disabled(row) : action.disabled;
-        const color = variantColor(action.variant);
         return (
           <button
             key={action.id}
             className="table-action-button"
+            data-variant={action.variant || 'ghost'}
             type="button"
             disabled={isDisabled}
             title={action.label}
@@ -116,30 +99,6 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
             onClick={(e) => {
               e.stopPropagation();
               if (!isDisabled) action.onClick(row);
-            }}
-            style={{
-              width: '36px',
-              height: '36px',
-              padding: 0,
-              border: 'none',
-              borderRadius: '8px',
-              background: 'transparent',
-              color,
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: isDisabled ? 0.4 : 1,
-              transition: 'background 0.15s, transform 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (isDisabled) return;
-              e.currentTarget.style.background = action.variant === 'primary'
-                ? 'var(--primary-light)'
-                : 'var(--bg-app)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
             }}
           >
             {action.icon}
@@ -151,7 +110,8 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
         <>
           <button
             ref={triggerRef}
-            className="table-action-button"
+            className="table-action-button table-action-button--overflow"
+            data-variant="ghost"
             type="button"
             title="ตัวเลือกเพิ่มเติม"
             aria-label="ตัวเลือกเพิ่มเติม"
@@ -170,22 +130,6 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
               e.stopPropagation();
               setIsOpen(!isOpen);
             }}
-            style={{
-              width: '36px',
-              height: '36px',
-              padding: 0,
-              border: 'none',
-              borderRadius: '50%',
-              background: 'transparent',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              transition: 'background 0.15s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-app)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           >
             <MoreHorizontal size={16} />
           </button>
@@ -193,6 +137,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
           {isOpen && createPortal(
             <div
               ref={menuRef}
+              className="table-action-menu"
               role="menu"
               onKeyDown={(e) => {
                 const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') || []);
@@ -216,17 +161,8 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
                 }
               }}
               style={{
-                position: 'fixed',
                 top: `${coords.top}px`,
                 left: `${coords.left}px`,
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                boxShadow: 'var(--shadow-lg)',
-                zIndex: 9999, // Render above sticky column and headers
-                minWidth: '160px',
-                overflow: 'hidden',
-                animation: 'fadeIn 0.2s'
               }}
             >
               {overflowActions.map((action) => {
@@ -235,6 +171,7 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
                   <button
                     key={action.id}
                     className="table-action-menuitem"
+                    data-variant={action.variant || 'ghost'}
                     type="button"
                     role="menuitem"
                     disabled={isDisabled}
@@ -243,25 +180,8 @@ function ActionMenu<T>({ row, actions }: ActionMenuProps<T>) {
                       action.onClick(row);
                       setIsOpen(false);
                     }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '10px 16px',
-                      border: 'none',
-                      background: 'none',
-                      textAlign: 'left',
-                      cursor: isDisabled ? 'not-allowed' : 'pointer',
-                      fontSize: '0.85rem',
-                      color: action.variant === 'danger' ? 'var(--danger)' : 'var(--text-main)',
-                      transition: 'background 0.2s',
-                      opacity: isDisabled ? 0.5 : 1
-                    }}
-                    onMouseOver={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = 'var(--bg-app)')}
-                    onMouseOut={(e) => !isDisabled && (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    {action.icon && <span style={{ display: 'flex' }}>{action.icon}</span>}
+                    {action.icon && <span className="table-action-menuitem__icon">{action.icon}</span>}
                     {action.label}
                   </button>
                 );

@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { BackButton } from '../components/ui/BackButton';
 import { formatDateTimeThai } from '../utils/formatDate';
 import type { Repair, InventoryTransaction } from '../types';
+import { getRepairStatusLabel } from '../constants/terminology';
 import {
   ListChecks,
   Inbox,
@@ -216,7 +217,7 @@ const MyTasks: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                           <Link to={detailPath(r)} style={{ fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>{r.ticket_no}</Link>
                           <span className={`badge badge-priority-${r.priority === 'วิกฤต' ? 'critical' : r.priority === 'ด่วนมาก' ? 'urgent' : r.priority === 'ด่วน' ? 'high' : 'normal'}`}>{r.priority}</span>
-                          <span className={`badge badge-${r.status}`}>{r.status}</span>
+                          <span className={`badge badge-${r.status}`}>{getRepairStatusLabel(r.status)}</span>
                           {overdue && (
                             <span className="led-breathe-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: 'var(--danger-light)', color: 'var(--danger)', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800, border: '1px solid var(--danger-border)' }}>
                               <AlertTriangle size={11} /> เกิน SLA {daysWaiting(r)} วัน

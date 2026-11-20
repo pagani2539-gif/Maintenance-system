@@ -42,8 +42,6 @@
 - ไฟล์ที่อัปโหลดจะถูกเก็บไว้ที่โฟลเดอร์ `uploads/`
 
 ## API Endpoints หลัก
-- `GET /api/repairs`: ดึงรายการแจ้งซ่อมทั้งหมด
-- `POST /api/repairs`: บันทึกการแจ้งซ่อมใหม่
-- `POST /api/claims`: บันทึกการแจ้งเคลมใหม่
-- `PATCH /api/repairs/:id/status`: อัปเดตสถานะงาน
-- `GET /api/repairs/unread/count`: ดึงจำนวนงานที่ยังไม่ได้อ่าน
+
+API resource ทั้งหมดใช้ v2 เท่านั้นที่ `/api/v2` ดูรายการ endpoint, payload
+และ response contract ได้ที่ `../API_V2.md` หรือ `GET /api-docs/v2`

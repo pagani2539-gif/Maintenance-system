@@ -44,6 +44,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ErrorBoundary from './ErrorBoundary';
 import { Button } from './ui/Button';
 import AppDialog from './ui/AppDialog';
+import { getRepairStatusLabel } from '../constants/terminology';
 
 
 // Notification Context
@@ -339,7 +340,7 @@ const Layout: React.FC = () => {
       // If low-stock item count increased, notify user
       if (lowStock > prevLowStockCount.current && prevLowStockCount.current !== 0) {
         console.log('New low-stock item detected, triggering notification...');
-        notify(`มีพัสดุใกล้หมดสต็อกเพิ่มขึ้น ${lowStock - prevLowStockCount.current} รายการ`, 'info', 'พัสดุใกล้หมดสต็อก', 'inventory', '/inventory');
+        notify(`มีอุปกรณ์ใกล้หมดเพิ่มขึ้น ${lowStock - prevLowStockCount.current} รายการ`, 'info', 'อุปกรณ์ใกล้หมด', 'inventory', '/inventory');
         playNotificationSound();
       }
 
@@ -375,6 +376,10 @@ const Layout: React.FC = () => {
               message = `มีการยืมอุปกรณ์จากคลัง: ${product_name} (-${quantity_borrowed} ชิ้น)${byUserStr}`;
             } else if (transaction_type === 'RETURN') {
               message = `มีการคืนอุปกรณ์เข้าคลัง: ${product_name} (+${quantity_returned} ชิ้น)${byUserStr}`;
+            } else if (transaction_type === 'ADJUSTMENT') {
+              const adjustmentQuantity = quantity_added || quantity_withdrawn || 0;
+              const sign = quantity_added ? '+' : '−';
+              message = `มีการปรับยอดคงเหลือ: ${product_name} (${sign}${adjustmentQuantity} ชิ้น)${byUserStr}`;
             } else {
               message = `มีการอัปเดตข้อมูลในคลังอุปกรณ์: ${product_name}`;
             }
@@ -441,7 +446,7 @@ const Layout: React.FC = () => {
         id: item.id,
         title: item.device_name,
         subtitle: `${item.ticket_no} · โดย ${item.reporter}`,
-        badgeText: item.status,
+        badgeText: getRepairStatusLabel(item.status),
         badgeType: item.status,
         link: `/repairs/${item.id}`
       });
@@ -453,7 +458,7 @@ const Layout: React.FC = () => {
         id: item.id,
         title: item.device_name,
         subtitle: `CLAIM: ${item.ticket_no} · โดย ${item.reporter}`,
-        badgeText: item.status,
+        badgeText: getRepairStatusLabel(item.status),
         badgeType: item.status,
         link: `/claim-history/${item.id}`
       });
@@ -668,7 +673,7 @@ const Layout: React.FC = () => {
               <ClipboardPlus size={18} /> <span className="nav-text">บันทึกแจ้งซ่อม</span>
             </NavLink>
             
-            <div className="nav-label">การเคลมพัสดุ</div>
+            <div className="nav-label">การเคลมอุปกรณ์</div>
             <NavLink to="/claim-history" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <ShieldAlert size={18} /> <span className="nav-text">ทะเบียนงานเคลม</span>
               {unreadClaimCount > 0 && (
@@ -679,23 +684,23 @@ const Layout: React.FC = () => {
               <FileWarning size={18} /> <span className="nav-text">บันทึกแจ้งเคลม</span>
             </NavLink>
             
-            <div className="nav-label">คลังสินค้าและประวัติ</div>
+            <div className="nav-label">คลังอุปกรณ์และประวัติ</div>
             <NavLink to="/inventory" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>  
-              <PackageSearch size={18} /> <span className="nav-text">รายการพัสดุคงคลัง</span>
+              <PackageSearch size={18} /> <span className="nav-text">รายการอุปกรณ์คงเหลือ</span>
               {lowStockCount > 0 && (
                 <span className="pulse-dot">{lowStockCount}</span>
               )}
             </NavLink>
             <NavLink to="/transactions" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <ArrowLeftRight size={18} /> <span className="nav-text">บัญชีคุมยอดพัสดุ</span>
+              <ArrowLeftRight size={18} /> <span className="nav-text">บัญชีคุมยอดอุปกรณ์</span>
             </NavLink>
             <NavLink to="/stock-counts" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <ScanBarcode size={18} /> <span className="nav-text">ตรวจนับสต็อก</span>
+              <ScanBarcode size={18} /> <span className="nav-text">ตรวจนับอุปกรณ์</span>
             </NavLink>
 
-            <div className="nav-label">สต็อกขาเข้า (Inbound)</div>
+            <div className="nav-label">รับเข้าอุปกรณ์ (Inbound)</div>
             <NavLink to="/purchase-orders" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
-              <ShoppingCart size={18} /> <span className="nav-text">ใบจัดสั่งซื้อ (PO)</span>
+              <ShoppingCart size={18} /> <span className="nav-text">ใบสั่งซื้อ (PO)</span>
             </NavLink>
             <NavLink to="/pending-returns" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
               <ClipboardCheck size={18} /> <span className="nav-text">ตรวจรับของคืนคลัง</span>
@@ -704,18 +709,18 @@ const Layout: React.FC = () => {
               )}
             </NavLink>
 
-            <div className="nav-label">สต็อกขาออก (Outbound)</div>
+            <div className="nav-label">เบิกอุปกรณ์ (Outbound)</div>
             <NavLink to="/withdrawal" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}> 
-              <PackageMinus size={18} /> <span className="nav-text">ใบเบิกจ่ายพัสดุอุปกรณ์</span>
+              <PackageMinus size={18} /> <span className="nav-text">ใบเบิกจ่ายอุปกรณ์</span>
             </NavLink>
             <NavLink to="/withdrawal-history" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
               <FileClock size={18} /> <span className="nav-text">ประวัติการเบิกจ่าย</span>
             </NavLink>
             <NavLink to="/technician-stock" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <HardHat size={18} /> <span className="nav-text">อะไหล่สำรองประจำตัวช่าง</span>
+              <HardHat size={18} /> <span className="nav-text">อุปกรณ์สำรองประจำตัวช่าง</span>
             </NavLink>
             <NavLink to="/technician-stock/movements" onClick={handleNavLinkClick} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-              <FileClock size={18} /> <span className="nav-text">ประวัติการใช้อะไหล่สำรอง</span>
+              <FileClock size={18} /> <span className="nav-text">ประวัติการใช้อุปกรณ์สำรอง</span>
             </NavLink>
 
             <div className="nav-label">รายงานวิเคราะห์</div>
@@ -982,7 +987,7 @@ const Layout: React.FC = () => {
                 </button>
                 <button type="button" className="header-quick-action" onClick={() => navigate('/withdrawal')}>
                   <PackageMinus size={16} aria-hidden="true" />
-                  <span>เบิกพัสดุ</span>
+                  <span>เบิกอุปกรณ์</span>
                 </button>
                 <button type="button" className="header-quick-action" onClick={() => setIsSearchOpen(true)}>
                   <Search size={16} aria-hidden="true" />
@@ -1147,7 +1152,7 @@ const Layout: React.FC = () => {
               <Search className="search-modal-icon" size={20} />
               <input
                 type="text"
-                placeholder="พิมพ์เพื่อค้นหาพัสดุ งานซ่อม หรือใบเคลม..."
+                placeholder="พิมพ์เพื่อค้นหาอุปกรณ์ งานซ่อม หรือใบเคลม..."
                 value={searchQuery}
                 onChange={e => {
                   const val = e.target.value;
@@ -1162,7 +1167,7 @@ const Layout: React.FC = () => {
                 onKeyDown={handleSearchKeyDown}
                 autoFocus
                 className="search-modal-input"
-                aria-label="พิมพ์เพื่อค้นหาพัสดุ งานซ่อม หรือใบเคลม"
+                aria-label="พิมพ์เพื่อค้นหาอุปกรณ์ งานซ่อม หรือใบเคลม"
               />
               <button 
                 type="button"
@@ -1213,7 +1218,7 @@ const Layout: React.FC = () => {
                     const catItems = flattenedResults.filter(item => item.type === category);
                     if (catItems.length === 0) return null;
                     
-                    const catTitle = category === 'inventory' ? 'คลังพัสดุ' : 
+                    const catTitle = category === 'inventory' ? 'คลังอุปกรณ์' :
                                      category === 'repair' ? 'รายการซ่อมแซม' : 'รายการแจ้งเคลม';
                                      
                     return (

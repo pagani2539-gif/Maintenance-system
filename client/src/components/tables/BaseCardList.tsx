@@ -19,11 +19,12 @@ function BaseCardList<T>({
   onRowClick
 }: BaseCardListProps<T>) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+    <div className="mobile-card-list">
       {data.map((row, index) => (
         <Card 
           key={index}
           onClick={() => onRowClick?.(row)}
+          className="mobile-data-card"
           style={{ 
             cursor: 'pointer',
             padding: '1.25rem',
@@ -34,34 +35,27 @@ function BaseCardList<T>({
             position: 'relative'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+          <div className="mobile-data-card__header">
+            <div className="mobile-data-card__identity">
+              <div className="mobile-data-card__title">
                 {config.title(row)}
               </div>
               {config.subtitle && (
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                <div className="mobile-data-card__subtitle">
                   {config.subtitle(row)}
                 </div>
               )}
             </div>
             {config.statusBadge && (
-              <div style={{ flexShrink: 0 }}>
+              <div className="mobile-data-card__status">
                 {config.statusBadge(row)}
               </div>
             )}
           </div>
 
-          <div className="mobile-card-actions" style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '0.5rem', 
-            borderTop: '1px solid var(--border)', 
-            paddingTop: '0.75rem' 
-          }}>
+          <div className="mobile-card-actions">
             {actions.length > 0 ? (
-              <div onClick={(event) => event.stopPropagation()}>
+              <div className="mobile-card-actions__menu" onClick={(event) => event.stopPropagation()}>
                 <ActionMenu row={row} actions={actions} />
               </div>
             ) : <span />}
@@ -77,7 +71,7 @@ function BaseCardList<T>({
             >
               ดูรายละเอียด
             </Button>
-            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+            <div className="mobile-card-actions__chevron" aria-hidden="true">
               <ChevronRight size={18} />
             </div>
           </div>

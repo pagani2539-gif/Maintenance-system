@@ -266,14 +266,14 @@ exports.loadStock = async (req, res) => {
         }
 
         if (inv.quantity < inv.min_stock) {
-          lowStockAlerts.push(`\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nพัสดุ: ${inv.name}\nคงเหลือ: ${inv.quantity} ชิ้น (ขั้นต่ำ: ${inv.min_stock} ชิ้น)`);
+          lowStockAlerts.push(`\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nอุปกรณ์: ${inv.name}\nคงเหลือ: ${inv.quantity} ชิ้น (ขั้นต่ำ: ${inv.min_stock} ชิ้น)`);
         }
       }
     });
 
     lowStockAlerts.forEach(msg => sendLineNotify('stock', msg));
     checkAndGenerateAutoPOs().catch(e => console.error('Auto-PO after tech load failed:', e.message));
-    res.status(201).json({ message: 'โหลดอะไหล่เข้าช่างเรียบร้อย' });
+    res.status(201).json({ message: 'โหลดอุปกรณ์เข้าช่างเรียบร้อย' });
   } catch (err) {
     console.error('Technician loadStock error:', err);
     res.status(err.status || 500).json({ error: err.message });
@@ -455,7 +455,7 @@ exports.installStock = async (req, res) => {
       }
     });
 
-    res.status(201).json({ message: 'บันทึกการติดตั้ง/เปลี่ยนอะไหล่เรียบร้อย' });
+    res.status(201).json({ message: 'บันทึกการติดตั้ง/เปลี่ยนอุปกรณ์เรียบร้อย' });
   } catch (err) {
     console.error('Technician installStock error:', err);
     res.status(err.status || 500).json({ error: err.message });
@@ -519,7 +519,7 @@ exports.returnStock = async (req, res) => {
       }
     });
 
-    res.status(201).json({ message: 'คืนอะไหล่เข้าคลังเรียบร้อย' });
+    res.status(201).json({ message: 'คืนอุปกรณ์เข้าคลังเรียบร้อย' });
   } catch (err) {
     console.error('Technician returnStock error:', err);
     res.status(err.status || 500).json({ error: err.message });
@@ -582,7 +582,7 @@ exports.deleteMovement = async (req, res) => {
       await client.query('DELETE FROM technician_stock_movements WHERE id = $1', [id]);
       logAudit('technician_stock_movement', id, 'reverse', m, null, req.user.full_name).catch(e => console.error(e));
     });
-    res.json({ message: 'ยกเลิกรายการและปรับสต็อกเรียบร้อย' });
+    res.json({ message: 'ยกเลิกรายการและปรับยอดคงเหลือเรียบร้อย' });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

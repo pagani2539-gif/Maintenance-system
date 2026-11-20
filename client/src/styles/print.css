@@ -1,0 +1,32 @@
+/* Print rules are kept separate from screen/table behavior. */
+@media print {
+  .data-table-container {
+    max-width: none;
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .data-table,
+  .report-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .data-table--has-actions th:last-child,
+  .data-table--has-actions td:last-child,
+  .sticky-actions-col-th,
+  .sticky-actions-col-td {
+    position: static;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .report-table td,
+  .report-table th {
+    padding: 6px 8px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+}

@@ -199,32 +199,18 @@ exports.deletePO = async (req, res) => {
     const { rows: poRows } = await query('SELECT * FROM purchase_orders WHERE id = $1', [id]);
     const po = poRows[0];
     if (!po) return res.status(404).json({ message: 'ไม่พบข้อมูลใบสั่งซื้อ' });
+    if (po.status === 'Received') {
+      return res.status(409).json({
+        message: 'ไม่สามารถลบใบสั่งซื้อที่รับเข้าคลังแล้วได้ หากยอดไม่ถูกต้องให้ทำรายการปรับยอดพร้อมระบุเหตุผล'
+      });
+    }
 
     await withTransaction(async (client) => {
-      if (po.status === 'Received') {
-        const { rows: poItems } = await client.query('SELECT * FROM purchase_order_items WHERE po_id = $1', [id]);
-
-        for (const poItem of poItems) {
-          const qtyToRevert = poItem.received_quantity || 0;
-          if (qtyToRevert <= 0) continue;
-
-          await client.query(
-            'UPDATE inventory SET quantity = GREATEST(0, quantity - $1), updated_at = NOW() WHERE id = $2',
-            [qtyToRevert, poItem.inventory_id]
-          );
-
-          await client.query(
-            "DELETE FROM inventory_transactions WHERE inventory_id = $1 AND transaction_type = 'ADD_STOCK' AND quantity_added = $2 AND note ILIKE $3",
-            [poItem.inventory_id, qtyToRevert, `%#${po.po_no}%`]
-          );
-        }
-      }
-
       await client.query('DELETE FROM purchase_order_items WHERE po_id = $1', [id]);
       await client.query('DELETE FROM purchase_orders WHERE id = $1', [id]);
     });
 
-    res.json({ message: 'ลบใบสั่งซื้อและปรับคืนยอดคลังเรียบร้อยแล้ว' });
+    res.json({ message: 'ลบใบสั่งซื้อเรียบร้อยแล้ว' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -244,12 +230,12 @@ exports.receivePO = async (req, res) => {
         throw err;
       }
       if (po.status === 'Received') {
-        const err = new Error('ใบสั่งซื้อนี้เคยรับสินค้าเข้าระบบไปแล้ว');
+        const err = new Error('ใบสั่งซื้อนี้เคยรับอุปกรณ์เข้าระบบไปแล้ว');
         err.status = 400;
         throw err;
       }
       if (po.status !== 'Approved' && po.status !== 'Ordered') {
-        const err = new Error('สามารถตรวจรับสินค้าได้เฉพาะใบสั่งซื้อที่ได้รับการอนุมัติหรือสั่งซื้อแล้วเท่านั้น');
+        const err = new Error('สามารถตรวจรับอุปกรณ์ได้เฉพาะใบสั่งซื้อที่ได้รับการอนุมัติหรือสั่งซื้อแล้วเท่านั้น');
         err.status = 400;
         throw err;
       }
@@ -262,7 +248,7 @@ exports.receivePO = async (req, res) => {
       `, [id]);
 
       if (!poItems || poItems.length === 0) {
-        const err = new Error('ไม่พบรายการสินค้าในใบสั่งซื้อ');
+        const err = new Error('ไม่พบรายการอุปกรณ์ในใบสั่งซื้อ');
         err.status = 400;
         throw err;
       }
@@ -290,7 +276,7 @@ exports.receivePO = async (req, res) => {
         await client.query(`
           INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_added, note)
           VALUES ($1, 'ADD_STOCK', $2, $3)
-        `, [poItem.inventory_id, receivedQty, `รับสินค้าตามใบสั่งซื้อ #${po.po_no}`]);
+        `, [poItem.inventory_id, receivedQty, `รับอุปกรณ์ตามใบสั่งซื้อ #${po.po_no}`]);
       }
 
       await client.query("UPDATE purchase_orders SET status = 'Received', updated_at = NOW() WHERE id = $1", [id]);
@@ -301,11 +287,11 @@ exports.receivePO = async (req, res) => {
     // Send LINE Notify Alert
     const itemsList = receivedSummaries.join('\n');
     if (itemsList) {
-      const lineMsg = `\n📥 *ตรวจรับสินค้าเข้าคลัง (PO)*\n🔢 เลขที่ใบสั่งซื้อ: #${po.po_no}\n🏢 โครงการ/บริษัท: ${po.project_name || po.company_name || '-'}\n📋 รายการที่ตรวจรับ:\n${itemsList}`;
+      const lineMsg = `\n📥 *ตรวจรับอุปกรณ์เข้าคลัง (PO)*\n🔢 เลขที่ใบสั่งซื้อ: #${po.po_no}\n🏢 โครงการ/บริษัท: ${po.project_name || po.company_name || '-'}\n📋 รายการที่ตรวจรับ:\n${itemsList}`;
       sendLineNotify('stock', lineMsg);
     }
 
-    res.json({ message: 'รับสินค้าเข้าระบบและอัปเดตสต็อกเรียบร้อยแล้ว' });
+    res.json({ message: 'รับอุปกรณ์เข้าระบบและอัปเดตยอดคงเหลือเรียบร้อยแล้ว' });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ message: err.message });
     res.status(500).json({ error: err.message });
@@ -315,7 +301,7 @@ exports.receivePO = async (req, res) => {
 exports.triggerAutoPO = async (req, res) => {
   try {
     await checkAndGenerateAutoPOs();
-    res.json({ message: 'ระบบสแกนสต็อกและอัปเดตใบสั่งซื้ออัตโนมัติเรียบร้อย' });
+    res.json({ message: 'ระบบตรวจสอบยอดคงเหลือและอัปเดตใบสั่งซื้ออัตโนมัติเรียบร้อย' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

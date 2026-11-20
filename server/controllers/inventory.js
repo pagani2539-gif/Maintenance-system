@@ -1,6 +1,19 @@
 const { query, withTransaction } = require('../database/db');
 const { sendLineNotify } = require('../utils/lineNotify');
 const { checkAndGenerateAutoPOs } = require('../utils/autoPo');
+const { logAudit } = require('../utils/auditLogger');
+const { badRequest, requirePositiveInteger } = require('../utils/stockValidation');
+
+const ADJUSTMENT_OPERATIONS = new Set(['ADD', 'REMOVE']);
+const ADJUSTMENT_STATUSES = new Set(['PENDING', 'APPROVED', 'REJECTED']);
+
+const actorName = (req) => req.user?.full_name || 'Public API';
+
+const adjustmentError = (message, status = 400) => {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+};
 
 exports.getAllItems = async (req, res) => {
   try {
@@ -77,11 +90,13 @@ exports.createItem = async (req, res) => {
 
 exports.updateItem = async (req, res) => {
   const { id } = req.params;
-  const { name, model, description, quantity, min_stock, requires_sn, storage_location } = req.body;
+  const { name, model, description, min_stock, requires_sn, storage_location } = req.body;
 
   try {
-    const params = [name, model, description, quantity, min_stock, requires_sn === undefined ? 1 : parseInt(requires_sn), storage_location || null];
-    let sql = 'UPDATE inventory SET name = $1, model = $2, description = $3, quantity = $4, min_stock = $5, requires_sn = $6, storage_location = $7, updated_at = NOW()';
+    // Quantity is intentionally excluded here. Stock changes must go through
+    // the Admin-only adjustment flow so the ledger always has a reason and actor.
+    const params = [name, model, description, min_stock, requires_sn === undefined ? 1 : parseInt(requires_sn), storage_location || null];
+    let sql = 'UPDATE inventory SET name = $1, model = $2, description = $3, min_stock = $4, requires_sn = $5, storage_location = $6, updated_at = NOW()';
 
     if (req.file) {
       params.push(req.file.filename);
@@ -102,6 +117,245 @@ exports.updateItem = async (req, res) => {
   } catch (err) {
     // InventoryList.tsx's handleSaveItem reads `.response.data.message` for both create and update
     res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getAdjustmentRequests = async (req, res) => {
+  const status = String(req.query.status || '').trim().toUpperCase();
+  if (status && !ADJUSTMENT_STATUSES.has(status)) {
+    return res.status(400).json({ message: 'สถานะคำขอปรับยอดไม่ถูกต้อง' });
+  }
+
+  try {
+    const params = [];
+    let where = '';
+    if (status) {
+      params.push(status);
+      where = `WHERE a.status = $${params.length}`;
+    }
+    const { rows } = await query(`
+      SELECT a.*, i.name AS inventory_name, i.model AS inventory_model,
+             i.quantity AS current_quantity
+      FROM inventory_adjustments a
+      JOIN inventory i ON i.id = a.inventory_id
+      ${where}
+      ORDER BY CASE WHEN a.status = 'PENDING' THEN 0 ELSE 1 END,
+               a.requested_at DESC, a.id DESC
+    `, params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.createAdjustmentRequest = async (req, res) => {
+  const inventoryId = Number(req.params.id);
+  const operation = String(req.body?.operation || '').trim().toUpperCase();
+  const reason = String(req.body?.reason || '').trim();
+  const note = String(req.body?.note || '').trim() || null;
+  let quantity;
+
+  try {
+    if (!Number.isSafeInteger(inventoryId) || inventoryId <= 0) throw badRequest('รหัสอุปกรณ์ไม่ถูกต้อง');
+    if (!ADJUSTMENT_OPERATIONS.has(operation)) throw badRequest('ประเภทการปรับยอดไม่ถูกต้อง');
+    quantity = requirePositiveInteger(req.body?.quantity, 'จำนวนที่ปรับ');
+    if (!reason) throw badRequest('กรุณาระบุเหตุผลการปรับยอด');
+    if (reason.length > 120) throw badRequest('เหตุผลการปรับยอดยาวเกิน 120 ตัวอักษร');
+    if (note && note.length > 1000) throw badRequest('รายละเอียดเพิ่มเติมยาวเกิน 1,000 ตัวอักษร');
+
+    const requestedBy = actorName(req);
+    const result = await withTransaction(async (client) => {
+      const { rows: itemRows } = await client.query(
+        'SELECT id, name, quantity FROM inventory WHERE id = $1 FOR UPDATE',
+        [inventoryId]
+      );
+      const item = itemRows[0];
+      if (!item) throw adjustmentError('ไม่พบข้อมูลอุปกรณ์', 404);
+
+      const oldQuantity = Number(item.quantity) || 0;
+      const delta = operation === 'ADD' ? quantity : -quantity;
+      const newQuantity = oldQuantity + delta;
+      if (newQuantity < 0) {
+        throw adjustmentError(`ไม่สามารถปรับลดได้ เพราะยอดคงเหลือจะติดลบ (ปัจจุบัน ${oldQuantity} ชิ้น)`);
+      }
+
+      await client.query(
+        'UPDATE inventory SET quantity = $1, updated_at = NOW() WHERE id = $2',
+        [newQuantity, inventoryId]
+      );
+
+      const transactionNote = [
+        `ปรับ${operation === 'ADD' ? 'เพิ่ม' : 'ลด'}โดย ${requestedBy}`,
+        `เหตุผล: ${reason}`,
+        note ? `รายละเอียด: ${note}` : null
+      ].filter(Boolean).join(' | ');
+
+      await client.query(`
+        INSERT INTO inventory_transactions (
+          inventory_id, transaction_type, quantity_added, quantity_withdrawn,
+          user_name, note, status
+        ) VALUES ($1, 'ADJUSTMENT', $2, $3, $4, $5, 'ADJUSTED')
+      `, [
+        inventoryId,
+        operation === 'ADD' ? quantity : 0,
+        operation === 'REMOVE' ? quantity : 0,
+        requestedBy,
+        transactionNote
+      ]);
+
+      const { rows } = await client.query(`
+        INSERT INTO inventory_adjustments (
+          inventory_id, operation, quantity, reason, note,
+          status, requested_by_id, requested_by,
+          reviewed_by_id, reviewed_by, reviewed_at, old_quantity, new_quantity
+        ) VALUES ($1, $2, $3, $4, $5, 'APPROVED', $6, $7, $6, $7, NOW(), $8, $9)
+        RETURNING *
+      `, [inventoryId, operation, quantity, reason, note, req.user?.id || null, requestedBy, oldQuantity, newQuantity]);
+
+      return { adjustment: rows[0], item, oldQuantity, newQuantity };
+    });
+
+    logAudit(
+      'inventory_adjustment',
+      result.adjustment.id,
+      'adjustment applied',
+      { quantity: result.oldQuantity },
+      {
+        inventory_id: inventoryId,
+        operation,
+        quantity,
+        reason,
+        note,
+        status: 'APPROVED',
+        new_quantity: result.newQuantity,
+        adjusted_by: requestedBy
+      },
+      requestedBy
+    ).catch((err) => console.error('Failed to write adjustment audit:', err.message));
+
+    checkAndGenerateAutoPOs().catch((err) => console.error('Error auto-generating POs after adjustment:', err.message));
+
+    res.status(201).json({
+      ...result.adjustment,
+      inventory_name: result.item.name,
+      current_quantity: result.newQuantity,
+      message: 'ปรับยอดคงเหลือเรียบร้อยแล้ว และบันทึกเหตุผลลงบัญชีคุมยอดอุปกรณ์แล้ว'
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+exports.approveAdjustment = async (req, res) => {
+  const adjustmentId = Number(req.params.adjustmentId);
+  const reviewNote = String(req.body?.review_note || '').trim() || null;
+  const reviewer = actorName(req);
+
+  try {
+    if (!Number.isSafeInteger(adjustmentId) || adjustmentId <= 0) throw badRequest('รหัสคำขอปรับยอดไม่ถูกต้อง');
+
+    const result = await withTransaction(async (client) => {
+      const { rows: requestRows } = await client.query(
+        'SELECT * FROM inventory_adjustments WHERE id = $1 FOR UPDATE',
+        [adjustmentId]
+      );
+      const adjustment = requestRows[0];
+      if (!adjustment) throw adjustmentError('ไม่พบคำขอปรับยอด', 404);
+      if (adjustment.status !== 'PENDING') throw adjustmentError('คำขอนี้ถูกดำเนินการไปแล้ว');
+
+      const { rows: inventoryRows } = await client.query(
+        'SELECT id, name, quantity FROM inventory WHERE id = $1 FOR UPDATE',
+        [adjustment.inventory_id]
+      );
+      const item = inventoryRows[0];
+      if (!item) throw adjustmentError('ไม่พบอุปกรณ์ของคำขอปรับยอด', 404);
+
+      const oldQuantity = Number(item.quantity) || 0;
+      const delta = adjustment.operation === 'ADD' ? adjustment.quantity : -adjustment.quantity;
+      const newQuantity = oldQuantity + delta;
+      if (newQuantity < 0) throw adjustmentError(`ไม่สามารถอนุมัติได้ เพราะยอดคงเหลือจะติดลบ (ปัจจุบัน ${oldQuantity} ชิ้น)`);
+
+      await client.query(
+        'UPDATE inventory SET quantity = $1, updated_at = NOW() WHERE id = $2',
+        [newQuantity, item.id]
+      );
+
+      const quantityAdded = adjustment.operation === 'ADD' ? adjustment.quantity : 0;
+      const quantityWithdrawn = adjustment.operation === 'REMOVE' ? adjustment.quantity : 0;
+      const transactionNote = [
+        `ปรับ${adjustment.operation === 'ADD' ? 'เพิ่ม' : 'ลด'}ตามคำขอ #${adjustment.id}`,
+        `เหตุผล: ${adjustment.reason}`,
+        adjustment.note ? `รายละเอียด: ${adjustment.note}` : null,
+        `ผู้ขอ: ${adjustment.requested_by}`,
+        `ผู้อนุมัติ: ${reviewer}`
+      ].filter(Boolean).join(' | ');
+
+      await client.query(`
+        INSERT INTO inventory_transactions (
+          inventory_id, transaction_type, quantity_added, quantity_withdrawn,
+          user_name, note, status
+        ) VALUES ($1, 'ADJUSTMENT', $2, $3, $4, $5, 'ADJUSTED')
+      `, [item.id, quantityAdded, quantityWithdrawn, reviewer, transactionNote]);
+
+      const { rows: updatedRows } = await client.query(`
+        UPDATE inventory_adjustments
+        SET status = 'APPROVED', reviewed_by_id = $1, reviewed_by = $2,
+            reviewed_at = NOW(), review_note = $3,
+            old_quantity = $4, new_quantity = $5
+        WHERE id = $6
+        RETURNING *
+      `, [req.user?.id || null, reviewer, reviewNote, oldQuantity, newQuantity, adjustment.id]);
+
+      return { adjustment: updatedRows[0], item, oldQuantity, newQuantity };
+    });
+
+    logAudit(
+      'inventory_adjustment',
+      adjustmentId,
+      'adjustment approved',
+      { status: 'PENDING' },
+      { status: 'APPROVED', old_quantity: result.oldQuantity, new_quantity: result.newQuantity, reviewed_by: reviewer, review_note: reviewNote },
+      reviewer
+    ).catch((err) => console.error('Failed to write adjustment approval audit:', err.message));
+    checkAndGenerateAutoPOs().catch((err) => console.error('Error auto-generating POs after adjustment:', err.message));
+
+    res.json({ ...result.adjustment, message: 'อนุมัติและปรับยอดคงเหลือเรียบร้อยแล้ว' });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+exports.rejectAdjustment = async (req, res) => {
+  const adjustmentId = Number(req.params.adjustmentId);
+  const reviewNote = String(req.body?.review_note || '').trim();
+  const reviewer = actorName(req);
+
+  try {
+    if (!Number.isSafeInteger(adjustmentId) || adjustmentId <= 0) throw badRequest('รหัสคำขอปรับยอดไม่ถูกต้อง');
+    if (!reviewNote) throw badRequest('กรุณาระบุเหตุผลที่ไม่อนุมัติ');
+    if (reviewNote.length > 1000) throw badRequest('เหตุผลที่ไม่อนุมัติยาวเกิน 1,000 ตัวอักษร');
+
+    const { rows } = await query(`
+      UPDATE inventory_adjustments
+      SET status = 'REJECTED', reviewed_by_id = $1, reviewed_by = $2,
+          reviewed_at = NOW(), review_note = $3
+      WHERE id = $4 AND status = 'PENDING'
+      RETURNING *
+    `, [req.user?.id || null, reviewer, reviewNote, adjustmentId]);
+    if (!rows[0]) throw adjustmentError('ไม่พบคำขอที่รออนุมัติ หรือคำขอนี้ถูกดำเนินการไปแล้ว', 404);
+
+    logAudit(
+      'inventory_adjustment',
+      adjustmentId,
+      'adjustment rejected',
+      { status: 'PENDING' },
+      { status: 'REJECTED', reviewed_by: reviewer, review_note: reviewNote },
+      reviewer
+    ).catch((err) => console.error('Failed to write adjustment rejection audit:', err.message));
+
+    res.json({ ...rows[0], message: 'ไม่อนุมัติคำขอปรับยอดแล้ว' });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
   }
 };
 
@@ -146,20 +400,39 @@ exports.bulkImport = async (req, res) => {
   try {
     await withTransaction(async (client) => {
       for (const row of cleaned) {
-        // Upsert by name (case-insensitive, trimmed)
-        const { rows: existingRows } = await client.query('SELECT id FROM inventory WHERE LOWER(TRIM(name)) = LOWER($1)', [row.name]);
+        // A model is part of an item's identity: products with the same name
+        // but different models must remain separate inventory records.
+        const { rows: existingRows } = await client.query(
+          `SELECT id, quantity FROM inventory
+           WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+             AND LOWER(TRIM(COALESCE(model, ''))) = LOWER(TRIM(COALESCE($2, '')))
+           ORDER BY id
+           LIMIT 1`,
+          [row.name, row.model]
+        );
         const existing = existingRows[0];
 
         if (existing) {
+          const oldQuantity = Number(existing.quantity) || 0;
+          const quantityDelta = row.quantity - oldQuantity;
           await client.query(
             `UPDATE inventory SET model = $1, description = $2, quantity = $3, min_stock = $4, requires_sn = $5, storage_location = $6, updated_at = NOW() WHERE id = $7`,
             [row.model, row.description, row.quantity, row.min_stock, row.requires_sn, row.storage_location, existing.id]
           );
           summary.updated += 1;
-          await client.query(
-            `INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_added, note) VALUES ($1, 'ADD_STOCK', $2, 'นำเข้าข้อมูลผ่าน Excel (อัปเดต)')`,
-            [existing.id, row.quantity]
-          );
+          if (quantityDelta !== 0) {
+            await client.query(
+              `INSERT INTO inventory_transactions (
+                inventory_id, transaction_type, quantity_added, quantity_withdrawn, note
+              ) VALUES ($1, 'ADJUSTMENT', $2, $3, $4)`,
+              [
+                existing.id,
+                quantityDelta > 0 ? quantityDelta : 0,
+                quantityDelta < 0 ? Math.abs(quantityDelta) : 0,
+                `นำเข้าข้อมูลผ่าน CSV (ปรับยอดจาก ${oldQuantity} เป็น ${row.quantity})`,
+              ]
+            );
+          }
         } else {
           const { rows: inserted } = await client.query(
             `INSERT INTO inventory (name, model, description, quantity, min_stock, requires_sn, storage_location) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
@@ -167,14 +440,14 @@ exports.bulkImport = async (req, res) => {
           );
           summary.created += 1;
           await client.query(
-            `INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_added, note) VALUES ($1, 'ADD_STOCK', $2, 'นำเข้าข้อมูลผ่าน Excel')`,
+            `INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_added, note) VALUES ($1, 'ADD_STOCK', $2, 'นำเข้าข้อมูลผ่าน CSV')`,
             [inserted[0].id, row.quantity]
           );
         }
       }
     });
 
-    const lineMsg = `\n📥 *นำเข้าอุปกรณ์แบบกลุ่ม (Excel)*\n➕ เพิ่มใหม่: ${summary.created} รายการ\n🔄 อัปเดตข้อมูล: ${summary.updated} รายการ\n📊 รวมทั้งหมด: ${summary.total} รายการ`;
+    const lineMsg = `\n📥 *นำเข้าอุปกรณ์แบบกลุ่ม (CSV)*\n➕ เพิ่มใหม่: ${summary.created} รายการ\n🔄 อัปเดตข้อมูล: ${summary.updated} รายการ\n📊 รวมทั้งหมด: ${summary.total} รายการ`;
     sendLineNotify('stock', lineMsg);
 
     checkAndGenerateAutoPOs().catch((autoPoErr) => {
@@ -295,7 +568,7 @@ exports.addInventorySerialNumbers = async (req, res) => {
   }
 };
 
-// GET /api/inventory/instances/:instanceId/timeline
+// GET /api/v2/inventory/instances/:instanceId/timeline
 // "Asset passport" — a chronological history of one physical unit (by instance),
 // merging stock movements, repair/claim tickets, and device swaps.
 exports.getInstanceTimeline = async (req, res) => {

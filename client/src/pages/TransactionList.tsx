@@ -18,7 +18,6 @@ import {
   Inbox,
   // Modern Icons
   Info,
-  Trash2,
   ScanEye,
   Undo2,
   MessageSquare,
@@ -27,7 +26,8 @@ import {
   CheckCircle2,
   Camera,
   Printer,
-  Download
+  Download,
+  SlidersHorizontal
 } from 'lucide-react';
 import type { InventoryTransaction } from '../types';
 import type { TableColumn, TableAction } from '../types/table.types';
@@ -43,7 +43,7 @@ import { PrintDialog } from '../components/PrintDialog';
 import { compressImage } from '../utils/imageCompressor';
 
 const TransactionList: React.FC = () => {
-  const { notify, confirm } = useNotification();
+  const { notify } = useNotification();
   const { hasPermission, user: currentUser } = useAuth();
   const { urlState, setTableState } = useTableUrlState(20);
   const [returnModal, setReturnModal] = useState<{ isOpen: boolean; transaction: InventoryTransaction | null }>({
@@ -55,7 +55,7 @@ const TransactionList: React.FC = () => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [printReturnTx, setPrintReturnTx] = useState<InventoryTransaction | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const [activeLogTab, setActiveLogTab] = useState<'all' | 'inbound' | 'outbound'>('all');
+  const [activeLogTab, setActiveLogTab] = useState<'all' | 'inbound' | 'outbound' | 'adjustments'>('all');
 
   // สี + label สำหรับ condition badge
   const conditionStyle = (cond?: string): { label: string; bg: string; color: string } | null => {
@@ -74,23 +74,6 @@ const TransactionList: React.FC = () => {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const handleDelete = async (id: number | string) => {
-    const isConfirmed = await confirm({
-      title: 'ยืนยันการลบรายการธุรกรรม',
-      message: 'คุณต้องการลบรายการธุรกรรมนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้',
-      variant: 'danger'
-    });
-    if (!isConfirmed) return;
-    try {
-      await transactionApi.delete(id);
-      notify('ลบรายการเรียบร้อยแล้ว');
-      fetchTransactions();
-    } catch (err) {
-      const error = err as Error;
-      notify(error.message || 'ไม่สามารถลบรายการได้', 'error');
-    }
-  };
-
   const stats = useMemo(() => {
     const list = transactions || [];
     return {
@@ -98,8 +81,9 @@ const TransactionList: React.FC = () => {
       activeLoans: list.filter((t: InventoryTransaction) => (t.transaction_type === 'BORROW' || (t.transaction_type === 'WITHDRAW' && (t.withdrawal_type === 'ทดสอบ' || t.withdrawal_type === 'สำรองใช้งาน'))) && t.status !== 'RETURNED').length,
       totalOutbound: list.reduce((acc: number, t: InventoryTransaction) => acc + (t.quantity_withdrawn || 0) + (t.quantity_borrowed || 0), 0),
       totalInbound: list.reduce((acc: number, t: InventoryTransaction) => acc + (t.quantity_added || 0) + (t.quantity_returned || 0), 0),
-      totalInboundCount: list.filter((t: InventoryTransaction) => t.transaction_type === 'ADD_STOCK' || t.transaction_type === 'RETURN').length,
-      totalOutboundCount: list.filter((t: InventoryTransaction) => t.transaction_type === 'WITHDRAW' || t.transaction_type === 'BORROW').length
+      totalInboundCount: list.filter((t: InventoryTransaction) => t.transaction_type === 'ADD_STOCK' || t.transaction_type === 'RETURN' || (t.transaction_type === 'ADJUSTMENT' && t.quantity_added > 0)).length,
+      totalOutboundCount: list.filter((t: InventoryTransaction) => t.transaction_type === 'WITHDRAW' || t.transaction_type === 'BORROW' || (t.transaction_type === 'ADJUSTMENT' && t.quantity_withdrawn > 0)).length,
+      totalAdjustmentCount: list.filter((t: InventoryTransaction) => t.transaction_type === 'ADJUSTMENT').length
     };
   }, [transactions]);
 
@@ -115,6 +99,8 @@ const TransactionList: React.FC = () => {
         if (t.transaction_type !== 'ADD_STOCK' && t.transaction_type !== 'RETURN') return false;
       } else if (activeLogTab === 'outbound') {
         if (t.transaction_type !== 'WITHDRAW' && t.transaction_type !== 'BORROW') return false;
+      } else if (activeLogTab === 'adjustments') {
+        if (t.transaction_type !== 'ADJUSTMENT') return false;
       }
       if (urlState.filters.type && urlState.filters.type !== 'All' && t.transaction_type !== urlState.filters.type) return false;
       if (urlState.filters.withdrawal_type && urlState.filters.withdrawal_type !== 'All' && t.withdrawal_type !== urlState.filters.withdrawal_type) return false;
@@ -138,16 +124,20 @@ const TransactionList: React.FC = () => {
 
   const typeFilterOptions = useMemo(() => {
     const allOptions = [
-      { label: 'นำเข้าสต็อก', value: 'ADD_STOCK' },
+      { label: 'รับเข้าอุปกรณ์', value: 'ADD_STOCK' },
       { label: 'เบิกอุปกรณ์', value: 'WITHDRAW' },
       { label: 'คืนอุปกรณ์', value: 'RETURN' },
-      { label: 'ยืมอุปกรณ์', value: 'BORROW' }
+      { label: 'ยืมอุปกรณ์', value: 'BORROW' },
+      { label: 'ปรับยอดคงเหลือ', value: 'ADJUSTMENT' }
     ];
     if (activeLogTab === 'inbound') {
       return allOptions.filter(o => o.value === 'ADD_STOCK' || o.value === 'RETURN');
     }
     if (activeLogTab === 'outbound') {
       return allOptions.filter(o => o.value === 'WITHDRAW' || o.value === 'BORROW');
+    }
+    if (activeLogTab === 'adjustments') {
+      return allOptions.filter(o => o.value === 'ADJUSTMENT');
     }
     return allOptions;
   }, [activeLogTab]);
@@ -162,6 +152,7 @@ const TransactionList: React.FC = () => {
       case 'WITHDRAW': return <ArrowDownCircle size={18} color="var(--danger)" />;
       case 'BORROW': return <RefreshCcw size={18} color="var(--warning)" />;
       case 'RETURN': return <ArrowUpCircle size={18} color="var(--primary)" />;
+      case 'ADJUSTMENT': return <SlidersHorizontal size={18} color="var(--primary)" />;
       default: return <Inbox size={18} />;
     }
   };
@@ -172,22 +163,24 @@ const TransactionList: React.FC = () => {
       case 'WITHDRAW': return 'var(--danger)';
       case 'BORROW': return 'var(--warning)';
       case 'RETURN': return 'var(--primary)';
+      case 'ADJUSTMENT': return 'var(--primary)';
       default: return 'var(--text-muted)';
     }
   };
 
   const columns: TableColumn<InventoryTransaction>[] = [
     {
-      id: 'equipment', header: 'อุปกรณ์', accessor: 'product_name', priority: 1, width: 'auto',
+      id: 'equipment', header: 'อุปกรณ์', accessor: 'product_name', priority: 1, width: 'auto', minWidth: '240px', cellMode: 'wrap-2',
+      getCellText: (row) => [row.product_name, row.product_model].filter(Boolean).join(' — '),
       render: (val, row) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+          <span style={{ fontWeight: 700, fontSize: '0.9rem', overflowWrap: 'anywhere' }}>{val}</span>
           {row.product_model && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{row.product_model}</span>}
         </div>
       )
     },
     {
-      id: 'serial_number', header: 'S/N (หมายเลขเครื่อง)', accessor: 'serial_number', priority: 1, width: '160px',
+      id: 'serial_number', header: 'หมายเลขเครื่อง (S/N)', accessor: 'serial_number', priority: 1, width: '160px',
       render: (val) => (
         val ? (
           <span style={{
@@ -214,7 +207,7 @@ const TransactionList: React.FC = () => {
     {
       id: 'quantity', header: 'จำนวน', accessor: 'quantity_withdrawn', priority: 1, width: '110px', align: 'center',
       render: (_, row) => {
-        const isIn = row.transaction_type === 'ADD_STOCK' || row.transaction_type === 'RETURN';
+        const isIn = row.transaction_type === 'ADD_STOCK' || row.transaction_type === 'RETURN' || (row.transaction_type === 'ADJUSTMENT' && row.quantity_added > 0);
         const qty = row.quantity_added || row.quantity_withdrawn || row.quantity_borrowed || row.quantity_returned || 0;
         const color = isIn ? 'var(--success)' : 'var(--danger)';
         const Icon = isIn ? ArrowUpCircle : ArrowDownCircle;
@@ -229,7 +222,7 @@ const TransactionList: React.FC = () => {
     {
       id: 'type', header: 'ประเภท', accessor: 'transaction_type', priority: 1, width: '140px',
       render: (val, row) => {
-        const label = val === 'ADD_STOCK' ? 'นำเข้า' : val === 'WITHDRAW' ? 'เบิก' : val === 'BORROW' ? 'ยืม' : 'คืน';
+        const label = val === 'ADD_STOCK' ? 'นำเข้า' : val === 'WITHDRAW' ? 'เบิก' : val === 'BORROW' ? 'ยืม' : val === 'ADJUSTMENT' ? 'ปรับยอด' : 'คืน';
         const sub = row.withdrawal_type;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -240,7 +233,8 @@ const TransactionList: React.FC = () => {
       }
     },
     {
-      id: 'location', header: 'สถานที่ / พื้นที่ย่อย', accessor: 'location', priority: 2, width: 'auto',
+      id: 'location', header: 'สถานที่ / พื้นที่ย่อย', accessor: 'location', priority: 2, width: 'auto', minWidth: '220px', cellMode: 'wrap-2',
+      getCellText: (row) => [row.station_name, row.station_area_name, row.location, row.project_name].filter(Boolean).join(' — '),
       render: (_, row) => {
         const hasStation = row.station_name || row.location;
         const project = row.project_name;
@@ -256,7 +250,7 @@ const TransactionList: React.FC = () => {
               compact={true}
             />
             {project && (
-              <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600, overflowWrap: 'anywhere', display: 'flex', alignItems: 'center', gap: '3px' }}>
                 <Briefcase size={10} /> {project}
               </span>
             )}
@@ -353,8 +347,7 @@ const TransactionList: React.FC = () => {
       icon: <Printer size={14} />,
       onClick: handlePrintReturn,
       hidden: (row) => row.transaction_type !== 'RETURN'
-    },
-    { id: 'delete', label: 'ลบรายการ', icon: <Trash2 size={14} />, variant: 'danger', onClick: (row) => handleDelete(row.id), hidden: () => !hasPermission('delete.transactions') }
+    }
   ];
 
   const handleReturn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -393,14 +386,15 @@ const TransactionList: React.FC = () => {
 
   const handleExportExcel = () => {
     const headers = [
-      'วันเวลาทำรายการ', 'ประเภทธุรกรรม', 'ประเภทการเบิก', 'อุปกรณ์', 'รุ่น/Model', 'S/N', 'จำนวน', 'ผู้ทำรายการ', 'สถานที่/โครงการ', 'สถานะ/หมายเหตุ'
+      'วันเวลาทำรายการ', 'ประเภทการเคลื่อนไหว', 'ประเภทการเบิก', 'อุปกรณ์', 'รุ่น (Model)', 'S/N', 'จำนวน', 'ผู้ทำรายการ', 'สถานที่/โครงการ', 'สถานะ/หมายเหตุ'
     ];
     const rows = filteredData.map((tx: InventoryTransaction) => {
       let typeText: string = tx.transaction_type;
-      if (tx.transaction_type === 'ADD_STOCK') typeText = 'นำเข้าสต็อก';
+      if (tx.transaction_type === 'ADD_STOCK') typeText = 'รับเข้าอุปกรณ์';
       else if (tx.transaction_type === 'WITHDRAW') typeText = 'เบิกออก';
       else if (tx.transaction_type === 'BORROW') typeText = 'ยืมใช้งาน';
       else if (tx.transaction_type === 'RETURN') typeText = 'ส่งคืน';
+      else if (tx.transaction_type === 'ADJUSTMENT') typeText = tx.quantity_added > 0 ? 'ปรับเพิ่ม' : 'ปรับลด';
 
       return [
         tx.created_at ? new Date(tx.created_at).toLocaleString('th-TH') : '-',
@@ -457,10 +451,11 @@ const TransactionList: React.FC = () => {
 
   const formatTxType = (type: string) => {
     switch (type) {
-      case 'ADD_STOCK': return 'นำเข้าพัสดุ (ADD_STOCK)';
-      case 'WITHDRAW': return 'เบิกจ่ายพัสดุ (WITHDRAW)';
-      case 'BORROW': return 'ยืมพัสดุ (BORROW)';
-      case 'RETURN': return 'คืนพัสดุ (RETURN)';
+      case 'ADD_STOCK': return 'รับเข้าอุปกรณ์ (ADD_STOCK)';
+      case 'WITHDRAW': return 'เบิกจ่ายอุปกรณ์ (WITHDRAW)';
+      case 'BORROW': return 'ยืมอุปกรณ์ (BORROW)';
+      case 'RETURN': return 'คืนอุปกรณ์ (RETURN)';
+      case 'ADJUSTMENT': return 'ปรับยอดคงเหลือ (ADJUSTMENT)';
       default: return type;
     }
   };
@@ -478,13 +473,13 @@ const TransactionList: React.FC = () => {
       </div>
 
       <section>
-        <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--primary)' }}><Info size={18} /> ข้อมูลธุรกรรม</h4>
+        <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--primary)' }}><Info size={18} /> ข้อมูลการเคลื่อนไหว</h4>
         <Card style={{ padding: '1rem', backgroundColor: 'var(--bg-app)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
             <div><strong>ประเภทรายการ:</strong> {formatTxType(tx.transaction_type)} {tx.withdrawal_type ? `(${tx.withdrawal_type})` : ''}</div>
             <div><strong>อุปกรณ์:</strong> {tx.product_name}</div>
-            <div><strong>รุ่น:</strong> {tx.product_model || '-'}</div>
-            <div><strong>S/N (หมายเลขเครื่อง):</strong> <code style={{ background: 'var(--bg-subtle)', color: 'var(--text-main)', padding: '2px 4px', borderRadius: '4px' }}>{tx.serial_number || 'ไม่ระบุ'}</code></div>
+            <div><strong>รุ่น (Model):</strong> {tx.product_model || '-'}</div>
+            <div><strong>หมายเลขเครื่อง (S/N):</strong> <code style={{ background: 'var(--bg-subtle)', color: 'var(--text-main)', padding: '2px 4px', borderRadius: '4px' }}>{tx.serial_number || 'ไม่ระบุ'}</code></div>
             <div><strong>จำนวน:</strong> {tx.quantity_added || tx.quantity_withdrawn || tx.quantity_borrowed || tx.quantity_returned} ชิ้น</div>
             <div><strong>สภาพ:</strong> {conditionStyle(tx.condition)?.label || tx.condition || '-'}</div>
           </div>
@@ -524,20 +519,21 @@ const TransactionList: React.FC = () => {
       <div className="responsive-page-content" style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 2.5rem' }}>
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="page-title"><h2>สมุดบัญชีสต็อก (Ledger)</h2><p>ติดตามความเคลื่อนไหวพัสดุและประวัติการเบิก/คืนทั้งหมด</p></div>
+            <div className="page-title"><h2>บัญชีคุมยอดอุปกรณ์ (Ledger)</h2><p>ติดตามรับเข้า เบิกจ่าย คืน และการปรับยอดพร้อมเหตุผล</p></div>
           <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก Excel</Button>
         </div>
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         {[
-          { id: 'all', label: 'ธุรกรรมทั้งหมด', count: stats.total, icon: RefreshCcw, color: 'var(--primary)' },
-          { id: 'inbound', label: 'สต็อกขาเข้า (Inbound)', count: stats.totalInboundCount, icon: ArrowUpCircle, color: 'var(--success)' },
-          { id: 'outbound', label: 'สต็อกขาออก (Outbound)', count: stats.totalOutboundCount, icon: ArrowDownCircle, color: 'var(--danger)' }
+          { id: 'all', label: 'รายการเคลื่อนไหวทั้งหมด', count: stats.total, icon: RefreshCcw, color: 'var(--primary)' },
+          { id: 'inbound', label: 'รับเข้าอุปกรณ์ (Inbound)', count: stats.totalInboundCount, icon: ArrowUpCircle, color: 'var(--success)' },
+          { id: 'outbound', label: 'เบิกอุปกรณ์ (Outbound)', count: stats.totalOutboundCount, icon: ArrowDownCircle, color: 'var(--danger)' },
+          { id: 'adjustments', label: 'ปรับยอดคงเหลือ', count: stats.totalAdjustmentCount, icon: SlidersHorizontal, color: 'var(--primary)' }
         ].map(tab => (
           <Card
             key={tab.id}
             onClick={() => {
-              setActiveLogTab(tab.id as 'all' | 'inbound' | 'outbound');
+              setActiveLogTab(tab.id as 'all' | 'inbound' | 'outbound' | 'adjustments');
               setTableState({ filters: {}, page: 1 });
             }}
             style={{ cursor: 'pointer', borderColor: activeLogTab === tab.id ? 'var(--primary)' : undefined }}
@@ -588,7 +584,7 @@ const TransactionList: React.FC = () => {
         state={{ loading, error: error?.message || null, empty: !loading && paginatedData.length === 0 }}
         totalCount={transactions?.length ?? 0}
         emptyState={{
-          noData: { message: 'ยังไม่มีความเคลื่อนไหวสต็อกในระบบ', hint: 'รายการจะปรากฏเมื่อมีการเบิก รับเข้า หรือคืนอุปกรณ์' },
+          noData: { message: 'ยังไม่มีรายการเคลื่อนไหวอุปกรณ์ในระบบ', hint: 'รายการจะปรากฏเมื่อมีการเบิก รับเข้า หรือคืนอุปกรณ์' },
           noResults: { message: 'ไม่พบรายการที่ตรงกับเงื่อนไข', hint: 'ลองปรับคำค้นหรือตัวกรองใหม่' }
         }}
         actions={actions}
@@ -599,11 +595,11 @@ const TransactionList: React.FC = () => {
         mobileConfig={{
           title: (r) => r.product_name,
           subtitle: (r) => {
-            const label = r.transaction_type === 'ADD_STOCK' ? 'นำเข้าสต็อก' : r.transaction_type === 'WITHDRAW' ? 'เบิกอุปกรณ์' : r.transaction_type === 'BORROW' ? 'ยืมอุปกรณ์' : 'คืนอุปกรณ์';
+            const label = r.transaction_type === 'ADD_STOCK' ? 'รับเข้าอุปกรณ์' : r.transaction_type === 'WITHDRAW' ? 'เบิกอุปกรณ์' : r.transaction_type === 'BORROW' ? 'ยืมอุปกรณ์' : r.transaction_type === 'ADJUSTMENT' ? 'ปรับยอดคงเหลือ' : 'คืนอุปกรณ์';
             return `${label} · ${r.user_name || 'ระบบ'}`;
           },
           statusBadge: (r) => {
-            const label = r.transaction_type === 'ADD_STOCK' ? 'นำเข้า' : r.transaction_type === 'WITHDRAW' ? 'เบิก' : r.transaction_type === 'BORROW' ? 'ยืม' : 'คืน';
+            const label = r.transaction_type === 'ADD_STOCK' ? 'นำเข้า' : r.transaction_type === 'WITHDRAW' ? 'เบิก' : r.transaction_type === 'BORROW' ? 'ยืม' : r.transaction_type === 'ADJUSTMENT' ? 'ปรับยอด' : 'คืน';
             return <span className={`badge badge-${r.transaction_type.toLowerCase()}`}>{label}</span>;
           }
         }}

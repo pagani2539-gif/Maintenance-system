@@ -1,9 +1,12 @@
 import { useSearchParams } from 'react-router-dom';
 import { useCallback, useMemo } from 'react';
 import type { TableUrlState } from '../types/table.types';
+import { useBreakpoint } from './useBreakpoint';
 
 export const useTableUrlState = (defaultPageSize: number = 20) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const breakpoint = useBreakpoint();
+  const responsiveDefaultPageSize = breakpoint === 'mobile' ? Math.min(defaultPageSize, 10) : defaultPageSize;
 
   const urlState = useMemo<TableUrlState>(() => {
     const filters: Record<string, string> = {};
@@ -15,13 +18,13 @@ export const useTableUrlState = (defaultPageSize: number = 20) => {
 
     return {
       page: parseInt(searchParams.get('page') || '1', 10),
-      pageSize: parseInt(searchParams.get('pageSize') || defaultPageSize.toString(), 10),
+      pageSize: parseInt(searchParams.get('pageSize') || responsiveDefaultPageSize.toString(), 10),
       search: searchParams.get('search') || '',
       sortBy: searchParams.get('sortBy') || '',
       sortDir: (searchParams.get('sortDir') as 'asc' | 'desc') || 'desc',
       filters
     };
-  }, [searchParams, defaultPageSize]);
+  }, [searchParams, responsiveDefaultPageSize]);
 
   const setTableState = useCallback((newState: Partial<TableUrlState>) => {
     setSearchParams(prev => {
@@ -33,7 +36,7 @@ export const useTableUrlState = (defaultPageSize: number = 20) => {
       }
 
       if (newState.pageSize !== undefined) {
-        if (newState.pageSize === defaultPageSize) next.delete('pageSize');
+        if (newState.pageSize === responsiveDefaultPageSize) next.delete('pageSize');
         else next.set('pageSize', newState.pageSize.toString());
       }
 
@@ -66,7 +69,7 @@ export const useTableUrlState = (defaultPageSize: number = 20) => {
 
       return next;
     }, { replace: true });
-  }, [setSearchParams, defaultPageSize]);
+  }, [setSearchParams, responsiveDefaultPageSize]);
 
   return { urlState, setTableState };
 };

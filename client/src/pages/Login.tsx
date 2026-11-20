@@ -177,7 +177,7 @@ const Login: React.FC = () => {
             letterSpacing: '-0.02em',
             fontFamily: 'var(--font-display)'
           }}>
-            ระบบซ่อมบำรุงและคลังพัสดุ
+            ระบบซ่อมบำรุงและคลังอุปกรณ์
           </h1>
           <p style={{ 
             margin: '6px 0 0', 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
@@ -33,7 +33,6 @@ import { useNotification } from '../components/Layout';
 import { useApi } from '../hooks/useApi';
 import { Skeleton } from '../components/ui/Skeleton';
 import ChartFrame from '../components/dashboard/ChartFrame';
-import type { DashboardData } from '../types';
 import Select from '../components/ui/Select';
 
 const tooltipStyle = {
@@ -62,7 +61,8 @@ const movementLabel = (type?: string) => ({
   ADD_STOCK: 'รับเข้าคลัง',
   WITHDRAW: 'เบิกออก',
   BORROW: 'ยืมอุปกรณ์',
-  RETURN: 'รับคืน'
+  RETURN: 'รับคืน',
+  ADJUSTMENT: 'ปรับยอดคงเหลือ'
 }[type || ''] || 'เคลื่อนไหวคลัง');
 
 const Dashboard: React.FC = () => {
@@ -122,38 +122,30 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  const fallback: DashboardData = {
-    kpis: { total: 0, pending: 0, in_progress: 0, completed: 0, critical_stock: 0 },
-    recentJobs: [],
-    recentLogs: [],
-    technicians: [],
-    inventory: { topUsed: [], leastUsed: [], criticalItems: [], recentTransactions: [], recentWithdrawals: [] },
-    analysis: { mostBroken: [], overdue: [], monthlyTrend: [] },
-    withdrawalBreakdown: [],
-    stockMovements: [],
-    people: { topRecipients: [], pendingReturns: [], pendingReturnsCount: 0 },
-    purchaseOrders: { total_po: 0, pending_po: 0, received_po: 0 },
-    claimsKpis: { total: 0, pending: 0, in_progress: 0, completed: 0 },
-    inventoryConditions: []
-  };
-  const dashboard = data || fallback;
-  const { kpis, inventory, stockMovements } = dashboard;
-  const people = dashboard.people || fallback.people!;
-  const purchaseOrders = dashboard.purchaseOrders || fallback.purchaseOrders!;
+  if (!data) {
+    return (
+      <div className="brief-dashboard brief-dashboard--loading">
+        <Skeleton height="180px" variant="rect" />
+        <Skeleton height="120px" variant="rect" />
+        <Skeleton height="340px" variant="rect" />
+      </div>
+    );
+  }
 
-  const metrics = useMemo(() => {
-    const conditionTotal = (dashboard.inventoryConditions || []).reduce((sum, item) => sum + item.count, 0);
-    const usableStock = (dashboard.inventoryConditions || [])
-      .filter(item => item.condition === 'New' || item.condition === 'Good')
-      .reduce((sum, item) => sum + item.count, 0);
-    const movementTotal = stockMovements.reduce((sum, item) => sum + item.added + item.withdrawn + item.borrowed + item.returned, 0);
-    return {
-      warehouseAttention: kpis.critical_stock + (people.pendingReturnsCount || 0) + (purchaseOrders.pending_po || 0),
-      usableRate: conditionTotal ? Math.round((usableStock / conditionTotal) * 100) : 0,
-      withdrawals: (dashboard.withdrawalBreakdown || []).reduce((sum, item) => sum + item.count, 0),
-      movementTotal
-    };
-  }, [dashboard, kpis, people.pendingReturnsCount, purchaseOrders.pending_po, stockMovements]);
+  const dashboard = data;
+  const { kpis, inventory, stockMovements, people, purchaseOrders } = dashboard;
+
+  const conditionTotal = (dashboard.inventoryConditions || []).reduce((sum, item) => sum + item.count, 0);
+  const usableStock = (dashboard.inventoryConditions || [])
+    .filter(item => item.condition === 'New' || item.condition === 'Good')
+    .reduce((sum, item) => sum + item.count, 0);
+  const movementTotal = stockMovements.reduce((sum, item) => sum + item.added + item.withdrawn + item.borrowed + item.returned, 0);
+  const metrics = {
+    warehouseAttention: kpis.critical_stock + (people.pendingReturnsCount || 0) + (purchaseOrders.pending_po || 0),
+    usableRate: conditionTotal ? Math.round((usableStock / conditionTotal) * 100) : 0,
+    withdrawals: (dashboard.withdrawalBreakdown || []).reduce((sum, item) => sum + item.count, 0),
+    movementTotal
+  };
 
   const warehouseTrend = stockMovements.map(item => ({
     ...item,
@@ -166,23 +158,13 @@ const Dashboard: React.FC = () => {
     { name: 'ชำรุด', value: (dashboard.inventoryConditions || []).find(item => item.condition === 'Broken')?.count || 0, color: '#d95d5d' }
   ];
 
-  if (!data) {
-    return (
-      <div className="brief-dashboard brief-dashboard--loading">
-        <Skeleton height="180px" variant="rect" />
-        <Skeleton height="120px" variant="rect" />
-        <Skeleton height="340px" variant="rect" />
-      </div>
-    );
-  }
-
   return (
     <div className="brief-dashboard">
       <header className="brief-dashboard__header">
         <div>
           <div className="brief-dashboard__kicker"><span /> WAREHOUSE / DAILY BRIEF</div>
           <h1>ภาพรวมคลังที่ช่วยให้จัดการได้เร็วขึ้น</h1>
-          <p>สรุปจากสต็อก การเบิกจ่าย และรายการค้าง · อัปเดตล่าสุด {lastUpdated || 'กำลังโหลด'} น.</p>
+          <p>สรุปจากยอดคงเหลือ การเบิกจ่าย และรายการค้าง · อัปเดตล่าสุด {lastUpdated || 'กำลังโหลด'} น.</p>
         </div>
         <div className="brief-dashboard__controls">
           <div className="brief-dashboard__select"><CalendarDays size={15} /><Select value={quickFilter} onChange={value => updateFilter(String(value))} ariaLabel="ช่วงเวลาข้อมูล" options={[{ value: 'all', label: 'ข้อมูลทั้งหมด' }, { value: '7_days', label: '7 วันล่าสุด' }, { value: '30_days', label: '30 วันล่าสุด' }, { value: '90_days', label: '90 วันล่าสุด' }]} /></div>
@@ -195,11 +177,11 @@ const Dashboard: React.FC = () => {
         <div className="brief-hero__focus">
           <div className="brief-hero__eyebrow"><span /> WAREHOUSE FOCUS <b>{new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</b></div>
           <div className="brief-hero__headline">
-            <div><small>รายการคลังที่ต้องติดตาม</small><strong>{metrics.warehouseAttention}</strong><p>รวมสต็อกวิกฤต ของค้างคืน และ PO ที่ยังรอตรวจรับ</p></div>
+            <div><small>รายการอุปกรณ์ที่ต้องติดตาม</small><strong>{metrics.warehouseAttention}</strong><p>รวมอุปกรณ์ต่ำกว่าเกณฑ์ ของค้างคืน และ PO ที่ยังรอตรวจรับ</p></div>
             <Link to="/inventory" className="brief-hero__action">เปิดคลัง <ArrowUpRight size={16} /></Link>
           </div>
           <div className="brief-hero__signals">
-            <Signal label="สต็อกวิกฤต" value={kpis.critical_stock} tone="danger" to="/inventory" />
+            <Signal label="อุปกรณ์ต่ำกว่าเกณฑ์" value={kpis.critical_stock} tone="danger" to="/inventory" />
             <Signal label="ค้างคืน" value={people.pendingReturnsCount || 0} tone="info" to="/pending-returns" />
             <Signal label="PO รอรับ" value={purchaseOrders.pending_po} tone="neutral" to="/purchase-orders" />
             <Signal label="เบิกจ่าย" value={metrics.withdrawals} tone="warning" to="/withdrawal-history" />
@@ -213,10 +195,10 @@ const Dashboard: React.FC = () => {
       </section>
 
       <section className="brief-metric-grid" aria-label="ตัวชี้วัดหลัก">
-        <MetricCard icon={<ShieldAlert size={17} />} label="สต็อกวิกฤต" value={kpis.critical_stock} note="รายการต่ำกว่าจุดสั่งซื้อ" to="/inventory" tone="amber" />
+        <MetricCard icon={<ShieldAlert size={17} />} label="อุปกรณ์ต่ำกว่าเกณฑ์" value={kpis.critical_stock} note="รายการต่ำกว่าเกณฑ์ขั้นต่ำ" to="/inventory" tone="amber" />
         <MetricCard icon={<Truck size={17} />} label="เบิกจ่าย" value={metrics.withdrawals} note="รายการเบิกในช่วงที่เลือก" to="/withdrawal-history" tone="blue" />
         <MetricCard icon={<PackageOpen size={17} />} label="รายการค้างคืน" value={people.pendingReturnsCount || 0} note="รอติดตามการรับคืน" to="/pending-returns" tone="violet" />
-        <MetricCard icon={<Boxes size={17} />} label="สุขภาพคลัง" value={`${metrics.usableRate}%`} note="สัดส่วนพัสดุพร้อมใช้งาน" to="/inventory" tone="green" />
+        <MetricCard icon={<Boxes size={17} />} label="สุขภาพคลัง" value={`${metrics.usableRate}%`} note="สัดส่วนอุปกรณ์พร้อมใช้งาน" to="/inventory" tone="green" />
       </section>
 
       <SectionHeading eyebrow="WAREHOUSE SNAPSHOT" title="ภาพรวมคลังและการเคลื่อนไหว" />
@@ -228,7 +210,7 @@ const Dashboard: React.FC = () => {
         <article className="brief-card brief-card--priority">
           <PanelTitle icon={<Bell size={16} />} title="คิวงานคลัง" note="รายการที่ต้องจัดการก่อน" action={<Link to="/inventory">เปิดคลัง <ChevronRight size={14} /></Link>} />
           <div className="brief-priority-list">
-            <PriorityRow icon={<ShieldAlert size={15} />} label="สต็อกวิกฤต" value={kpis.critical_stock} detail={inventory.criticalItems[0]?.name || 'ไม่มีรายการ'} tone="danger" to="/inventory" />
+          <PriorityRow icon={<ShieldAlert size={15} />} label="อุปกรณ์ต่ำกว่าเกณฑ์" value={kpis.critical_stock} detail={inventory.criticalItems[0]?.name || 'ไม่มีรายการ'} tone="danger" to="/inventory" />
             <PriorityRow icon={<PackageOpen size={15} />} label="รายการค้างคืน" value={people.pendingReturnsCount || 0} detail={people.pendingReturns[0]?.product_name || 'ไม่มีรายการ'} tone="info" to="/pending-returns" />
             <PriorityRow icon={<Truck size={15} />} label="PO รอตรวจรับ" value={purchaseOrders.pending_po} detail="ติดตามการรับเข้าคลัง" tone="neutral" to="/purchase-orders" />
             <PriorityRow icon={<Boxes size={15} />} label="การเบิกจ่าย" value={metrics.withdrawals} detail={inventory.recentTransactions[0]?.product_name || 'ยังไม่มีรายการล่าสุด'} tone="warning" to="/withdrawal-history" />
@@ -242,17 +224,17 @@ const Dashboard: React.FC = () => {
           <div className="brief-ranking">{inventory.topUsed.slice(0, 5).map((item, index) => <div className="brief-ranking-row" key={item.name}><span>{String(index + 1).padStart(2, '0')}</span><b>{item.name}</b><strong>{item.count} ชิ้น</strong></div>)}{inventory.topUsed.length === 0 && <Empty text="ยังไม่มีข้อมูลการเบิกจ่าย" />}</div>
         </article>
         <article className="brief-card brief-card--condition">
-          <PanelTitle icon={<CircleCheck size={16} />} title="สุขภาพสินทรัพย์" note={`พร้อมใช้งาน ${metrics.usableRate}%`} action={<Link to="/inventory">เปิดคลัง <ChevronRight size={14} /></Link>} />
+          <PanelTitle icon={<CircleCheck size={16} />} title="สุขภาพอุปกรณ์" note={`พร้อมใช้งาน ${metrics.usableRate}%`} action={<Link to="/inventory">เปิดคลัง <ChevronRight size={14} /></Link>} />
           <div className="brief-condition"><div className="brief-condition__chart"><ChartFrame height={182}>{({ width, height }) => <PieChart width={width} height={height}><Pie data={conditions} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={72} paddingAngle={3} stroke="var(--brief-surface)" strokeWidth={3}>{conditions.map(item => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip contentStyle={tooltipStyle} /></PieChart>}</ChartFrame><div className="brief-condition__center"><strong>{metrics.usableRate}%</strong><span>พร้อมใช้</span></div></div><div className="brief-condition__legend">{conditions.map(item => <div key={item.name}><span><i style={{ background: item.color }} />{item.name}</span><b>{item.value}</b></div>)}</div></div>
-          <div className="brief-condition__note"><CircleCheck size={14} /> สินทรัพย์ที่พร้อมใช้งานยังเป็นสัดส่วนหลักของคลัง</div>
+          <div className="brief-condition__note"><CircleCheck size={14} /> อุปกรณ์ที่พร้อมใช้งานยังเป็นสัดส่วนหลักของคลัง</div>
         </article>
       </section>
 
       <SectionHeading eyebrow="WAREHOUSE ACTIVITY" title="รายการคลังล่าสุดและงานสนับสนุน" />
       <section className="brief-grid brief-grid--bottom">
         <article className="brief-card">
-          <PanelTitle icon={<PackageOpen size={16} />} title="ธุรกรรมคลังล่าสุด" note="5 รายการล่าสุด" action={<Link to="/transactions">ดูทั้งหมด <ChevronRight size={14} /></Link>} />
-          <div className="brief-list">{inventory.recentTransactions.slice(0, 5).map(item => <Link to="/transactions" className="brief-list-row" key={item.id}><span className="brief-list-row__icon"><PackageOpen size={14} /></span><span><b>{item.product_name}</b><small>{movementLabel(item.transaction_type)} · {formatDate(item.created_at)}</small></span><ChevronRight size={14} /></Link>)}{inventory.recentTransactions.length === 0 && <Empty text="ยังไม่มีธุรกรรมล่าสุด" />}</div>
+          <PanelTitle icon={<PackageOpen size={16} />} title="รายการเคลื่อนไหวคลังล่าสุด" note="5 รายการล่าสุด" action={<Link to="/transactions">ดูทั้งหมด <ChevronRight size={14} /></Link>} />
+          <div className="brief-list">{inventory.recentTransactions.slice(0, 5).map(item => <Link to="/transactions" className="brief-list-row" key={item.id}><span className="brief-list-row__icon"><PackageOpen size={14} /></span><span><b>{item.product_name}</b><small>{movementLabel(item.transaction_type)} · {formatDate(item.created_at)}</small></span><ChevronRight size={14} /></Link>)}{inventory.recentTransactions.length === 0 && <Empty text="ยังไม่มีรายการเคลื่อนไหวล่าสุด" />}</div>
         </article>
         <article className="brief-card">
           <PanelTitle icon={<Truck size={16} />} title="รายการเบิกจ่ายล่าสุด" note="ผู้รับ ประเภท และวันที่เบิก" action={<Link to="/withdrawal-history">ดูทั้งหมด <ChevronRight size={14} /></Link>} />
@@ -263,7 +245,7 @@ const Dashboard: React.FC = () => {
           <SummaryRow label="PO รับเข้าแล้ว" value={purchaseOrders.received_po} tone="green" />
           <SummaryRow label="PO รอตรวจรับ" value={purchaseOrders.pending_po} tone="amber" />
           <SummaryRow label="รายการค้างคืน" value={people.pendingReturnsCount || 0} tone="blue" />
-          <SummaryRow label="สต็อกวิกฤต" value={kpis.critical_stock} tone="red" />
+          <SummaryRow label="อุปกรณ์ต่ำกว่าเกณฑ์" value={kpis.critical_stock} tone="red" />
           <Link to="/inventory" className="brief-card-link">ดูภาพรวมคลัง <ArrowUpRight size={14} /></Link>
         </article>
       </section>

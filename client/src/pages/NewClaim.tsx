@@ -264,7 +264,7 @@ const NewClaim: React.FC = () => {
               }}
             />
             <Input
-              label="ชื่ออุปกรณ์ / รุ่น (เพื่อการเคลม)"
+              label="ชื่ออุปกรณ์ / รุ่น (Model) (เพื่อการเคลม)"
               required
               maxLength={100}
               placeholder="ชื่ออุปกรณ์และ Serial Number"

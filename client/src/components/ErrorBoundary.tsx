@@ -10,10 +10,57 @@ interface State {
 }
 
 const CHUNK_RELOAD_KEY = 'maintenance:chunk-reload-attempted';
+const CHUNK_RECOVERY_PARAM = '__maintenance_reload';
+const CHUNK_RELOAD_COOLDOWN_MS = 15_000;
 
 const isChunkLoadError = (error: Error) => (
-  /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror/i.test(error.message)
+  /failed to fetch dynamically imported module|importing a module script failed|chunkloaderror|loading chunk .* failed|unexpected token '<'/i.test(error.message)
 );
+
+const getChunkReloadAttempt = () => {
+  try {
+    return Number(sessionStorage.getItem(CHUNK_RELOAD_KEY));
+  } catch {
+    return 0;
+  }
+};
+
+const markChunkReloadAttempt = () => {
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+  } catch {
+    // The recovery URL below is the fallback when sessionStorage is blocked.
+  }
+};
+
+const clearChunkReloadAttempt = () => {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+  } catch {
+    // Ignore storage failures; this must never hide the original error.
+  }
+};
+
+const hasRecentChunkReloadAttempt = () => {
+  const attemptedAt = getChunkReloadAttempt();
+  return Number.isFinite(attemptedAt)
+    && attemptedAt > 0
+    && Date.now() - attemptedAt < CHUNK_RELOAD_COOLDOWN_MS;
+};
+
+const hasRecoveryQuery = () => (
+  typeof window !== 'undefined'
+  && new URL(window.location.href).searchParams.has(CHUNK_RECOVERY_PARAM)
+);
+
+const clearRecoveryQuery = () => {
+  if (typeof window === 'undefined') return;
+
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(CHUNK_RECOVERY_PARAM)) return;
+  url.searchParams.delete(CHUNK_RECOVERY_PARAM);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+};
 
 const clearStaleReleaseAndReload = async () => {
   await Promise.allSettled([
@@ -24,8 +71,21 @@ const clearStaleReleaseAndReload = async () => {
       ? caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
       : Promise.resolve(),
   ]);
-  window.location.reload();
+
+  const url = new URL(window.location.href);
+  url.searchParams.set(CHUNK_RECOVERY_PARAM, String(Date.now()));
+  window.location.replace(url.toString());
 };
+
+if (typeof window !== 'undefined') {
+  // A successful recovery should not permanently disable future recovery
+  // attempts. The cooldown also prevents an actually missing chunk from
+  // causing an infinite reload loop.
+  window.setTimeout(clearChunkReloadAttempt, CHUNK_RELOAD_COOLDOWN_MS);
+  window.addEventListener('load', () => {
+    window.setTimeout(clearRecoveryQuery, 500);
+  }, { once: true });
+}
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
@@ -42,16 +102,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // A deployment replaces Vite's hashed lazy chunks. If a PWA tab still has
     // an older app shell, clear that one stale release and reload once.
-    if (isChunkLoadError(error) && sessionStorage.getItem(CHUNK_RELOAD_KEY) !== '1') {
-      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+    if (isChunkLoadError(error) && !hasRecoveryQuery() && !hasRecentChunkReloadAttempt()) {
+      markChunkReloadAttempt();
       void clearStaleReleaseAndReload();
     }
   }
 
   private handleReset = () => {
-    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    clearChunkReloadAttempt();
     this.setState({ hasError: false, error: null });
-    window.location.reload();
+    void clearStaleReleaseAndReload();
   };
 
   public render() {

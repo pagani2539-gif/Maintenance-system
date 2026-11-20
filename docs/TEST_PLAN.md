@@ -1,6 +1,6 @@
 # แผนทดสอบระบบก่อนขึ้น Production จริง (Pre-Production Test Plan)
 
-> จัดทำ: 2026-07-04 · Branch: `feature/postgres-migration` · สถานะ: ระบบผ่านการ migrate SQLite → PostgreSQL ครบทุก stage บนเครื่อง dev/staging แล้ว — เครื่อง production จริงยังไม่ได้ cutover
+> จัดทำ: 2026-07-04 · ปรับปรุงล่าสุด: 2026-09-10 · Branch: `feature/postgres-migration` · สถานะ: ระบบผ่านการ migrate SQLite → PostgreSQL ครบทุก stage และเพิ่มการแยกฐานข้อมูลสำหรับ automated tests แล้ว
 >
 > วิธีใช้: ไล่ติ๊ก `[ ]` ทีละข้อ ข้อไหนตกให้จดอาการ + วันที่ไว้ท้ายข้อ ห้ามขึ้น production จนกว่าหมวด A, B, H, I, J จะผ่านครบทุกข้อ (หมวดอื่นผ่าน ≥ ที่ระบุไว้ในเกณฑ์ท้ายเอกสาร)
 
@@ -12,11 +12,21 @@
 
 | รายการ | คำสั่ง (รันจากโฟลเดอร์) | ผลล่าสุด |
 |---|---|---|
-| Backend test suite (vitest → DB `maintenance_system_test`) | `server`: `npx vitest run` | ✅ 3 ไฟล์ / 10 เทสต์ ผ่านหมด |
+| Backend test suite (Vitest → schema `maintenance_test`) | `server`: `npm.cmd test -- --run` | ✅ 7 ไฟล์ / 34 เทสต์ ผ่านหมด (2026-09-10) |
 | Frontend unit tests | `client`: `npx vitest run` | ✅ 2 ไฟล์ / 8 เทสต์ ผ่านหมด |
 | ESLint | `client`: `npm run lint` | ✅ 0 warning |
 | Production build (`tsc -b` + vite) | `client`: `npm run build` | ✅ ผ่าน (มี warning ขนาด chunk >500KB — ไม่ blocking) |
 | Pre-flight check | root: `npm run production:check` | ✅ 13/13 PASS |
+
+### กติกาการแยกข้อมูลทดสอบ (สำคัญ)
+
+- รัน backend tests จากโฟลเดอร์ `server` ด้วย `npm.cmd test -- --run` (หรือ `npm test -- --run` บนระบบที่ไม่ต้องใช้ suffix `.cmd`)
+- `globalSetup` จะตั้ง `NODE_ENV=test` และโหลด `server/.env.test` อัตโนมัติ
+- เทสใช้ PostgreSQL schema `maintenance_test` ผ่าน `PG_TEST_SCHEMA` ไม่ใช่ตาราง production ใน schema `public`
+- `DATABASE_URL_TEST` ในการตั้งค่าปัจจุบันชี้ไปฐานข้อมูล PostgreSQL เดียวกับเครื่องนี้ แต่ `search_path` บังคับเข้า `maintenance_test`; หากมีสิทธิ์สร้างฐานข้อมูล แนะนำให้ใช้ฐานข้อมูล test แยกต่างหาก
+- ห้ามรัน test โดยนำ `DATABASE_URL` ของ production ไปแทน `DATABASE_URL_TEST` หรือเอา `PG_TEST_SCHEMA` ออก ระบบจะหยุดด้วย fail-closed guard
+- Test suites สร้างข้อมูลจำลองเองระหว่างรัน เช่น สถานี อุปกรณ์ ใบเบิก งานซ่อม และ PO ไม่ได้ใช้ข้อมูลจริงจาก production
+- ข้อมูลใน schema ทดสอบอาจค้างจาก suite ที่ยังไม่ได้ cleanup ทุก entity; ข้อมูลค้างดังกล่าวไม่กระทบ production แต่ test ใหม่ควรใช้รหัสสุ่ม/คำนำหน้าเฉพาะและล้างข้อมูลที่สร้างเองเสมอ
 
 - [ ] **A1** รันทั้ง 5 รายการซ้ำอีกครั้ง "หลัง" แก้โค้ดใดๆ เพิ่มเติม และก่อนวัน cutover จริง — ต้องผ่านเท่าเดิม
 - [ ] **A2** รัน `node scripts/smoke-test-pg.js` (จากโฟลเดอร์ `server`) กับ DB dev — ทุกบรรทัดขึ้น `OK`
@@ -41,8 +51,9 @@
 ### B3. Permission matrix
 เตรียม user ทดสอบ 2 คน: `admin` (is_full) และ `user-limited` (เปิดสิทธิ์แค่ดู + สร้าง repair)
 - [ ] `user-limited` ไม่เห็นเมนู/ปุ่ม: จัดการผู้ใช้, Audit Logs, Settings, ปุ่มลบใน repair/claim/PO/station
-- [ ] ยิง API ตรง (เช่นด้วย curl/Postman) ด้วย token ของ `user-limited` ไปยัง endpoint ที่ไม่มีสิทธิ์ → ได้ 403 (`DELETE /api/repairs/:id`, `GET /api/users/audit-logs`, `POST /api/settings/...`)
-- [ ] ยิง API โดย**ไม่มี** token → 401 ทุก route ยกเว้น `/api/auth/*` และ `GET /api`
+- [ ] ยิง API v2 ตรง (เช่นด้วย curl/Postman) ด้วย token ของ `user-limited` ไปยัง endpoint ที่ไม่มีสิทธิ์ → ได้ 403 (`DELETE /api/v2/repairs/:id`, `GET /api/v2/users/audit-logs`, `POST /api/v2/settings/...`)
+- [ ] ยิง API v2 โดย**ไม่มี** token → 401 ทุก resource route ยกเว้น `POST /api/v2/auth/login` และ `GET /api`
+- [ ] เรียก resource path เดิม เช่น `GET /api/inventory` และ `POST /api/auth/login` → ได้ 404 พร้อม error code `NOT_FOUND`
 - [ ] Admin แก้ permission ของ `user-limited` ขณะที่เขา login อยู่ → มีผลทันทีใน request ถัดไป (ระบบ re-fetch user ทุก request)
 
 ---
@@ -220,7 +231,7 @@
 ## เกณฑ์ผ่าน (Go / No-Go)
 
 | หมวด | เกณฑ์ |
-|---|---|
+|---|---|---|
 | A ชุดทดสอบอัตโนมัติ | ต้องผ่าน 100% |
 | B Auth & สิทธิ์ | ต้องผ่าน 100% |
 | C–G ฟังก์ชันหลัก | ผ่าน ≥ 95% และข้อที่ตกต้องไม่ใช่ data-loss/security |

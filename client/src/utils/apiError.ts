@@ -6,12 +6,14 @@
  */
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   const data = (err as {
-    response?: { data?: { message?: string; error?: string } };
+    response?: { data?: { message?: string; error?: string | { message?: string }; errorDetails?: Array<{ field?: string; reason?: string }> } };
     message?: string;
   } | null | undefined);
+  const errorValue = data?.response?.data?.error;
+  const structuredMessage = typeof errorValue === 'object' ? errorValue?.message : errorValue;
   return (
     data?.response?.data?.message ||
-    data?.response?.data?.error ||
+    structuredMessage ||
     fallback
   );
 }

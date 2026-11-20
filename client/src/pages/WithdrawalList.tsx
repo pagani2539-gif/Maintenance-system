@@ -172,13 +172,13 @@ const WithdrawalList: React.FC = () => {
   const handleDelete = async (id: number) => {
     const isConfirmed = await confirm({
       title: 'ยืนยันการลบประวัติการเบิก',
-      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนสต็อกอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ\nการลบประวัตินี้ไม่สามารถย้อนกลับได้',
+      message: 'คุณต้องการลบประวัติการเบิกนี้ใช่หรือไม่? ระบบจะทำการคืนยอดคงเหลือของอุปกรณ์ทั้งหมดในรายการนี้ให้โดยอัตโนมัติ\nการลบประวัตินี้ไม่สามารถย้อนกลับได้',
       variant: 'danger'
     });
     if (!isConfirmed) return;
     try {
       await withdrawalApi.delete(id);
-      notify('ลบประวัติและคืนสต็อกเรียบร้อยแล้ว');
+      notify('ลบประวัติและคืนอุปกรณ์เข้าคลังเรียบร้อยแล้ว');
       fetchWithdrawals();
     } catch (err) {
       notify(getApiErrorMessage(err, 'ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'), 'error');
@@ -241,12 +241,14 @@ const WithdrawalList: React.FC = () => {
       accessor: 'recipient',
       priority: 1,
       width: '180px',
+      minWidth: '180px',
+      cellMode: 'wrap-2',
       render: (val) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
           <div style={{ width: 26, height: 26, background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <User size={13} />
           </div>
-          <span style={{ fontWeight: 'var(--table-text-weight)', fontSize: 'var(--table-text-size)', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val as string}>{val}</span>
+          <span style={{ fontWeight: 'var(--table-text-weight)', fontSize: 'var(--table-text-size)', color: 'var(--text-main)', overflowWrap: 'anywhere' }}>{val}</span>
         </div>
       )
     },
@@ -344,8 +346,10 @@ const WithdrawalList: React.FC = () => {
       header: 'ประเภทการเบิก',
       accessor: 'type',
       priority: 1,
-      width: '140px',
+      width: '160px',
+      minWidth: '160px',
       align: 'center',
+      cellMode: 'wrap-2',
       render: (val) => (
         <span className={`badge ${getBadgeClass(val)}`} style={{ minWidth: '100px', justifyContent: 'center' }}>
           {val}
@@ -587,7 +591,7 @@ const WithdrawalList: React.FC = () => {
         <div className="page-header boot-animate stagger-0" style={{ marginBottom: '2.5rem' }}>
           <div className="page-title">
             <h2>ประวัติการเบิกอุปกรณ์</h2>
-            <p>ตรวจสอบรายการเบิกอุปกรณ์ย้อนหลังทั้งหมดในระบบคลังพัสดุ</p>
+            <p>ตรวจสอบรายการเบิกอุปกรณ์ย้อนหลังทั้งหมดในระบบคลังอุปกรณ์</p>
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <Button variant="outline" icon={<Download size={20} />} onClick={handleExportExcel}>ส่งออก Excel</Button>

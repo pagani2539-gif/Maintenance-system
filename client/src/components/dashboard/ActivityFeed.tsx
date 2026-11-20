@@ -5,6 +5,7 @@ import Card from '../ui/Card';
 import { ScopeBadge } from './common';
 import { timeAgo } from './dashboardUtils';
 import type { DashboardData, RepairLog, InventoryTransaction } from '../../types';
+import { translateRepairStatusText } from '../../constants/terminology';
 
 interface ActivityFeedProps {
   recentLogs: DashboardData['recentLogs'];
@@ -28,7 +29,7 @@ const formatRepairAction = (action: string): string => {
   // Some legacy log rows contain replacement characters instead of the Thai
   // status text. Keep the activity useful without exposing unreadable output.
   if (/\?{2,}/.test(normalized)) return 'อัปเดตสถานะงาน';
-  return normalized;
+  return translateRepairStatusText(normalized);
 };
 
 /** Zone 7 — กิจกรรมล่าสุด: รวม log งานซ่อม + ธุรกรรมสต็อกเป็นฟีดเดียว */
@@ -47,11 +48,11 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ recentLogs, recentTransacti
     const stockEvents = (recentTransactions || []).map((tx: InventoryTransaction & { product_name: string }) => ({
       id: `stk-${tx.id}`,
       title: tx.product_name,
-      subtitle: `${tx.transaction_type === 'ADD_STOCK' ? 'นำเข้า' : tx.transaction_type === 'WITHDRAW' ? 'เบิกจ่าย' : tx.transaction_type === 'RETURN' ? 'คืน' : 'ปรับปรุง'} · ${tx.quantity_added || tx.quantity_withdrawn || tx.quantity_returned || tx.quantity_borrowed} ชิ้น`,
+      subtitle: `${tx.transaction_type === 'ADD_STOCK' ? 'นำเข้า' : tx.transaction_type === 'WITHDRAW' ? 'เบิกจ่าย' : tx.transaction_type === 'RETURN' ? 'คืน' : tx.transaction_type === 'ADJUSTMENT' ? 'ปรับยอด' : 'ยืม' } · ${tx.quantity_added || tx.quantity_withdrawn || tx.quantity_returned || tx.quantity_borrowed} ชิ้น`,
       user: tx.user_name || 'ระบบ',
       time: tx.created_at,
       icon: tx.transaction_type === 'ADD_STOCK' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />,
-      color: tx.transaction_type === 'ADD_STOCK' ? 'var(--success)' : 'var(--danger)'
+      color: tx.transaction_type === 'ADD_STOCK' || (tx.transaction_type === 'ADJUSTMENT' && tx.quantity_added > 0) ? 'var(--success)' : 'var(--danger)'
     }));
 
     return [...repairEvents, ...stockEvents]

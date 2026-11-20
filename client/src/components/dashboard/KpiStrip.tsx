@@ -22,7 +22,7 @@ const KpiStrip: React.FC<KpiStripProps> = ({
   criticalStock
 }) => {
   const tiles = [
-    { label: 'สต็อกวิกฤต', value: criticalStock, icon: ShieldAlert, color: 'var(--danger)', bg: 'var(--danger-light)', to: '/inventory' },
+    { label: 'อุปกรณ์ต่ำกว่าเกณฑ์', value: criticalStock, icon: ShieldAlert, color: 'var(--danger)', bg: 'var(--danger-light)', to: '/inventory' },
     { label: 'รายการค้างคืน', value: pendingReturns, icon: RotateCcw, color: 'var(--warning)', bg: 'var(--warning-light)', to: '/pending-returns' },
     { label: 'PO รอตรวจรับ', value: pendingPo, icon: FileSignature, color: 'var(--info)', bg: 'var(--info-light)', to: '/purchase-orders' },
     { label: 'ใบเบิกทั้งหมด', value: totalWithdrawals, icon: PackageCheck, color: 'var(--primary)', bg: 'var(--primary-light)', to: '/withdrawal-history' },

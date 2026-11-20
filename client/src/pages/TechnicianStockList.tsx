@@ -34,13 +34,13 @@ const KitDrawer: React.FC<{ technicianId: number; fullName: string }> = ({ techn
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <section>
         <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: 'var(--primary)' }}>
-          <Boxes size={18} /> อะไหล่ในมือช่าง
+          <Boxes size={18} /> อุปกรณ์ในมือช่าง
         </h4>
         {loading ? (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>กำลังโหลด...</p>
         ) : (detail?.holdings.length ?? 0) === 0 ? (
           <div style={{ padding: '1rem', background: 'var(--bg-app)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            ช่างคนนี้ยังไม่มีอะไหล่สำรองในมือ
+            ช่างคนนี้ยังไม่มีอุปกรณ์สำรองในมือ
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -76,7 +76,7 @@ const KitDrawer: React.FC<{ technicianId: number; fullName: string }> = ({ techn
 
       <Link to={`/technician-stock/movements?technician_id=${technicianId}`} style={{ width: '100%' }}>
         <Button variant="outline" style={{ width: '100%' }} icon={<FileClock size={18} />}>
-          ดูประวัติการใช้อะไหล่ของ {fullName}
+          ดูประวัติการใช้อุปกรณ์ของ {fullName}
         </Button>
       </Link>
     </div>
@@ -105,21 +105,22 @@ const TechnicianStockList: React.FC = () => {
 
   const columns: TableColumn<TechnicianKitSummary>[] = [
     {
-      id: 'name', header: 'ช่าง', accessor: 'full_name', priority: 1, width: 'auto',
+      id: 'name', header: 'ช่าง', accessor: 'full_name', priority: 1, width: 'auto', minWidth: '220px', cellMode: 'wrap-2',
+      getCellText: (row) => [row.full_name, row.code].filter(Boolean).join(' — '),
       render: (val, row) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <div style={{ width: 30, height: 30, background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <User size={15} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
+            <div style={{ fontWeight: 800, fontSize: '0.9rem', overflowWrap: 'anywhere' }}>{val}</div>
             {row.code && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{row.code}</div>}
           </div>
         </div>
       ),
     },
     {
-      id: 'items', header: 'อะไหล่ในมือ', accessor: 'item_count', priority: 1, width: '160px', align: 'center',
+      id: 'items', header: 'อุปกรณ์ในมือ', accessor: 'item_count', priority: 1, width: '160px', align: 'center',
       render: (_, row) => row.item_count > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', lineHeight: 1.15 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary)' }}>
@@ -130,7 +131,7 @@ const TechnicianStockList: React.FC = () => {
       ) : <span className="cell-empty">— ว่าง —</span>,
     },
     {
-      id: 'status', header: 'สถานะ', accessor: 'is_active', priority: 2, width: '110px', align: 'center',
+      id: 'status', header: 'สถานะ', accessor: 'is_active', priority: 2, width: '130px', minWidth: '130px', align: 'center', cellMode: 'wrap-2',
       render: (val) => val
         ? <span className="badge" style={{ background: 'var(--success-light)', color: 'var(--success)' }}>ใช้งาน</span>
         : <span className="badge" style={{ background: 'var(--bg-app)', color: 'var(--text-muted)' }}>ปิดใช้งาน</span>,
@@ -138,7 +139,7 @@ const TechnicianStockList: React.FC = () => {
   ];
 
   const actions: TableAction<TechnicianKitSummary>[] = [
-    { id: 'load', label: 'โหลดอะไหล่', icon: <Truck size={14} />, inline: true, onClick: (row) => setModal({ mode: 'load', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
+    { id: 'load', label: 'โหลดอุปกรณ์', icon: <Truck size={14} />, inline: true, onClick: (row) => setModal({ mode: 'load', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
     { id: 'install', label: 'ติดตั้ง/เปลี่ยน', icon: <PackageOpen size={14} />, inline: true, onClick: (row) => setModal({ mode: 'install', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
     { id: 'return', label: 'คืนคลัง', icon: <Undo2 size={14} />, inline: true, onClick: (row) => setModal({ mode: 'return', technicianId: row.technician_id }), hidden: () => !canManageTechnicianStock },
   ];
@@ -171,12 +172,12 @@ const TechnicianStockList: React.FC = () => {
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
-            <h2>อะไหล่สำรองประจำตัวช่าง</h2>
-            <p>ติดตามว่าช่างแต่ละคนถืออะไหล่สำรองอะไร เอาไปเปลี่ยนที่ไหนบ้าง</p>
+            <h2>อุปกรณ์สำรองประจำตัวช่าง</h2>
+            <p>ติดตามว่าช่างแต่ละคนถืออุปกรณ์สำรองอะไร และนำไปเปลี่ยนที่ไหนบ้าง</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             {canManageTechnicianStock && <>
-              <Button variant="outline" icon={<Truck size={18} />} onClick={() => setModal({ mode: 'load' })}>โหลดอะไหล่เข้าช่าง</Button>
+              <Button variant="outline" icon={<Truck size={18} />} onClick={() => setModal({ mode: 'load' })}>โหลดอุปกรณ์เข้าช่าง</Button>
               <Button variant="primary" icon={<PackageOpen size={18} />} onClick={() => setModal({ mode: 'install' })}>ติดตั้ง / เปลี่ยน</Button>
               <Button variant="outline" icon={<Undo2 size={18} />} onClick={() => setModal({ mode: 'return' })}>คืนคลัง</Button>
             </>}
@@ -186,7 +187,7 @@ const TechnicianStockList: React.FC = () => {
         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
           {[
             { key: 'all' as const, label: 'ช่างทั้งหมด', val: totals.techCount, icon: Wrench, color: 'var(--primary)' },
-            { key: 'withItems' as const, label: 'ช่างที่ถืออะไหล่', val: totals.withItems, icon: User, color: 'var(--success)' },
+            { key: 'withItems' as const, label: 'ช่างที่ถืออุปกรณ์', val: totals.withItems, icon: User, color: 'var(--success)' },
             { key: 'withItems' as const, label: 'ชิ้นที่อยู่ในมือช่าง', val: totals.units, icon: Boxes, color: 'var(--primary)' },
           ].map((s, i) => (
             <Card
@@ -227,11 +228,11 @@ const TechnicianStockList: React.FC = () => {
             }}
             actions={actions}
             onRetry={fetchSummary}
-            drawerTitle={(row) => `อะไหล่ในมือของ ${row.full_name}`}
+              drawerTitle={(row) => `อุปกรณ์ในมือของ ${row.full_name}`}
             renderDetailDrawer={renderDrawer}
             mobileConfig={{
               title: (row) => row.full_name,
-              subtitle: (row) => `ถืออะไหล่ ${row.item_count} รายการ (${row.total_qty} ชิ้น)`,
+              subtitle: (row) => `ถืออุปกรณ์ ${row.item_count} รายการ (${row.total_qty} ชิ้น)`,
             }}
           />
 

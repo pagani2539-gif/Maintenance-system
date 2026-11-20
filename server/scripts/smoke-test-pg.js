@@ -55,7 +55,7 @@ async function run() {
   // 4. stations.createStation
   const stationRes = mockRes('stations.createStation');
   await stations.createStation({
-    body: { name: 'ด่านทดสอบ Smoke', station_type: 'toll', highway_no: '7', direction: 'BOTH', region: 'ภาคกลาง', province: 'ชลบุรี', responsible_person: 'ทดสอบ' },
+  body: { name: 'ด่านทดสอบ Smoke', station_type: 'toll', highway_no: '7', direction: 'BOTH', region: 'ภาคกลาง', province: 'ชลบุรี', gps_coordinates: '13.3611,100.9847', responsible_person: 'ทดสอบ' },
     user: testUser
   }, stationRes);
 

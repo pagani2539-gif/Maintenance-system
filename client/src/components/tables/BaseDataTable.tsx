@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { 
   TableColumn, 
   TableAction, 
@@ -14,7 +14,14 @@ import TableEmptyState from './TableEmptyState';
 import TableErrorState from './TableErrorState';
 import ActionMenu from './ActionMenu';
 import TableDetailDrawer from './TableDetailDrawer';
+import TableCellContent from './TableCellContent';
 import { ChevronUp, ChevronDown, MoreHorizontal } from 'lucide-react';
+
+const ACTION_BUTTON_SIZE = 44;
+const ACTION_BUTTON_TOUCH_SIZE = 44;
+const ACTION_GAP = 2;
+const ACTION_CELL_HORIZONTAL_PADDING = 32;
+const ACTION_COLUMN_SAFETY_SPACE = 8;
 
 interface BaseDataTableProps<T> {
   columns: TableColumn<T>[];
@@ -65,6 +72,24 @@ function BaseDataTable<T>({
   const breakpoint = useBreakpoint();
   const [selectedRow, setSelectedRow] = useState<T | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [actionButtonSize, setActionButtonSize] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return ACTION_BUTTON_SIZE;
+    return window.matchMedia('(pointer: coarse)').matches
+      ? ACTION_BUTTON_TOUCH_SIZE
+      : ACTION_BUTTON_SIZE;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const mediaQuery = window.matchMedia('(pointer: coarse)');
+    const syncActionButtonSize = () => {
+      setActionButtonSize(mediaQuery.matches ? ACTION_BUTTON_TOUCH_SIZE : ACTION_BUTTON_SIZE);
+    };
+
+    syncActionButtonSize();
+    mediaQuery.addEventListener?.('change', syncActionButtonSize);
+    return () => mediaQuery.removeEventListener?.('change', syncActionButtonSize);
+  }, []);
 
   const renderEmptyState = () => {
     if (!emptyState) return <TableEmptyState />;
@@ -80,15 +105,21 @@ function BaseDataTable<T>({
     });
   }, [columns, breakpoint]);
 
-  // Estimate action column width: inline buttons (32px each) + overflow trigger (32px) + gaps/padding.
+  // Reserve the real button dimensions plus the cell padding so action buttons never overflow.
   // Static `hidden: true` actions are excluded; per-row hidden functions are counted (upper bound).
   const actionsCellWidth = useMemo(() => {
     if (actions.length === 0) return 0;
     const renderable = actions.filter(a => a.hidden !== true);
     const inlineCount = renderable.filter(a => a.inline).length;
     const hasOverflow = renderable.some(a => !a.inline);
-    return inlineCount * 34 + (hasOverflow ? 36 : 0) + 16;
-  }, [actions]);
+    const buttonCount = inlineCount + (hasOverflow ? 1 : 0);
+    if (buttonCount === 0) return 0;
+
+    return buttonCount * actionButtonSize
+      + Math.max(buttonCount - 1, 0) * ACTION_GAP
+      + ACTION_CELL_HORIZONTAL_PADDING
+      + ACTION_COLUMN_SAFETY_SPACE;
+  }, [actions, actionButtonSize]);
 
   const handleRowClick = (row: T) => {
     if (renderDetailDrawer) {
@@ -141,8 +172,8 @@ function BaseDataTable<T>({
 
   return (
     <>
-      <div className="w-full overflow-x-auto" style={{ borderRadius: 'var(--table-radius)', border: '1px solid var(--border)' }}>
-        <table className="w-full data-table" style={{ tableLayout: 'fixed', minWidth }}>
+      <div className={`data-table-container${actions.length > 0 ? ' data-table-container--has-actions' : ''}`}>
+        <table className={`data-table${actions.length > 0 ? ' data-table--has-actions' : ''}`} style={{ minWidth }}>
           <colgroup>
             {selection?.enabled && <col style={{ width: '48px' }} />}
             {visibleColumns.map(col => (
@@ -151,7 +182,7 @@ function BaseDataTable<T>({
             {actions.length > 0 && <col style={{ width: `${actionsCellWidth}px` }} />}
           </colgroup>
           
-          <thead style={{ height: 'var(--table-header-height)', backgroundColor: 'var(--bg-app)' }}>
+          <thead>
             <tr>
               {selection?.enabled && (
                 <th style={{ textAlign: 'center' }}>
@@ -172,12 +203,12 @@ function BaseDataTable<T>({
                 return (
                   <th
                     key={col.id}
+                    data-column-id={col.id}
                     aria-sort={col.sortable ? (sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none') : undefined}
                     style={{
                       textAlign: col.align || 'left',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 20,
+                      minWidth: col.minWidth || col.width,
+                      maxWidth: col.maxWidth,
                     }}
                   >
                     {col.sortable ? (
@@ -190,7 +221,7 @@ function BaseDataTable<T>({
                         {isSorted && (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                       </button>
                     ) : (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{col.header}</div>
+                      <div className="data-table__header-content">{col.header}</div>
                     )}
                   </th>
                 );
@@ -200,9 +231,8 @@ function BaseDataTable<T>({
                   title="จัดการ"
                   aria-label="จัดการ"
                   className="sticky-actions-col-th"
-                  style={{ textAlign: 'center', position: 'sticky', right: 0, zIndex: 21, width: `${actionsCellWidth}px`, color: 'var(--text-muted)' }}
                 >
-                  <MoreHorizontal size={16} style={{ verticalAlign: 'middle' }} />
+                  <MoreHorizontal size={16} />
                 </th>
               )}
             </tr>
@@ -228,10 +258,7 @@ function BaseDataTable<T>({
                   tabIndex={isInteractiveRow ? 0 : undefined}
                   className={`data-table-row ${isSelected ? 'is-selected' : ''}`}
                   style={{
-                    height: 'var(--table-row-height)',
                     cursor: isInteractiveRow ? 'pointer' : 'default',
-                    backgroundColor: isSelected ? 'var(--primary-light)' : undefined,
-                    transition: 'background-color 0.2s, transform 0.15s',
                     '--row-accent': accent || 'transparent'
                   } as React.CSSProperties}
                 >
@@ -252,21 +279,28 @@ function BaseDataTable<T>({
                     const value = typeof col.accessor === 'function' 
                       ? col.accessor(row) 
                       : (col.accessor ? (row as Record<string, unknown>)[col.accessor as string] : undefined);
+                    const fullText = col.getCellText?.(row) ?? (typeof value === 'string' ? value : undefined);
+                    const cellMode = col.cellMode ?? (col.align && col.align !== 'left' ? 'nowrap' : 'wrap-2');
                     
                     return (
                       <td 
                         key={col.id} 
-                        style={{ textAlign: col.align || 'left', verticalAlign: 'middle' }}
-                        title={typeof value === 'string' ? value : undefined}
+                        data-column-id={col.id}
+                        style={{
+                          textAlign: col.align || 'left',
+                          verticalAlign: 'middle',
+                          minWidth: col.minWidth || col.width,
+                          maxWidth: col.maxWidth,
+                        }}
                       >
-                        <div className="truncate">
+                        <TableCellContent mode={cellMode} fullText={fullText}>
                           {col.render ? col.render(value, row) : (value ?? '-')}
-                        </div>
+                        </TableCellContent>
                       </td>
                     );
                   })}
                   {actions.length > 0 && (
-                    <td className="sticky-actions-col-td" style={{ textAlign: 'center', position: 'sticky', right: 0, zIndex: 10, width: `${actionsCellWidth}px` }} onClick={e => e.stopPropagation()}>
+                    <td className="sticky-actions-col-td" style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                       <ActionMenu
                         row={row}
                         actions={actions.map(a => a.id === 'view' ? { ...a, onClick: () => handleRowClick(row) } : a)}

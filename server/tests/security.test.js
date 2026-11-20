@@ -38,11 +38,11 @@ describe('Authorization and upload security', () => {
     );
 
     const [unprivileged, manager] = await Promise.all([
-      request(app).post('/api/auth/login').send({ username: users.unprivileged, password }),
-      request(app).post('/api/auth/login').send({ username: users.manager, password }),
+      request(app).post('/api/v2/auth/login').send({ username: users.unprivileged, password }),
+      request(app).post('/api/v2/auth/login').send({ username: users.manager, password }),
     ]);
-    unprivilegedToken = unprivileged.body.token;
-    managerToken = manager.body.token;
+    unprivilegedToken = unprivileged.body.data.token;
+    managerToken = manager.body.data.token;
   });
 
   afterAll(async () => {
@@ -58,17 +58,18 @@ describe('Authorization and upload security', () => {
 
   const stationPayload = (name) => ({
     name,
-    station_type: 'WIM',
-    highway_no: '1',
+    stationType: 'WIM',
+    highwayNo: '1',
     direction: 'INBOUND',
     region: 'central',
     province: 'Bangkok',
-    responsible_person: 'Security Test',
+    gpsCoordinates: '13.7563,100.5018',
+    responsiblePerson: 'Security Test',
   });
 
   it('rejects station creation without manage.stations permission', async () => {
     const res = await request(app)
-      .post('/api/stations')
+      .post('/api/v2/stations')
       .set('Authorization', `Bearer ${unprivilegedToken}`)
       .send(stationPayload(`Forbidden station ${Date.now()}`));
 
@@ -77,19 +78,20 @@ describe('Authorization and upload security', () => {
 
   it('allows station creation with manage.stations permission', async () => {
     const res = await request(app)
-      .post('/api/stations')
+      .post('/api/v2/stations')
       .set('Authorization', `Bearer ${managerToken}`)
       .send(stationPayload(`Allowed station ${Date.now()}`));
 
     expect(res.statusCode).toBe(201);
-    createdStationIds.push(res.body.id);
+    createdStationIds.push(res.body.data.id);
   });
 
   it('rejects HTML masquerading as a PNG upload', async () => {
     const res = await request(app)
-      .post('/api/settings/logos')
+      .post('/api/v2/settings/logos')
       .set('Authorization', `Bearer ${managerToken}`)
-      .attach('logo', Buffer.from('<script>window.xss = true</script>'), {
+      .field('payload', JSON.stringify({ label: 'payload.html' }))
+      .attach('files', Buffer.from('<script>window.xss = true</script>'), {
         filename: 'payload.html',
         contentType: 'image/png',
       });
@@ -103,20 +105,22 @@ describe('Authorization and upload security', () => {
       'base64'
     );
     const res = await request(app)
-      .post('/api/settings/logos')
+      .post('/api/v2/settings/logos')
       .set('Authorization', `Bearer ${managerToken}`)
-      .attach('logo', onePixelPng, { filename: 'logo.png', contentType: 'image/png' });
+      .field('payload', JSON.stringify({ label: 'logo' }))
+      .attach('files', onePixelPng, { filename: 'logo.png', contentType: 'image/png' });
 
     expect(res.statusCode).toBe(201);
-    expect(res.body.file_path).toMatch(/^logos\/logo-[\w-]+\.png$/);
-    createdLogos.push({ id: res.body.id, filePath: res.body.file_path });
+    expect(res.body.data.filePath).toMatch(/^logos\/[\w-]+\.png$/);
+    createdLogos.push({ id: res.body.data.id, filePath: res.body.data.filePath });
   });
 
   it('rejects company-logo uploads without manage.companies permission', async () => {
     const res = await request(app)
-      .post('/api/settings/logos')
+      .post('/api/v2/settings/logos')
       .set('Authorization', `Bearer ${unprivilegedToken}`)
-      .attach('logo', Buffer.from('not-an-image'), { filename: 'logo.png', contentType: 'image/png' });
+      .field('payload', JSON.stringify({ label: 'logo' }))
+      .attach('files', Buffer.from('not-an-image'), { filename: 'logo.png', contentType: 'image/png' });
 
     expect(res.statusCode).toBe(403);
   });
@@ -124,11 +128,11 @@ describe('Authorization and upload security', () => {
   it('blocks repeated failed logins for the same username', async () => {
     const username = `rate_limit_${Date.now()}`;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const res = await request(app).post('/api/auth/login').send({ username, password: 'wrong-password' });
+      const res = await request(app).post('/api/v2/auth/login').send({ username, password: 'wrong-password' });
       expect(res.statusCode).toBe(401);
     }
 
-    const blocked = await request(app).post('/api/auth/login').send({ username, password: 'wrong-password' });
+    const blocked = await request(app).post('/api/v2/auth/login').send({ username, password: 'wrong-password' });
     expect(blocked.statusCode).toBe(429);
     expect(blocked.headers['retry-after']).toBeDefined();
   });

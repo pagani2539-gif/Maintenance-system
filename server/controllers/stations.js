@@ -5,15 +5,50 @@ const { validateStationExists } = require('../utils/stationValidation');
 // สภาพอุปกรณ์ (manual) ที่ตั้งได้เองต่อ (สถานี × ชนิดอุปกรณ์)
 const VALID_ASSET_STATUSES = ['ปกติ', 'ชำรุด', 'ชำรุดรอเปลี่ยน', 'ปลดระวาง'];
 
+const GPS_COORDINATES_ERROR = 'กรุณาระบุพิกัด GPS ในรูปแบบ ละติจูด,ลองจิจูด เช่น 14.1083611,99.7096389';
+const DECIMAL_COORDINATE_PATTERN = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
+
+const parseGpsCoordinates = (rawValue, { required = false } = {}) => {
+  if (rawValue == null || String(rawValue).trim() === '') {
+    if (required) return { error: GPS_COORDINATES_ERROR };
+    return { latitude: null, longitude: null };
+  }
+
+  if (typeof rawValue !== 'string') {
+    return { error: GPS_COORDINATES_ERROR };
+  }
+
+  const parts = rawValue.split(',').map((part) => part.trim());
+  if (
+    parts.length !== 2
+    || !DECIMAL_COORDINATE_PATTERN.test(parts[0])
+    || !DECIMAL_COORDINATE_PATTERN.test(parts[1])
+  ) {
+    return { error: GPS_COORDINATES_ERROR };
+  }
+
+  const latitude = Number(parts[0]);
+  const longitude = Number(parts[1]);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    return { error: 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90' };
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return { error: 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180' };
+  }
+
+  return { latitude, longitude };
+};
+
 exports.getUniqueStations = async (req, res) => {
   try {
-    const { status } = req.query;
+    // The station directory is an active-use list by default. Deleted stations
+    // are soft-deleted (status = 0) so their historical references remain, but
+    // they must not reappear in the normal station picker/list.
+    const { status = '1' } = req.query;
     let sql = `SELECT * FROM stations`;
     const params = [];
-    if (status !== undefined) {
-      sql += ` WHERE status = $1`;
-      params.push(status);
-    }
+    sql += ` WHERE status = $1`;
+    params.push(status);
     sql += ` ORDER BY name ASC`;
     const { rows } = await query(sql, params);
     res.json(rows);
@@ -559,10 +594,13 @@ exports.moveAsset = async (req, res) => {
 };
 
 exports.createStation = async (req, res) => {
-  const { name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date } = req.body;
+  const { name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date, gps_coordinates } = req.body;
   if (!name || !station_type || !highway_no || !direction || !region || !province || !responsible_person) {
     return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง (รวมถึง "ผู้รับผิดชอบสถานี")' });
   }
+
+  const parsedGps = parseGpsCoordinates(gps_coordinates, { required: true });
+  if (parsedGps.error) return res.status(400).json({ error: parsedGps.error });
 
   try {
     const { rows: maxRows } = await query('SELECT MAX(id) as "maxId" FROM stations');
@@ -578,10 +616,10 @@ exports.createStation = async (req, res) => {
     const code = `STN-${nextId}-${shortDir}`;
 
     const { rows } = await query(`
-      INSERT INTO stations (code, name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO stations (code, name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date, latitude, longitude)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
-    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), operational_start_date || null]);
+    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), operational_start_date || null, parsedGps.latitude, parsedGps.longitude]);
 
     const row = rows[0];
     logAudit('station', row.id, 'create', null, row, 'System/Admin').catch(e => console.error(e));
@@ -624,7 +662,7 @@ exports.deleteStation = async (req, res) => {
 
 exports.updateStation = async (req, res) => {
   const { id } = req.params;
-  const { name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date } = req.body;
+  const { name, station_type, highway_no, direction, region, province, responsible_person, operational_start_date, gps_coordinates } = req.body;
 
   if (!name || !station_type || !highway_no || !direction || !region || !province || !responsible_person) {
     return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง (รวมถึง "ผู้รับผิดชอบสถานี")' });
@@ -634,6 +672,11 @@ exports.updateStation = async (req, res) => {
     const { rows: oldRows } = await query('SELECT * FROM stations WHERE id = $1', [id]);
     const oldStation = oldRows[0];
     if (!oldStation) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการแก้ไข' });
+
+    const parsedGps = Object.prototype.hasOwnProperty.call(req.body, 'gps_coordinates')
+      ? parseGpsCoordinates(gps_coordinates)
+      : { latitude: oldStation.latitude, longitude: oldStation.longitude };
+    if (parsedGps.error) return res.status(400).json({ error: parsedGps.error });
 
     let shortDir = 'NONE';
     if (direction === 'INBOUND') shortDir = 'IN';
@@ -645,10 +688,10 @@ exports.updateStation = async (req, res) => {
 
     const { rows } = await query(`
       UPDATE stations
-      SET code = $1, name = $2, station_type = $3, highway_no = $4, direction = $5, region = $6, province = $7, responsible_person = $8, operational_start_date = $9, updated_at = NOW()
-      WHERE id = $10
+      SET code = $1, name = $2, station_type = $3, highway_no = $4, direction = $5, region = $6, province = $7, responsible_person = $8, operational_start_date = $9, latitude = $10, longitude = $11, updated_at = NOW()
+      WHERE id = $12
       RETURNING *
-    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), operational_start_date || null, id]);
+    `, [code, name.trim(), station_type, highway_no.trim(), direction, region, province, responsible_person.trim(), operational_start_date || null, parsedGps.latitude, parsedGps.longitude, id]);
 
     const row = rows[0];
     if (!row) return res.status(404).json({ error: 'ไม่พบสถานีที่ต้องการแก้ไข' });

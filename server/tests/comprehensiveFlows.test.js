@@ -23,11 +23,11 @@ describe('Comprehensive Business Flows', () => {
 
     // Login to get token
     const res = await request(app)
-      .post('/api/auth/login')
+      .post('/api/v2/auth/login')
       .send({ username: testUsername, password: testPassword });
 
-    if (res.body && res.body.token) {
-      token = res.body.token;
+    if (res.body?.data?.token) {
+      token = res.body.data.token;
     }
   });
 
@@ -48,27 +48,76 @@ describe('Comprehensive Business Flows', () => {
     for (const d of directions) {
       const uniqueName = `Station-CompTest-${d.dir}-${Math.random().toString(36).substring(7)}`;
       const res = await request(app)
-        .post('/api/stations')
+        .post('/api/v2/stations')
         .set('Authorization', `Bearer ${token}`)
         .send({
           name: uniqueName,
-          station_type: 'ประเภท ก',
-          highway_no: '9',
+          stationType: 'ประเภท ก',
+          highwayNo: '9',
           direction: d.dir,
           region: 'กลาง',
           province: 'กรุงเทพมหานคร',
-          responsible_person: 'ผู้ดูแลจำลอง'
+          gpsCoordinates: '14.1083611,99.7096389',
+          responsiblePerson: 'ผู้ดูแลจำลอง'
         });
 
       expect(res.statusCode).toEqual(201);
-      expect(res.body).toHaveProperty('code');
-      expect(res.body.code).toContain(`-${d.expected}`);
-      expect(res.body.name).toEqual(uniqueName);
+      expect(res.body.data).toHaveProperty('code');
+      expect(res.body.data.code).toContain(`-${d.expected}`);
+      expect(res.body.data.name).toEqual(uniqueName);
+      expect(res.body.data.latitude).toBeCloseTo(14.1083611, 7);
+      expect(res.body.data.longitude).toBeCloseTo(99.7096389, 7);
+
+      const firstListRes = await request(app)
+        .get('/api/v2/stations?page=1&pageSize=100')
+        .set('Authorization', `Bearer ${token}`);
+      const allStations = [...firstListRes.body.data];
+      const totalPages = firstListRes.body.meta.totalPages || 1;
+      for (let page = 2; page <= totalPages; page += 1) {
+        const pageRes = await request(app)
+          .get(`/api/v2/stations?page=${page}&pageSize=100`)
+          .set('Authorization', `Bearer ${token}`);
+        allStations.push(...pageRes.body.data);
+      }
+      const listedStation = allStations.find(station => station.id === res.body.data.id);
+      expect(listedStation).toBeDefined();
+      expect(listedStation.latitude).toBeCloseTo(14.1083611, 7);
+      expect(listedStation.longitude).toBeCloseTo(99.7096389, 7);
+
+      const detailRes = await request(app)
+        .get(`/api/v2/stations/${res.body.data.id}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(detailRes.body.data.station.latitude).toBeCloseTo(14.1083611, 7);
+      expect(detailRes.body.data.station.longitude).toBeCloseTo(99.7096389, 7);
 
       // Clean up station
-      const stationId = res.body.id;
+      const stationId = res.body.data.id;
       await query('DELETE FROM stations WHERE id = $1', [stationId]);
     }
+  });
+
+  it('should require valid GPS coordinates when creating a station', async () => {
+    const basePayload = {
+      name: `Station-GpsValidation-${Date.now()}`,
+      stationType: 'ประเภท ก',
+      highwayNo: '9',
+      direction: 'BOTH',
+      region: 'กลาง',
+      province: 'กรุงเทพมหานคร',
+      responsiblePerson: 'ผู้ดูแลจำลอง'
+    };
+
+    const missingGps = await request(app)
+      .post('/api/v2/stations')
+      .set('Authorization', `Bearer ${token}`)
+      .send(basePayload);
+    expect(missingGps.statusCode).toBe(400);
+
+    const invalidGps = await request(app)
+      .post('/api/v2/stations')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...basePayload, name: `${basePayload.name}-invalid`, gpsCoordinates: '91,99' });
+    expect(invalidGps.statusCode).toBe(400);
   });
 
   // Test 2: Auto PO Generation on Stock Deficit
@@ -81,13 +130,14 @@ describe('Comprehensive Business Flows', () => {
 
     // 2. Perform a withdrawal that drops it below min_stock
     const resWithdraw = await request(app)
-      .post('/api/withdrawals')
+      .post('/api/v2/withdrawals')
       .set('Authorization', `Bearer ${token}`)
       .send({
+        recipient: 'Comprehensive Test Recipient',
         type: 'ติดตั้งใหม่',
         note: 'CompTest withdrawal',
         items: [
-          { inventory_id: invId, quantity: 10 } // Drops stock from 20 -> 10, which is < min_stock (15)
+          { inventoryId: invId, quantity: 10 } // Drops stock from 20 -> 10, which is < min_stock (15)
         ]
       });
     expect(resWithdraw.statusCode).toEqual(201);
@@ -97,22 +147,22 @@ describe('Comprehensive Business Flows', () => {
 
     // 4. Query draft POs to check if the item is present with a quantity of 5 (min_stock 15 - remaining 10)
     const resPos = await request(app)
-      .get('/api/purchase-orders')
+      .get('/api/v2/purchase-orders')
       .set('Authorization', `Bearer ${token}`);
 
     expect(resPos.statusCode).toEqual(200);
-    const draftPos = resPos.body.filter(po => po.status === 'Draft');
+    const draftPos = resPos.body.data.filter(po => po.status === 'Draft');
     expect(draftPos.length).toBeGreaterThan(0);
 
     // Get the details of the latest Draft PO
     const latestDraftPoId = draftPos[0].id;
     const resPoDetail = await request(app)
-      .get(`/api/purchase-orders/${latestDraftPoId}`)
+      .get(`/api/v2/purchase-orders/${latestDraftPoId}`)
       .set('Authorization', `Bearer ${token}`);
 
     expect(resPoDetail.statusCode).toEqual(200);
-    const poItems = resPoDetail.body.items;
-    const matchItem = poItems.find(item => Number(item.inventory_id) === invId);
+    const poItems = resPoDetail.body.data.items;
+    const matchItem = poItems.find(item => Number(item.inventoryId) === invId);
     expect(matchItem).toBeDefined();
     expect(matchItem.quantity).toEqual(5); // Deficit = 15 - 10 = 5
 
@@ -121,7 +171,7 @@ describe('Comprehensive Business Flows', () => {
     await query('DELETE FROM purchase_orders WHERE id = $1', [latestDraftPoId]);
     await query('DELETE FROM inventory_transactions WHERE inventory_id = $1', [invId]);
     await query('DELETE FROM withdrawal_items WHERE inventory_id = $1', [invId]);
-    await query('DELETE FROM withdrawals WHERE id = $1', [resWithdraw.body.id]);
+    await query('DELETE FROM withdrawals WHERE id = $1', [resWithdraw.body.data.id]);
     await query('DELETE FROM inventory WHERE id = $1', [invId]);
   });
 
@@ -137,47 +187,48 @@ describe('Comprehensive Business Flows', () => {
 
     // 2. Create withdrawal with type = 'ยืมใช้งาน' and return_due_date
     const resWithdraw = await request(app)
-      .post('/api/withdrawals')
+      .post('/api/v2/withdrawals')
       .set('Authorization', `Bearer ${token}`)
       .send({
+        recipient: 'Comprehensive Test Borrower',
         type: 'ยืมใช้งาน',
         note: 'CompTest borrow withdrawal',
-        return_due_date: dueDate,
+        returnDueDate: dueDate,
         items: [
-          { inventory_id: invId, quantity: 2 }
+          { inventoryId: invId, quantity: 2 }
         ]
       });
     expect(resWithdraw.statusCode).toEqual(201);
-    const withdrawalId = Number(resWithdraw.body.id);
+    const withdrawalId = Number(resWithdraw.body.data.id);
 
     // 3. Query withdrawals and verify due date is present
     const resGetWithdrawal = await request(app)
-      .get(`/api/withdrawals/${withdrawalId}`)
+      .get(`/api/v2/withdrawals/${withdrawalId}`)
       .set('Authorization', `Bearer ${token}`);
 
     expect(resGetWithdrawal.statusCode).toEqual(200);
-    expect(resGetWithdrawal.body.return_due_date).toEqual(dueDate);
+    expect(resGetWithdrawal.body.data.returnDueDate).toEqual(dueDate);
 
     // 4. Query pending returns transactions
     const resGetPending = await request(app)
-      .get('/api/transactions?pending_only=true')
+      .get('/api/v2/transactions?pendingOnly=true')
       .set('Authorization', `Bearer ${token}`);
 
     expect(resGetPending.statusCode).toEqual(200);
-    const pendingTx = resGetPending.body.find(tx => Number(tx.withdrawal_id) === withdrawalId && Number(tx.inventory_id) === invId);
+    const pendingTx = resGetPending.body.data.find(tx => Number(tx.withdrawalId) === withdrawalId && Number(tx.inventoryId) === invId);
     expect(pendingTx).toBeDefined();
-    expect(pendingTx.return_due_date).toEqual(dueDate);
+    expect(pendingTx.returnDueDate).toEqual(dueDate);
 
     // 5. Return the item
     const resReturn = await request(app)
-      .post('/api/transactions/return')
+      .post('/api/v2/returns')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        inventory_id: invId,
+        inventoryId: invId,
         quantity: 2,
         condition: 'Good',
         note: 'Returned CompTest borrow',
-        transaction_id: pendingTx.id
+        transactionId: pendingTx.id
       });
     expect(resReturn.statusCode).toEqual(200);
 

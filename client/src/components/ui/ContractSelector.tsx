@@ -114,6 +114,9 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
     if (!nameTrim) errors.name = 'กรุณากรอกชื่อสัญญา';
     if (!addYear || isNaN(yearNum)) errors.year_be = 'กรุณากรอกปี พ.ศ.';
     else if (yearNum < 2500 || yearNum > 2700) errors.year_be = 'ปี พ.ศ. ไม่ถูกต้อง (เช่น 2567)';
+    if (addStartDate && addEndDate && addEndDate < addStartDate) {
+      errors.end_date = 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มมีผล';
+    }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -202,7 +205,7 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
         </div>
 
         {showDropdown && filtered.length > 0 && (
-          <div style={{
+          <div className="floating-surface" style={{
             position: 'absolute',
             top: '100%',
             left: 0,
@@ -342,7 +345,15 @@ const ContractSelector: React.FC<ContractSelectorProps> = ({ selectedContractId,
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px' }}>
                     สิ้นสุด
                   </label>
-                  <DatePicker value={addEndDate} onChange={setAddEndDate} />
+                  <DatePicker
+                    value={addEndDate}
+                    onChange={(value) => {
+                      setAddEndDate(value);
+                      setFieldErrors((current) => ({ ...current, end_date: '' }));
+                    }}
+                    className="contract-end-date-picker"
+                  />
+                  {fieldErrors.end_date && <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.end_date}</p>}
                 </div>
               </div>
 

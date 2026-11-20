@@ -89,7 +89,7 @@ export const PdfHeader: React.FC<Props> = ({ docType, docNumber, docDate, compan
                 lineHeight: 1.15,
                 letterSpacing: '0.01em',
               }}>
-                ระบบบริหารจัดการงานซ่อมบำรุงและพัสดุอุปกรณ์
+                ระบบบริหารจัดการงานซ่อมบำรุงและอุปกรณ์
               </div>
               <div style={{
                 fontSize: `${pdfTheme.size.micro}px`,
@@ -129,7 +129,7 @@ export const PdfHeader: React.FC<Props> = ({ docType, docNumber, docDate, compan
                 justifyContent: 'center',
               }}>
                 <img
-                  src={`${UPLOAD_URL}/uploads/${logo.file_path}`}
+                  src={`${UPLOAD_URL}/uploads/${logo.file_path}?v=${logo.id}`}
                   alt=""
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   crossOrigin="anonymous"

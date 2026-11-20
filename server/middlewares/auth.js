@@ -1,12 +1,78 @@
 const { query } = require('../database/db');
 const { verify } = require('../utils/jwt');
 
+const isPublicApiMode = () => (
+  process.env.NODE_ENV !== 'test'
+  && /^(1|true|yes|on)$/i.test(String(process.env.PUBLIC_API_MODE || '').trim())
+);
+
+const isReadOnlyIpBypassEnabled = () => (
+  /^(1|true|yes|on)$/i.test(String(process.env.READ_ONLY_IP_BYPASS || '').trim())
+);
+
+const normalizeIp = (value) => {
+  const ip = String(value || '').trim().toLowerCase();
+  return ip.startsWith('::ffff:') ? ip.slice('::ffff:'.length) : ip;
+};
+
+const getDirectRemoteAddress = (req) => (
+  req?.socket?.remoteAddress || req?.connection?.remoteAddress || ''
+);
+
+const getReadOnlyIpAllowlist = () => new Set(
+  String(process.env.READ_ONLY_IPS || '')
+    .split(',')
+    .map(normalizeIp)
+    .filter(Boolean)
+);
+
+/**
+ * Temporary, read-only test access for a directly connected LAN client.
+ * Deliberately ignores req.ip and forwarded headers so an arbitrary client
+ * cannot claim an allowed address through X-Forwarded-For.
+ */
+const isReadOnlyIpBypassRequest = (req) => (
+  isReadOnlyIpBypassEnabled()
+  && req?.method === 'GET'
+  && getReadOnlyIpAllowlist().has(normalizeIp(getDirectRemoteAddress(req)))
+);
+
+// Public API requests still receive an actor so existing controllers and audit
+// logging can continue to work without inventing a real user account.
+const PUBLIC_API_USER = Object.freeze({
+  id: null,
+  username: 'public-api',
+  full_name: 'Public API',
+  is_full: true,
+  is_public: true,
+  permissions: {},
+});
+
+const READ_ONLY_IP_TEST_USER = Object.freeze({
+  id: null,
+  username: 'read-only-ip-test',
+  full_name: 'Read-only IP Test',
+  is_full: false,
+  is_public: true,
+  permissions: {},
+});
+
 /**
  * Verifies the JWT in Authorization header, re-fetches the user from DB
  * (so disabled accounts + permission changes take effect immediately),
  * and attaches req.user.
  */
 exports.requireAuth = async (req, res, next) => {
+  if (isPublicApiMode()) {
+    req.user = PUBLIC_API_USER;
+    return next();
+  }
+
+  if (isReadOnlyIpBypassRequest(req)) {
+    req.user = READ_ONLY_IP_TEST_USER;
+    return next();
+  }
+
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'ไม่ได้รับ token หรือรูปแบบไม่ถูกต้อง' });
@@ -61,6 +127,7 @@ exports.requireAuth = async (req, res, next) => {
  * is_full bypasses all checks.
  */
 const hasPermission = (user, key) => {
+  if (isPublicApiMode()) return true;
   if (!user) return false;
   if (user.is_full) return true;
   const parts = key.split('.');
@@ -75,6 +142,7 @@ const hasPermission = (user, key) => {
 exports.hasPermission = hasPermission;
 
 exports.requirePermission = (key) => (req, res, next) => {
+  if (isPublicApiMode()) return next();
   if (!hasPermission(req.user, key)) {
     return res.status(403).json({ error: 'ไม่มีสิทธิ์ดำเนินการนี้' });
   }
@@ -82,8 +150,22 @@ exports.requirePermission = (key) => (req, res, next) => {
 };
 
 exports.requireFull = (req, res, next) => {
+  if (isPublicApiMode()) return next();
   if (!req.user || !req.user.is_full) {
     return res.status(403).json({ error: 'ต้องใช้สิทธิ์ผู้ดูแลระบบ (User Full)' });
   }
   next();
 };
+
+// Sensitive stock adjustments must always come from a real authenticated
+// administrator. The public API actor is intentionally not accepted here.
+exports.requireAdmin = (req, res, next) => {
+  if (!req.user || !req.user.is_full || req.user.is_public) {
+    return res.status(403).json({ error: 'ต้องใช้สิทธิ์ผู้ดูแลระบบ (Admin) เพื่อปรับยอดคงเหลือ' });
+  }
+  next();
+};
+
+exports.isPublicApiMode = isPublicApiMode;
+exports.isReadOnlyIpBypassRequest = isReadOnlyIpBypassRequest;
+exports.normalizeIp = normalizeIp;

@@ -165,16 +165,17 @@ const PendingReturns: React.FC = () => {
 
   const columns: TableColumn<InventoryTransaction>[] = [
     {
-      id: 'equipment', header: 'อุปกรณ์', accessor: 'product_name', priority: 1, width: 'auto',
+      id: 'equipment', header: 'อุปกรณ์', accessor: 'product_name', priority: 1, width: 'auto', minWidth: '240px', cellMode: 'wrap-2',
+      getCellText: (row) => [row.product_name, row.product_model].filter(Boolean).join(' — '),
       render: (val, row) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+          <span style={{ fontWeight: 700, fontSize: '0.9rem', overflowWrap: 'anywhere' }}>{val}</span>
           {row.product_model && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{row.product_model}</span>}
         </div>
       )
     },
     {
-      id: 'serial_number', header: 'S/N (หมายเลขเครื่อง)', accessor: 'serial_number', priority: 1, width: '160px',
+      id: 'serial_number', header: 'หมายเลขเครื่อง (S/N)', accessor: 'serial_number', priority: 1, width: '160px',
       render: (val) => (
         val ? (
           <span style={{
@@ -364,7 +365,7 @@ const PendingReturns: React.FC = () => {
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <div className="page-title">
             <h2>อุปกรณ์ค้างส่งคืน</h2>
-            <p>ติดตามพัสดุประเภทการยืม ทดสอบ หรือสำรองใช้งาน ที่ยังไม่ได้ส่งคืนกลับเข้าคลังพัสดุ</p>
+            <p>ติดตามอุปกรณ์ประเภทการยืม ทดสอบ หรือสำรองใช้งาน ที่ยังไม่ได้ส่งคืนกลับเข้าคลังอุปกรณ์</p>
           </div>
         </div>
 

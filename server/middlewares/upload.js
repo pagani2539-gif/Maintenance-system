@@ -90,9 +90,23 @@ const uploadLogo = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+// API v2 sends binary multipart parts under the shared `files` field. Logos
+// need their own uploader so the physical location matches the persisted
+// `logos/<filename>` path used by the settings controller.
+const uploadV2Logo = multer({
+  storage: storageFor(logosDir, () => 'logo-'),
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 module.exports = {
   uploadRepairImages: withImageValidation(upload.array('images', 4)),
   uploadInventoryImage: withImageValidation(upload.single('image')),
   uploadReturnImage: withImageValidation(upload.single('image')),
   uploadCompanyLogo: withImageValidation(uploadLogo.single('logo')),
+  // API v2 uses one JSON `payload` part and one or more binary `files` parts.
+  // The v2 route adapter maps the resulting file array to the legacy
+  // controller shape (`req.file` or `req.files`).
+  uploadV2Files: withImageValidation(upload.array('files', 4)),
+  uploadV2LogoFiles: withImageValidation(uploadV2Logo.array('files', 1)),
 };

@@ -10,6 +10,8 @@ const { pool, ready: dbReady } = require('./database/initPg'); // Connects the p
 const app = express();
 const PORT = process.env.PORT || 5221;
 const isProduction = process.env.NODE_ENV === 'production';
+const isPublicApiMode = process.env.NODE_ENV !== 'test'
+  && /^(1|true|yes|on)$/i.test(String(process.env.PUBLIC_API_MODE || '').trim());
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -37,7 +39,12 @@ if (!fs.existsSync(uploadDir)){
 }
 
 // Middleware
-if (isProduction && allowedOrigins.length === 0) {
+if (isPublicApiMode) {
+  // Public API mode intentionally supports browser calls from any origin.
+  // Credentials must remain disabled when using the wildcard origin.
+  app.use(cors({ origin: '*', credentials: false }));
+  console.warn('PUBLIC_API_MODE enabled; all API routes accept unauthenticated cross-origin requests.');
+} else if (isProduction && allowedOrigins.length === 0) {
   console.warn('CORS_ORIGIN not set; production API will allow same-origin requests only.');
 } else {
   app.use(cors(isProduction ? { origin: allowedOrigins, credentials: true } : undefined));
@@ -78,27 +85,21 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
-// Import Routes
-const repairRoutes = require('./routes/repairs');
-const inventoryRoutes = require('./routes/inventory');
-const withdrawalRoutes = require('./routes/withdrawals');
-const transactionRoutes = require('./routes/transactions');
-const poRoutes = require('./routes/purchaseOrders');
-const searchRoutes = require('./routes/search');
-const stationRoutes = require('./routes/stations');
-const contractRoutes = require('./routes/contracts');
-const settingsRoutes = require('./routes/settings');
-const stockCountRoutes = require('./routes/stockCounts');
-const authRoutes = require('./routes/auth');
-const usersRoutes = require('./routes/users');
-const techniciansRoutes = require('./routes/technicians');
-const technicianStockRoutes = require('./routes/technicianStock');
-const reportsRoutes = require('./routes/reports');
-const errorHandler = require('./middlewares/errorHandler');
-const { requireAuth } = require('./middlewares/auth');
+// Compatibility for logos uploaded through the old v2 middleware. Their DB
+// path is `logos/<filename>`, but the file was previously written one level
+// too high. Serve those existing files without mutating production data.
+app.get('/uploads/logos/:filename', (req, res, next) => {
+  const filename = path.basename(req.params.filename);
+  const legacyPath = path.join(uploadDir, filename);
+  if (!fs.existsSync(legacyPath)) return next();
+  return res.sendFile(legacyPath);
+});
 
-// Public auth routes — must be mounted BEFORE the global auth guard
-app.use('/api/auth', authRoutes);
+// Import the versioned API only. Controllers remain shared internally by v2.
+const v2Routes = require('./routes/v2');
+const { requestId } = require('./middlewares/apiV2');
+const openApiV2 = require('./openapi/v2');
+const errorHandler = require('./middlewares/errorHandler');
 
 // A minimal readiness endpoint for PM2, reverse proxies, and external monitors.
 // It intentionally exposes no database, version, or environment details.
@@ -115,31 +116,55 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// All other API routes require authentication
-app.use('/api/repairs', requireAuth, repairRoutes);
-app.use('/api/inventory', requireAuth, inventoryRoutes);
-app.use('/api/withdrawals', requireAuth, withdrawalRoutes);
-app.use('/api/transactions', requireAuth, transactionRoutes);
-app.use('/api/purchase-orders', requireAuth, poRoutes);
-app.use('/api/search', requireAuth, searchRoutes);
-app.use('/api/stations', requireAuth, stationRoutes);
-app.use('/api/contracts', requireAuth, contractRoutes);
-app.use('/api/settings', requireAuth, settingsRoutes);
-app.use('/api/stock-counts', requireAuth, stockCountRoutes);
-app.use('/api/users', requireAuth, usersRoutes);
-app.use('/api/technicians', requireAuth, techniciansRoutes);
-app.use('/api/technician-stock', requireAuth, technicianStockRoutes);
-app.use('/api/reports', requireAuth, reportsRoutes);
+// API v2 uses a versioned URL, camelCase DTOs, shared validation and a stable
+// response/error envelope.
+app.use('/api/v2', requestId, v2Routes);
 
 // Health check endpoint
 app.get('/api', (req, res) => {
   res.json({ message: 'Repair System API is running' });
 });
 
+// Serve API documentation at /api-docs
+app.get('/api-docs', (req, res) => {
+  const docsPath = path.join(__dirname, '../API_V2.md');
+  if (!fs.existsSync(docsPath)) {
+    return res.status(404).json({ error: 'API documentation not found' });
+  }
+
+  res.set({
+    'Content-Type': 'text/markdown; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
+  res.send(fs.readFileSync(docsPath, 'utf8'));
+});
+
+app.get('/api-docs/v2', (_req, res) => {
+  res.set({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  res.json(openApiV2);
+});
+
+// Resource endpoints outside /api/v2 are intentionally removed. Keep this
+// before the production SPA fallback so a stale client receives a real 404.
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  return requestId(req, res, () => res.status(404).json({
+    error: {
+      code: 'NOT_FOUND',
+      message: 'ไม่พบ endpoint ที่ร้องขอ',
+      details: [],
+      requestId: req.requestId,
+    },
+  }));
+});
+
 // Mount central error handler
 app.use(errorHandler);
 
-console.log('Routes mounted on /api/repairs, /api/inventory, /api/withdrawals, /api/purchase-orders');
+console.log('Routes mounted on /api/v2');
 
 // Serve static frontend files in production if dist folder exists
 const distPath = path.join(__dirname, '../client/dist');

@@ -96,7 +96,7 @@ const StockCountList: React.FC = () => {
         <BackButton />
         <div className="page-header" style={{ marginBottom: '2rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div className="page-title">
-            <h2>ตรวจนับสต็อก (Stocktaking)</h2>
+            <h2>ตรวจนับอุปกรณ์ (Stocktaking)</h2>
             <p>เปิดรอบตรวจนับ เทียบยอดของจริงกับยอดในระบบ และปรับยอดส่วนต่างพร้อมบันทึกประวัติ</p>
           </div>
           {canManageStockCounts && activeCount ? (
@@ -150,7 +150,7 @@ const StockCountList: React.FC = () => {
               </div>
               <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {counts.length === 0
-                  ? 'กดปุ่ม "เปิดรอบตรวจนับใหม่" ระบบจะบันทึกยอดคงคลังปัจจุบันไว้เป็นฐานเปรียบเทียบ'
+                  ? 'กดปุ่ม "เปิดรอบตรวจนับใหม่" ระบบจะบันทึกยอดคงเหลือปัจจุบันไว้เป็นฐานเปรียบเทียบ'
                   : 'ลองกดการ์ด "รอบตรวจนับทั้งหมด" ด้านบนเพื่อล้างตัวกรอง'}
               </div>
             </div>
@@ -239,7 +239,7 @@ const StockCountList: React.FC = () => {
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
           <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
-              <h3><ClipboardCheck size={22} color="var(--primary)" /> เปิดรอบตรวจนับสต็อกใหม่</h3>
+              <h3><ClipboardCheck size={22} color="var(--primary)" /> เปิดรอบตรวจนับอุปกรณ์ใหม่</h3>
               <button className="close-btn" onClick={() => setModalOpen(false)}><X size={20} /></button>
             </div>
 
@@ -247,9 +247,9 @@ const StockCountList: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <Card style={{ padding: '1rem', backgroundColor: 'var(--warning-light)', border: '1px solid var(--warning-border)' }}>
                   <div style={{ fontSize: '0.82rem', lineHeight: 1.6, color: 'var(--text-main)' }}>
-                    <strong>ระบบจะบันทึกยอดคงคลังปัจจุบันของทุกรายการ</strong> ไว้เป็นฐานเปรียบเทียบ
+                    <strong>ระบบจะบันทึกยอดคงเหลือปัจจุบันของทุกรายการ</strong> ไว้เป็นฐานเปรียบเทียบ
                     จากนั้นทีมงานเดินนับของจริงและกรอกจำนวนที่นับได้ เมื่อปิดรอบ
-                    ระบบจะปรับยอดส่วนต่างเข้าบัญชีคุมยอดพัสดุพร้อมบันทึกประวัติอัตโนมัติ
+                    ระบบจะปรับยอดส่วนต่างเข้าบัญชีคุมยอดอุปกรณ์พร้อมบันทึกประวัติอัตโนมัติ
                   </div>
                 </Card>
 

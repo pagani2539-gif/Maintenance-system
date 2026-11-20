@@ -6,7 +6,7 @@ const { checkAndGenerateAutoPOs } = require('../utils/autoPo');
 
 const userName = (req) => (req.user && (req.user.full_name || req.user.username)) || 'System/Admin';
 
-// POST /api/stock-counts — เปิดรอบตรวจนับใหม่ พร้อม snapshot ยอดคงคลังทุกรายการ
+// POST /api/v2/stock-counts — เปิดรอบตรวจนับใหม่ พร้อม snapshot ยอดคงคลังทุกรายการ
 exports.createCount = async (req, res) => {
   const { note } = req.body || {};
 
@@ -37,7 +37,7 @@ exports.createCount = async (req, res) => {
         [count.id]
       );
       if (snapshot.rowCount === 0) {
-        const err = new Error('ไม่มีรายการพัสดุในคลัง จึงไม่สามารถเปิดรอบตรวจนับได้');
+        const err = new Error('ไม่มีรายการอุปกรณ์ในคลัง จึงไม่สามารถเปิดรอบตรวจนับได้');
         err.status = 400;
         throw err;
       }
@@ -54,7 +54,7 @@ exports.createCount = async (req, res) => {
   }
 };
 
-// GET /api/stock-counts — รายการรอบตรวจนับพร้อมสรุปความคืบหน้า
+// GET /api/v2/stock-counts — รายการรอบตรวจนับพร้อมสรุปความคืบหน้า
 exports.getAllCounts = async (req, res) => {
   try {
     const { rows } = await query(`
@@ -73,7 +73,7 @@ exports.getAllCounts = async (req, res) => {
   }
 };
 
-// GET /api/stock-counts/:id — รายละเอียดรอบตรวจนับพร้อมรายการนับ
+// GET /api/v2/stock-counts/:id — รายละเอียดรอบตรวจนับพร้อมรายการนับ
 exports.getCountById = async (req, res) => {
   const { id } = req.params;
   try {
@@ -96,7 +96,7 @@ exports.getCountById = async (req, res) => {
   }
 };
 
-// PATCH /api/stock-counts/:id/items/:itemId — บันทึกจำนวนที่นับได้
+// PATCH /api/v2/stock-counts/:id/items/:itemId — บันทึกจำนวนที่นับได้
 exports.updateCountItem = async (req, res) => {
   const { id, itemId } = req.params;
   const { counted_qty, note } = req.body || {};
@@ -131,7 +131,7 @@ exports.updateCountItem = async (req, res) => {
   }
 };
 
-// POST /api/stock-counts/:id/complete — ปิดรอบและปรับยอดตามผลนับ
+// POST /api/v2/stock-counts/:id/actions/complete — ปิดรอบและปรับยอดตามผลนับ
 exports.completeCount = async (req, res) => {
   const { id } = req.params;
   const actor = userName(req);
@@ -233,14 +233,14 @@ exports.completeCount = async (req, res) => {
         .map(a => `• ${a.name}: ${a.expected_qty} → ${a.counted_qty} (${a.variance > 0 ? '+' : ''}${a.variance})`)
         .join('\n');
       const more = summary.adjustments.length > 10 ? `\n...และอีก ${summary.adjustments.length - 10} รายการ` : '';
-      sendLineNotify('stock', `\n📋 *ปิดรอบตรวจนับสต็อก ${summary.count_no}*\n👤 ผู้ปิดรอบ: ${actor}\n✅ นับแล้ว: ${summary.counted_items}/${summary.total_items} รายการ\n⚠️ พบยอดต่าง ${summary.adjustments.length} รายการ (ปรับยอดแล้ว):\n${lines}${more}`);
+      sendLineNotify('stock', `\n📋 *ปิดรอบตรวจนับอุปกรณ์ ${summary.count_no}*\n👤 ผู้ปิดรอบ: ${actor}\n✅ นับแล้ว: ${summary.counted_items}/${summary.total_items} รายการ\n⚠️ พบยอดต่าง ${summary.adjustments.length} รายการ (ปรับยอดแล้ว):\n${lines}${more}`);
 
       // Negative adjustments may have dropped items below min_stock
       checkAndGenerateAutoPOs().catch((autoPoErr) => {
         console.error('Error auto-generating POs after stock count:', autoPoErr.message);
       });
     } else {
-      sendLineNotify('stock', `\n📋 *ปิดรอบตรวจนับสต็อก ${summary.count_no}*\n👤 ผู้ปิดรอบ: ${actor}\n✅ นับแล้ว: ${summary.counted_items}/${summary.total_items} รายการ\n🎯 ยอดตรงทั้งหมด ไม่มีการปรับยอด`);
+      sendLineNotify('stock', `\n📋 *ปิดรอบตรวจนับอุปกรณ์ ${summary.count_no}*\n👤 ผู้ปิดรอบ: ${actor}\n✅ นับแล้ว: ${summary.counted_items}/${summary.total_items} รายการ\n🎯 ยอดตรงทั้งหมด ไม่มีการปรับยอด`);
     }
 
     res.json({ message: `ปิดรอบตรวจนับเรียบร้อย ปรับยอด ${summary.adjustments.length} รายการ`, ...summary });
@@ -250,7 +250,7 @@ exports.completeCount = async (req, res) => {
   }
 };
 
-// POST /api/stock-counts/:id/cancel — ยกเลิกรอบตรวจนับ (ไม่ปรับยอดใด ๆ)
+// POST /api/v2/stock-counts/:id/actions/cancel — ยกเลิกรอบตรวจนับ (ไม่ปรับยอดใด ๆ)
 exports.cancelCount = async (req, res) => {
   const { id } = req.params;
   try {

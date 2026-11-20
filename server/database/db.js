@@ -9,9 +9,19 @@ const { Pool, types } = require('pg');
 // Row counts here will never approach 2^53, so parsing as int is safe.
 types.setTypeParser(20, (val) => parseInt(val, 10));
 
+const isTestEnvironment = process.env.NODE_ENV === 'test';
+const testSchema = String(process.env.PG_TEST_SCHEMA || '').trim();
+
+if (isTestEnvironment && !process.env.DATABASE_URL_TEST) {
+  throw new Error('DATABASE_URL_TEST is required; refusing to connect tests to production.');
+}
+if (isTestEnvironment && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(testSchema)) {
+  throw new Error('PG_TEST_SCHEMA must be a valid isolated PostgreSQL schema name.');
+}
+
 const pool = new Pool({
-  connectionString: process.env.NODE_ENV === 'test'
-    ? (process.env.DATABASE_URL_TEST || process.env.DATABASE_URL)
+  connectionString: isTestEnvironment
+    ? process.env.DATABASE_URL_TEST
     : process.env.DATABASE_URL,
   // Force every session to UTC regardless of the server/OS locale. TIMESTAMPTZ
   // columns are always stored as an absolute UTC instant, but a *naive*
@@ -20,7 +30,10 @@ const pool = new Pool({
   // Asia/Bangkok, which silently shifted values by 7 hours (caught during the
   // Stage 4 migration rehearsal). NOW()/.toISOString() writes were already
   // safe; this closes the gap for any future naive-string parameter too.
-  options: '-c timezone=UTC',
+  options: [
+    '-c timezone=UTC',
+    ...(isTestEnvironment && testSchema ? [`-c search_path=${testSchema}`] : []),
+  ].join(' '),
 });
 
 pool.on('error', (err) => {

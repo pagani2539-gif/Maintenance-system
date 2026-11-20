@@ -1,0 +1,10 @@
+/* Shared layout contract. Page-specific visual treatments stay scoped in legacy/page layers. */
+
+.app-container,
+.main-content {
+  min-width: 0;
+}
+
+.main-content {
+  overflow-x: hidden;
+}

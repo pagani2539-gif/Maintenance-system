@@ -12,6 +12,7 @@ import StationSelector from '../components/ui/StationSelector';
 import type { Station, InventoryTransaction, Repair } from '../types';
 import ThailandMap from '../components/ui/ThailandMap';
 import type { TableColumn, TableAction } from '../types/table.types';
+import { getRepairStatusLabel } from '../constants/terminology';
 import {
   MapPin,
   Tag,
@@ -37,6 +38,7 @@ import {
 } from 'lucide-react';
 import { provincesByRegion, getRegionFromProvince } from '../utils/thaiProvinces';
 import { formatDateTimeThai } from '../utils/formatDate';
+import { formatGpsCoordinates, validateGpsCoordinates } from '../utils/gpsCoordinates';
 
 type StationFormData = {
   name: string;
@@ -46,13 +48,14 @@ type StationFormData = {
   direction: 'INBOUND' | 'OUTBOUND' | 'BOTH' | 'NONE';
   region: string;
   province: string;
+  gps_coordinates: string;
   responsible_person: string;
   operational_start_date: string;
 };
 
 const EMPTY_FORM: StationFormData = {
   name: '', station_type: 'WEIGH_STATION', custom_type: '',
-  highway_no: '', direction: 'INBOUND', region: '', province: '', responsible_person: '', operational_start_date: ''
+  highway_no: '', direction: 'INBOUND', region: '', province: '', gps_coordinates: '', responsible_person: '', operational_start_date: ''
 };
 
 const REGIONS = ['ภาคเหนือ', 'ภาคตะวันออกเฉียงเหนือ', 'ภาคกลาง', 'ภาคตะวันออก', 'ภาคตะวันตก', 'ภาคใต้'];
@@ -75,7 +78,7 @@ const ASSET_STATUS_META: Record<AssetStatusKey, { label: string; icon: string; c
   normal: { label: 'ปกติ', icon: '✓', color: 'var(--success)', bg: 'var(--success-light)' },
   pending: { label: 'รอดำเนินการซ่อม', icon: '⏳', color: 'var(--warning)', bg: 'var(--warning-light)' },
   in_progress: { label: 'กำลังซ่อม', icon: '🔧', color: 'var(--info)', bg: 'var(--info-light)' },
-  waiting_parts: { label: 'รออะไหล่', icon: '📦', color: 'var(--warning)', bg: 'var(--warning-light)' },
+  waiting_parts: { label: 'รออุปกรณ์', icon: '📦', color: 'var(--warning)', bg: 'var(--warning-light)' },
   claiming: { label: 'กำลังเคลม', icon: '🛡️', color: 'var(--danger)', bg: 'var(--danger-light)' },
 };
 
@@ -242,7 +245,9 @@ const StationSearch: React.FC = () => {
   const loadInitialData = useCallback(async () => {
     try {
       const [stList, repList] = await Promise.all([
-        stationApi.getUniqueList(),
+        // The directory should only show active stations. Deleted stations
+        // remain in the database for historical references.
+        stationApi.getUniqueList({ status: 1 }),
         repairApi.getAll({})
       ]);
       setStations(stList);
@@ -281,6 +286,7 @@ const StationSearch: React.FC = () => {
       direction: st.direction,
       region: st.region,
       province: st.province,
+      gps_coordinates: formatGpsCoordinates(st.latitude, st.longitude),
       responsible_person: st.responsible_person || '',
       operational_start_date: st.operational_start_date || ''
     });
@@ -320,6 +326,9 @@ const StationSearch: React.FC = () => {
     if (!highwayTrim) errors.highway_no = 'กรุณาระบุเส้นทางหลวง';
     else if (highwayTrim.length > 20) errors.highway_no = 'เส้นทางหลวงยาวเกินไป';
 
+    const gpsError = validateGpsCoordinates(formData.gps_coordinates, stationModal.mode === 'create');
+    if (gpsError) errors.gps_coordinates = gpsError;
+
     if (!formData.direction) errors.direction = 'กรุณาเลือกทิศทาง';
 
     if (Object.keys(errors).length > 0) {
@@ -338,6 +347,7 @@ const StationSearch: React.FC = () => {
         direction: formData.direction,
         region: formData.region,
         province: formData.province.trim(),
+        gps_coordinates: formData.gps_coordinates.trim() || undefined,
         responsible_person: responsibleTrim,
         operational_start_date: formData.operational_start_date || undefined
       };
@@ -461,8 +471,8 @@ const StationSearch: React.FC = () => {
     if (isConfirmed) {
       try {
         await stationApi.delete(st.id);
-        notify('ลบสถานีสำเร็จ', 'success');
-        loadInitialData();
+        notify('ปิดใช้งานสถานีสำเร็จ', 'success');
+        await loadInitialData();
       } catch (err) {
         const error = err as Error;
         notify(error.message || 'ไม่สามารถลบสถานีได้', 'error');
@@ -528,7 +538,7 @@ const StationSearch: React.FC = () => {
         const latestLot = asset.source_lots?.[0];
         assetsMap.set(asset.inventory_id, {
           id: asset.inventory_id,
-          name: asset.device_name || 'ไม่ระบุชื่อพัสดุ',
+          name: asset.device_name || 'ไม่ระบุชื่ออุปกรณ์',
           model: asset.model || '—',
           quantity: Number(asset.current_quantity) || 0,
           image: asset.image_path,
@@ -555,7 +565,7 @@ const StationSearch: React.FC = () => {
             } else {
               assetsMap.set(invId, {
                 id: invId,
-                name: item.item_name || 'ไม่ระบุชื่อพัสดุ',
+                name: item.item_name || 'ไม่ระบุชื่ออุปกรณ์',
                 model: item.item_model || '—',
                 quantity: item.quantity,
                 image: item.item_image,
@@ -717,26 +727,26 @@ const StationSearch: React.FC = () => {
 
   const columns: TableColumn<Station>[] = [
     { 
-      id: 'code', header: 'รหัสสถานี', accessor: 'code', priority: 1, width: '150px',
+      id: 'code', header: 'รหัสสถานี', accessor: 'code', priority: 1, width: '150px', cellMode: 'nowrap',
       render: (val) => <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '6px 12px', borderRadius: '8px' }}><Tag size={14} />{val}</div>
     },
     { 
-      id: 'name', header: 'ชื่อสถานี / จุดตรวจ', accessor: 'name', priority: 1, width: 'auto',
+      id: 'name', header: 'ชื่อสถานี / จุดตรวจ', accessor: 'name', priority: 1, width: 'auto', minWidth: '240px', cellMode: 'wrap-2',
       render: (val) => <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}><MapPin size={16} color="var(--danger)" />{val}</div>
     },
     { 
-      id: 'province', header: 'จังหวัด', accessor: 'province', priority: 2, width: '110px',
+      id: 'province', header: 'จังหวัด', accessor: 'province', priority: 2, width: '110px', cellMode: 'nowrap',
       render: (val) => <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--text-muted)' }}><Globe size={14} />{val}</div>
     },
     {
-      id: 'type', header: 'ประเภทสถานี', accessor: 'station_type', priority: 1, width: '160px',
+      id: 'type', header: 'ประเภทสถานี', accessor: 'station_type', priority: 1, width: '190px', minWidth: '190px', cellMode: 'wrap-2',
       render: (val) => {
         const typeLabel = stationTypes.find(t => t.value === val)?.label || val;
         return <span className="badge glass-card" style={{ border: '1px solid var(--primary-light)', color: 'var(--primary)', fontWeight: 800 }}>{typeLabel}</span>;
       }
     },
     {
-      id: 'responsible', header: 'ผู้รับผิดชอบ', accessor: 'responsible_person', priority: 2, width: '140px',
+      id: 'responsible', header: 'ผู้รับผิดชอบ', accessor: 'responsible_person', priority: 2, width: '170px', minWidth: '170px', cellMode: 'wrap-2',
       render: (val) => {
         if (val && String(val).trim() !== '') {
           return (
@@ -744,7 +754,7 @@ const StationSearch: React.FC = () => {
               <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <User size={13} />
               </div>
-              <span style={{ fontWeight: 700, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(val)}>{val}</span>
+              <span style={{ fontWeight: 700, fontSize: '0.85rem', overflowWrap: 'anywhere' }}>{val}</span>
             </div>
           );
         }
@@ -759,7 +769,7 @@ const StationSearch: React.FC = () => {
         );
       }
     },
-    { id: 'status', header: 'สถานะระบบ', accessor: () => 'ปกติ', priority: 1, width: '100px', align: 'center', render: () => <span className="badge badge-success" style={{ width: '80px', textAlign: 'center', fontWeight: 800 }}>พร้อมใช้งาน</span> }
+    { id: 'status', header: 'สถานะระบบ', accessor: () => 'พร้อมใช้งาน', priority: 1, width: '130px', minWidth: '130px', align: 'center', cellMode: 'wrap-2', render: () => <span className="badge badge-success" style={{ width: '96px', textAlign: 'center', fontWeight: 800 }}>พร้อมใช้งาน</span> }
   ];
 
   const actions: TableAction<Station>[] = [
@@ -845,7 +855,7 @@ const StationSearch: React.FC = () => {
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>0</div>
            </Card>
            <Card className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '8px' }}>ยอดเบิกพัสดุ</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '8px' }}>ยอดเบิกอุปกรณ์</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--success)' }}>0</div>
            </Card>
         </div>
@@ -869,7 +879,7 @@ const StationSearch: React.FC = () => {
       {!selectedStationId ? (
         <>
           <BackButton />
-          <div className="page-header" style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div className="page-header station-page-header" style={{ marginBottom: '3rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)', marginBottom: '6px' }}>
                 <MapIcon size={20} />
@@ -877,14 +887,14 @@ const StationSearch: React.FC = () => {
               </div>
               <h2 style={{ fontSize: '2.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>บริหารจัดการสถานีและจุดตรวจ</h2>
               <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontSize: '1.05rem', fontWeight: 500 }}>
-                สืบค้นข้อมูลพัสดุและประวัติการซ่อมบำรุงรายสถานีทั่วประเทศ
+                สืบค้นข้อมูลอุปกรณ์และประวัติการซ่อมบำรุงรายสถานีทั่วประเทศ
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="station-header-actions">
                <button className="btn btn-outline" onClick={toggleMap} title={isMapOpen ? 'ซ่อนแผนที่' : 'แสดงแผนที่'}>
                  <MapIcon size={20} /> {isMapOpen ? 'ซ่อนแผนที่' : 'แสดงแผนที่'}
                </button>
-               <button className="btn btn-outline" onClick={loadInitialData} title="รีเฟรชข้อมูล"><RefreshCw size={20} /></button>
+               <button className="btn btn-outline station-header-actions__refresh" onClick={loadInitialData} title="รีเฟรชข้อมูล" aria-label="รีเฟรชข้อมูล"><RefreshCw size={20} /></button>
                {hasPermission('manage.stations') && (
                  <button className="btn btn-primary" onClick={openCreateModal}><Plus size={20} /> เพิ่มสถานีใหม่</button>
                )}
@@ -1117,7 +1127,7 @@ const StationSearch: React.FC = () => {
                           onClick={() => navigate(`/withdrawal?station_id=${details.station.id}`)}
                           style={{ borderRadius: '10px', fontSize: '0.75rem', padding: '8px 16px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: '#ffffff', fontWeight: 800 }}
                         >
-                          <Plus size={12} /> เบิกพัสดุลงด่าน
+                          <Plus size={12} /> เบิกอุปกรณ์ลงด่าน
                         </button>
                         <button 
                           type="button"
@@ -1568,14 +1578,14 @@ const StationSearch: React.FC = () => {
                         <Package size={36} style={{ color: 'var(--text-muted)', marginBottom: '1rem', opacity: 0.5 }} />
                         <h4 style={{ margin: '0 0 6px 0', fontWeight: 800, fontSize: '0.95rem' }}>ยังไม่มีอุปกรณ์ติดตั้งประจำด่านนี้</h4>
                         <p style={{ margin: '0 0 1rem 0', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 500 }}>
-                          เมื่อมีการทำเรื่องเบิกพัสดุลงด่านนี้ รายการพัสดุจะถูกลงบันทึกเป็นอุปกรณ์ประจำด่านโดยอัตโนมัติ
+                          เมื่อมีการทำเรื่องเบิกอุปกรณ์ลงด่านนี้ รายการอุปกรณ์จะถูกลงบันทึกเป็นอุปกรณ์ประจำด่านโดยอัตโนมัติ
                         </p>
                         <button
                           onClick={() => navigate(`/withdrawal?station_id=${details.station.id}`)}
                           className="btn btn-outline btn-sm"
                           style={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, border: '1px solid var(--primary)', color: 'var(--primary)', background: 'transparent' }}
                         >
-                          เบิกพัสดุลงด่านทันที
+                          เบิกอุปกรณ์ลงด่านทันที
                         </button>
                       </div>
                     ) : (
@@ -1662,7 +1672,7 @@ const StationSearch: React.FC = () => {
                                   {asset.name}
                                 </h4>
                                 <p style={{ margin: '2px 0 4px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  รุ่น/โมเดล: {asset.model}
+                                  รุ่น (Model): {asset.model}
                                 </p>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
                                   <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '4px' }}>
@@ -1753,7 +1763,7 @@ const StationSearch: React.FC = () => {
                                       background: 'var(--bg-card)', border: '1px solid var(--border)'
                                     }}>
                                       <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{t.ticket_no}</span>
-                                      <span style={{ color: 'var(--text-muted)' }}>{t.type === 'claim' ? 'เคลม' : 'ซ่อม'} · {t.status}</span>
+                                      <span style={{ color: 'var(--text-muted)' }}>{t.type === 'claim' ? 'เคลม' : 'ซ่อม'} · {getRepairStatusLabel(t.status)}</span>
                                     </div>
                                   ))
                                 ) : (
@@ -1948,7 +1958,7 @@ const StationSearch: React.FC = () => {
                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                        <HistoryIcon size={14} style={{ color: 'var(--primary)' }} />
                                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                                         ประวัติการนำเข้าอุปกรณ์ (เบิกพัสดุ)
+                                         ประวัติการนำเข้าอุปกรณ์ (เบิกอุปกรณ์)
                                        </span>
                                      </div>
                                      <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700 }}>
@@ -2116,7 +2126,7 @@ const StationSearch: React.FC = () => {
                         extra: (
                           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                             <span className={`badge badge-priority-${item.priority === 'วิกฤต' ? 'critical' : item.priority === 'ด่วนมาก' ? 'urgent' : item.priority === 'ด่วน' ? 'high' : 'normal'}`} style={{ fontSize: '0.6rem', padding: '1px 6px' }}>{item.priority}</span>
-                            <span className={`badge badge-${item.status}`} style={{ fontSize: '0.6rem', padding: '1px 6px' }}>{item.status}</span>
+                            <span className={`badge badge-${item.status}`} style={{ fontSize: '0.6rem', padding: '1px 6px' }}>{getRepairStatusLabel(item.status)}</span>
                           </div>
                         ),
                         href: `/repairs/${item.id}`,
@@ -2128,7 +2138,7 @@ const StationSearch: React.FC = () => {
                       navigate: () => navigate('/claim-history'),
                       empty: 'ไม่มีงานเคลม',
                       icon: <Shield size={24} style={{ opacity: 0.4, marginBottom: '6px', color: 'var(--warning)' }} />,
-                      cta: 'แจ้งเคลมพัสดุที่นี่',
+                      cta: 'แจ้งเคลมอุปกรณ์ที่นี่',
                       ctaAction: () => navigate(`/claim?station_id=${details.station.id}`),
                       items: filteredDetails.claims.slice(0, 6).map(item => ({
                         id: item.id,
@@ -2136,7 +2146,7 @@ const StationSearch: React.FC = () => {
                         title: item.device_name,
                         subtitle: item.reporter,
                         time: item.created_at,
-                        extra: <span className={`badge badge-${item.status}`} style={{ fontSize: '0.6rem', padding: '1px 6px' }}>{item.status === 'กำลังซ่อม' ? 'กำลังเคลม' : item.status}</span>,
+                        extra: <span className={`badge badge-${item.status}`} style={{ fontSize: '0.6rem', padding: '1px 6px' }}>{item.status === 'กำลังซ่อม' ? 'กำลังเคลม' : getRepairStatusLabel(item.status)}</span>,
                         href: `/claim-history/${item.id}`,
                       })),
                     },
@@ -2167,10 +2177,10 @@ const StationSearch: React.FC = () => {
                       navigate: () => navigate('/transactions'),
                       empty: 'ไม่มีความเคลื่อนไหว',
                       icon: <Activity size={24} style={{ opacity: 0.4, marginBottom: '6px', color: 'var(--info)' }} />,
-                      cta: 'ดูประวัติคลังพัสดุ',
+                      cta: 'ดูประวัติคลังอุปกรณ์',
                       ctaAction: () => navigate('/inventory'),
                       items: filteredDetails.transactions.slice(0, 6).map(tx => {
-                        const isIn = tx.transaction_type === 'ADD_STOCK' || tx.transaction_type === 'RETURN';
+                        const isIn = tx.transaction_type === 'ADD_STOCK' || tx.transaction_type === 'RETURN' || (tx.transaction_type === 'ADJUSTMENT' && tx.quantity_added > 0);
                         const qty = tx.quantity_added || tx.quantity_withdrawn || tx.quantity_borrowed || tx.quantity_returned || 0;
                         const accent = isIn ? 'var(--success)' : 'var(--danger)';
                         return {
@@ -2446,6 +2456,27 @@ const StationSearch: React.FC = () => {
                   />
                   {fieldErrors.name && (
                     <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.name}</p>
+                  )}
+                </div>
+
+                {/* พิกัด GPS */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>
+                    พิกัด GPS {stationModal.mode === 'create' && <span style={{ color: 'var(--danger)' }}>*</span>}
+                    <span style={{ marginLeft: '8px', fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)' }}>(ละติจูด,ลองจิจูด เช่น 14.1083611,99.7096389)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={formData.gps_coordinates}
+                    onChange={e => updateField('gps_coordinates', e.target.value)}
+                    placeholder="เช่น 14.1083611,99.7096389"
+                    maxLength={80}
+                    inputMode="decimal"
+                    style={fieldErrors.gps_coordinates ? { borderColor: 'var(--danger)' } : undefined}
+                  />
+                  {fieldErrors.gps_coordinates && (
+                    <p style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>⚠ {fieldErrors.gps_coordinates}</p>
                   )}
                 </div>
 

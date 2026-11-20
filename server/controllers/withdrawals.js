@@ -324,7 +324,7 @@ exports.createWithdrawal = async (req, res) => {
 
         // Check if stock is now below min_stock
         if (invCheck.quantity < invCheck.min_stock) {
-          const stockAlertMsg = `\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nพัสดุ: ${invCheck.name}\nคงเหลือ: ${invCheck.quantity} ชิ้น (เกณฑ์ขั้นต่ำ: ${invCheck.min_stock} ชิ้น)`;
+          const stockAlertMsg = `\n⚠️ *อุปกรณ์ต่ำกว่าเกณฑ์ขั้นต่ำ!*\nอุปกรณ์: ${invCheck.name}\nคงเหลือ: ${invCheck.quantity} ชิ้น (เกณฑ์ขั้นต่ำ: ${invCheck.min_stock} ชิ้น)`;
           sendLineNotify('stock', stockAlertMsg);
         }
 
@@ -762,7 +762,7 @@ exports.deleteWithdrawal = async (req, res) => {
     });
 
     logAudit('withdrawal', id, 'cancel', cancelledWithdrawal, null, cancelledBy).catch(e => console.error(e));
-    res.json({ message: 'ยกเลิกการเบิกและคืนสต็อกเรียบร้อย' });
+    res.json({ message: 'ยกเลิกการเบิกและคืนอุปกรณ์เข้าคลังเรียบร้อย' });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

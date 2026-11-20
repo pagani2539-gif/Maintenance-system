@@ -23,11 +23,11 @@ describe('Lifecycle and Flows', () => {
 
     // Login to get token
     const res = await request(app)
-      .post('/api/auth/login')
+      .post('/api/v2/auth/login')
       .send({ username: testUsername, password: testPassword });
 
-    if (res.body && res.body.token) {
-      token = res.body.token;
+    if (res.body?.data?.token) {
+      token = res.body.data.token;
     }
   });
 
@@ -82,15 +82,15 @@ describe('Lifecycle and Flows', () => {
     );
 
     // 3. Request lifecycle report
-    const req = request(app).get('/api/inventory/lifecycle-report');
+    const req = request(app).get('/api/v2/inventory/lifecycle-report?pageSize=100');
     if (token) req.set('Authorization', `Bearer ${token}`);
     const res = await req;
 
     expect(res.statusCode).toEqual(200);
-    const item = res.body.find(i => Number(i.instance_id) === instId);
+    const item = res.body.data.find(i => Number(i.instanceId) === instId);
     expect(item).toBeDefined();
-    expect(item.age_months).toBeGreaterThanOrEqual(4); // allow 4-6 due to boundaries
-    expect(item.repair_count).toEqual(1);
+    expect(item.ageMonths).toBeGreaterThanOrEqual(4); // allow 4-6 due to boundaries
+    expect(item.repairCount).toEqual(1);
   });
 
   it('should include station-assigned items that do not have S/N yet', async () => {
@@ -116,18 +116,18 @@ describe('Lifecycle and Flows', () => {
       [stationId, inventoryId]
     );
 
-    const req = request(app).get('/api/inventory/lifecycle-report');
+    const req = request(app).get('/api/v2/inventory/lifecycle-report?pageSize=100');
     if (token) req.set('Authorization', `Bearer ${token}`);
     const res = await req;
 
     expect(res.statusCode).toEqual(200);
-    const item = res.body.find(row => Number(row.station_id) === stationId && Number(row.inventory_id) === inventoryId);
+    const item = res.body.data.find(row => Number(row.stationId) === stationId && Number(row.inventoryId) === inventoryId);
     expect(item).toMatchObject({
-      asset_kind: 'station_stock',
-      instance_id: null,
+      assetKind: 'station_stock',
+      instanceId: null,
       quantity: 3,
-      untracked_quantity: 3,
-      requires_sn: 1,
+      untrackedQuantity: 3,
+      requiresSn: 1,
     });
   });
 
@@ -149,14 +149,15 @@ describe('Lifecycle and Flows', () => {
     const inventoryId = Number(invRows[0].id);
 
     const createRes = await request(app)
-      .post('/api/withdrawals')
+      .post('/api/v2/withdrawals')
       .set('Authorization', `Bearer ${token}`)
       .send({
+        recipient: 'Lifecycle Test Recipient',
         type: 'ติดตั้งใหม่',
-        project_name: 'Station assignment test',
+        projectName: 'Station assignment test',
         location: stationName,
-        station_id: stationId,
-        items: [{ inventory_id: inventoryId, quantity: 2, serial_numbers: [] }],
+        stationId,
+        items: [{ inventoryId, quantity: 2, serialNumbers: [] }],
       });
 
     expect(createRes.statusCode).toEqual(201);
@@ -191,34 +192,35 @@ describe('Lifecycle and Flows', () => {
     const inventoryId = Number(invRows[0].id);
 
     const createRes = await request(app)
-      .post('/api/withdrawals')
+      .post('/api/v2/withdrawals')
       .set('Authorization', `Bearer ${token}`)
       .send({
+        recipient: 'Lifecycle Asset Recipient',
         type: 'ติดตั้งใหม่',
-        project_name: 'Asset provenance test project',
+        projectName: 'Asset provenance test project',
         location: sourceName,
-        station_id: sourceStationId,
-        withdrawal_date: '2026-07-01',
-        contract_reference_type: 'none',
-        contract_reference_note: 'ทดสอบของเดิม',
-        items: [{ inventory_id: inventoryId, quantity: 4, serial_numbers: [] }],
+        stationId: sourceStationId,
+        withdrawalDate: '2026-07-01',
+        contractReferenceType: 'none',
+        contractReferenceNote: 'ทดสอบของเดิม',
+        items: [{ inventoryId, quantity: 4, serialNumbers: [] }],
       });
     expect(createRes.statusCode).toEqual(201);
 
     const detailsRes = await request(app)
-      .get(`/api/stations/details?station_id=${sourceStationId}`)
+      .get(`/api/v2/stations/${sourceStationId}`)
       .set('Authorization', `Bearer ${token}`);
     expect(detailsRes.statusCode).toEqual(200);
-    expect(detailsRes.body.assets[0]).toMatchObject({ inventory_id: inventoryId, current_quantity: 4 });
-    expect(detailsRes.body.assets[0].source_lots[0]).toMatchObject({
-      quantity_remaining: 4,
-      project_name_snapshot: 'Asset provenance test project',
+    expect(detailsRes.body.data.assets[0]).toMatchObject({ inventoryId, currentQuantity: 4 });
+    expect(detailsRes.body.data.assets[0].sourceLots[0]).toMatchObject({
+      quantityRemaining: 4,
+      projectNameSnapshot: 'Asset provenance test project',
     });
 
     const moveRes = await request(app)
-      .post(`/api/stations/${sourceStationId}/assets/move`)
+      .post(`/api/v2/stations/${sourceStationId}/asset-movements`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ inventory_id: inventoryId, quantity: 2, to_station_id: targetStationId, note: 'ทดสอบย้ายสถานี' });
+      .send({ inventoryId, quantity: 2, toStationId: targetStationId, note: 'ทดสอบย้ายสถานี' });
     expect(moveRes.statusCode).toEqual(200);
 
     const balances = await query(
@@ -255,17 +257,17 @@ describe('Lifecycle and Flows', () => {
 
     // 2. Create Repair via API
     const createRes = await request(app)
-      .post('/api/repairs')
+      .post('/api/v2/repairs')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        device_name: 'Repair Test Device',
+        deviceName: 'Repair Test Device',
         problem: 'Faulty screen',
-        instance_id: instId,
-        inventory_id: invId,
+        instanceId: instId,
+        inventoryId: invId,
         location: 'Station Alpha'
       });
     expect(createRes.statusCode).toEqual(201);
-    const repairId = createRes.body.id;
+    const repairId = createRes.body.data.id;
 
     // Verify instance status changed to "Under Repair"
     const { rows: afterCreateRows } = await query(`SELECT status FROM inventory_instances WHERE id = $1`, [instId]);
@@ -273,11 +275,11 @@ describe('Lifecycle and Flows', () => {
 
     // 3. Complete Repair via API (update status to เสร็จสิ้น)
     const updateRes = await request(app)
-      .patch(`/api/repairs/${repairId}/status`)
+      .post(`/api/v2/repairs/${repairId}/actions/status-transition`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         status: 'เสร็จสิ้น',
-        repair_note: 'Fixed the screen connector'
+        repairNote: 'Fixed the screen connector'
       });
     expect(updateRes.statusCode).toEqual(200);
 
@@ -296,19 +298,19 @@ describe('Lifecycle and Flows', () => {
 
     // 2. Create PO in Draft status
     const createPoRes = await request(app)
-      .post('/api/purchase-orders')
+      .post('/api/v2/purchase-orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        ordered_by: 'Test Buyer',
-        project_name: 'Test Project',
-        company_name: 'Vendor X',
+        orderedBy: 'Test Buyer',
+        projectName: 'Test Project',
+        companyName: 'Vendor X',
         status: 'Draft',
         items: [
-          { inventory_id: invId, quantity: 10 }
+          { inventoryId: invId, quantity: 10 }
         ]
       });
     expect(createPoRes.statusCode).toEqual(201);
-    const poId = createPoRes.body.id;
+    const poId = createPoRes.body.data.id;
 
     // Verify Draft status
     const getStatus = async () => (await query(`SELECT status FROM purchase_orders WHERE id = $1`, [poId])).rows[0];
@@ -317,7 +319,7 @@ describe('Lifecycle and Flows', () => {
 
     // 3. Transition to Pending
     let updatePoRes = await request(app)
-      .patch(`/api/purchase-orders/${poId}`)
+      .patch(`/api/v2/purchase-orders/${poId}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ status: 'Pending' });
     expect(updatePoRes.statusCode).toEqual(200);
@@ -327,7 +329,7 @@ describe('Lifecycle and Flows', () => {
 
     // 4. Transition to Approved
     updatePoRes = await request(app)
-      .patch(`/api/purchase-orders/${poId}`)
+      .patch(`/api/v2/purchase-orders/${poId}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ status: 'Approved' });
     expect(updatePoRes.statusCode).toEqual(200);
@@ -337,7 +339,7 @@ describe('Lifecycle and Flows', () => {
 
     // 5. Transition to Ordered
     updatePoRes = await request(app)
-      .patch(`/api/purchase-orders/${poId}`)
+      .patch(`/api/v2/purchase-orders/${poId}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ status: 'Ordered' });
     if (updatePoRes.statusCode !== 200) {
@@ -350,11 +352,11 @@ describe('Lifecycle and Flows', () => {
 
     // 6. Receive Goods (Receive PO) -> changes status to Received and increases inventory quantity
     const receiveRes = await request(app)
-      .post(`/api/purchase-orders/${poId}/receive`)
+      .post(`/api/v2/purchase-orders/${poId}/receipts`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         items: [
-          { inventory_id: invId, received_quantity: 10 }
+          { inventoryId: invId, receivedQuantity: 10 }
         ]
       });
     expect(receiveRes.statusCode).toEqual(200);
@@ -366,5 +368,15 @@ describe('Lifecycle and Flows', () => {
     // Verify inventory quantity increased: 5 + 10 = 15
     const { rows: qtyRows } = await query(`SELECT quantity FROM inventory WHERE id = $1`, [invId]);
     expect(qtyRows[0].quantity).toEqual(15);
+
+    const deleteReceived = await request(app)
+      .delete(`/api/v2/purchase-orders/${poId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(deleteReceived.statusCode).toEqual(409);
+
+    await query('DELETE FROM inventory_transactions WHERE inventory_id = $1', [invId]);
+    await query('DELETE FROM purchase_order_items WHERE po_id = $1', [poId]);
+    await query('DELETE FROM purchase_orders WHERE id = $1', [poId]);
+    await query('DELETE FROM inventory WHERE id = $1', [invId]);
   });
 });

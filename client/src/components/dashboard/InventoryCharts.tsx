@@ -57,7 +57,7 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
       <Card className="dash-card boot-animate stagger-2 dash-span-8">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ minWidth: 0 }}>
-            <h3 className="dash-card-title">ความเคลื่อนไหวสต็อกพัสดุ</h3>
+            <h3 className="dash-card-title">ความเคลื่อนไหวอุปกรณ์</h3>
             <p className="dash-card-subtitle">นำเข้า · เบิกออก · ยืม · คืน ย้อนหลัง 6 เดือน</p>
           </div>
           <ScopeBadge show={filterActive} label="6 เดือนล่าสุด" />
@@ -84,7 +84,7 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '8px' }}>
           <div style={{ minWidth: 0 }}>
             <h3 className="dash-card-title">สภาพอุปกรณ์ในคลัง</h3>
-            <p className="dash-card-subtitle">คัดแยกตามคุณภาพสินค้า (Instances)</p>
+            <p className="dash-card-subtitle">คัดแยกตามสภาพอุปกรณ์ (Instances)</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             <ScopeBadge show={filterActive} />
@@ -140,7 +140,7 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
       {/* พัสดุที่ใช้บ่อย */}
       <Card className="dash-card boot-animate stagger-3 dash-span-4">
         <h3 className="dash-card-title" style={{ marginBottom: '0.85rem' }}>
-          <ShoppingBag size={16} color="var(--primary)" /> พัสดุที่ใช้บ่อย Top 5
+            <ShoppingBag size={16} color="var(--primary)" /> อุปกรณ์ที่ใช้บ่อย Top 5
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {(topUsed || []).length > 0 ? topUsed.slice(0, 5).map((item, i) => (
@@ -159,7 +159,7 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
       <Card className="dash-card boot-animate stagger-3 dash-span-4">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '8px' }}>
           <div style={{ minWidth: 0 }}>
-            <h3 className="dash-card-title">พัสดุไม่มีการเคลื่อนไหว</h3>
+            <h3 className="dash-card-title">อุปกรณ์ไม่มีการเคลื่อนไหว</h3>
             <p className="dash-card-subtitle">Dead Stock (นิ่งเกิน 90 วัน)</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -180,7 +180,7 @@ const InventoryCharts: React.FC<InventoryChartsProps> = ({
             </Link>
           )) : (
             <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--success)', fontWeight: 700, fontSize: '0.85rem' }}>
-              ไม่มีสินค้าค้างสต็อก
+              ไม่มีอุปกรณ์ค้างในคลัง
             </div>
           )}
         </div>

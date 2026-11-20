@@ -74,6 +74,7 @@ const Settings: React.FC = () => {
   const [backups, setBackups] = useState<Array<{ filename: string; size: number; created_at: string }>>([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
+  const [downloadingBackup, setDownloadingBackup] = useState<string | null>(null);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [targetBackup, setTargetBackup] = useState<string | null>(null);
   const [restorePassword, setRestorePassword] = useState('');
@@ -325,6 +326,26 @@ const Settings: React.FC = () => {
       notify(err.response?.data?.error || 'เกิดข้อผิดพลาดในการสำรองข้อมูล', 'error');
     } finally {
       setCreatingBackup(false);
+    }
+  };
+
+  const handleDownloadBackup = async (filename: string) => {
+    setDownloadingBackup(filename);
+    try {
+      const blob = await settingsApi.downloadBackup(filename);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const err = error as { response?: { data?: { error?: string } } };
+      notify(err.response?.data?.error || 'ไม่สามารถดาวน์โหลดไฟล์สำรองได้', 'error');
+    } finally {
+      setDownloadingBackup(null);
     }
   };
 
@@ -761,7 +782,7 @@ const Settings: React.FC = () => {
                               padding: '8px',
                             }}>
                               <img
-                                src={`${UPLOAD_URL}/uploads/${logo.file_path}`}
+                                src={`${UPLOAD_URL}/uploads/${logo.file_path}?v=${logo.id}`}
                                 alt={logo.label}
                                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                               />
@@ -885,16 +906,16 @@ const Settings: React.FC = () => {
 
                 <div style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '1.25rem', background: 'var(--bg-app)' }}>
                   <label style={{ display: 'block', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '0.75rem' }}>
-                    LINE Target ID (Group ID / User ID) สำหรับคลังพัสดุ / สต็อกสินค้า
+                    LINE Target ID (Group ID / User ID) สำหรับคลังอุปกรณ์ / ยอดคงเหลืออุปกรณ์
                   </label>
                   <Input
                     type="text"
                     value={systemSettings.line_token_stock || ''}
                     onChange={(e) => setSystemSettings({ ...systemSettings, line_token_stock: e.target.value })}
-                    placeholder="กรอก Target ID ของกลุ่มหรือบัญชีผู้รับแจ้งสต็อก (เช่น C123456... หรือ U123456...)"
+                    placeholder="กรอก Target ID ของกลุ่มหรือบัญชีผู้รับแจ้งยอดอุปกรณ์ (เช่น C123456... หรือ U123456...)"
                   />
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0 }}>
-                    ระบบจะส่งข้อความเมื่อมีการ "เบิกอุปกรณ์", "รับเข้า/นำเข้าพัสดุเข้าคลัง", หรือกรณี "ปริมาณคงเหลือต่ำกว่าเกณฑ์ความปลอดภัย (Min Stock)"
+                    ระบบจะส่งข้อความเมื่อมีการ "เบิกอุปกรณ์", "รับเข้า/นำเข้าอุปกรณ์เข้าคลัง", หรือกรณี "ปริมาณคงเหลือต่ำกว่าเกณฑ์ความปลอดภัย (Min Stock)"
                   </p>
                 </div>
 
@@ -976,9 +997,10 @@ const Settings: React.FC = () => {
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <a
-                              href={`${UPLOAD_URL}/api/settings/backups/download/${b.filename}`}
-                              download
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadBackup(b.filename)}
+                              disabled={downloadingBackup === b.filename}
                               className="btn btn-outline"
                               style={{
                                 padding: '6px 10px',
@@ -994,8 +1016,8 @@ const Settings: React.FC = () => {
                               }}
                               title="ดาวน์โหลดไฟล์สำรอง"
                             >
-                              <Download size={14} /> ดาวน์โหลด
-                            </a>
+                              <Download size={14} /> {downloadingBackup === b.filename ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด'}
+                            </button>
                             <Button
                               variant="outline"
                               icon={<RefreshCw size={12} />}

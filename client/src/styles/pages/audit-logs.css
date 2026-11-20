@@ -1,0 +1,58 @@
+.audit-logs-page {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem;
+}
+
+.audit-logs-surface { overflow: hidden; }
+.audit-table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.audit-table {
+  width: 100%;
+  min-width: 1060px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.audit-table th:nth-child(1) { width: 180px; }
+.audit-table th:nth-child(2) { width: 150px; }
+.audit-table th:nth-child(3) { width: 180px; }
+.audit-table th:nth-child(4) { width: 120px; }
+.audit-table th:nth-child(5) { width: 120px; }
+.audit-table th:nth-child(6) { width: 310px; }
+.audit-table td { overflow-wrap: anywhere; }
+
+.audit-diff summary {
+  width: fit-content;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.audit-diff summary:focus-visible { border-radius: 4px; outline: 2px solid var(--primary); outline-offset: 3px; }
+.audit-diff__content { max-height: 18rem; margin-top: 0.75rem; overflow: auto; }
+
+.audit-mobile-list { display: grid; gap: 0.75rem; padding: 0.75rem; }
+.audit-mobile-card { min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; }
+.audit-mobile-card h3 { margin: 0.75rem 0; color: var(--text-main); font-size: 0.95rem; line-height: 1.5; overflow-wrap: anywhere; }
+.audit-mobile-card__topline,
+.audit-mobile-card__meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; min-width: 0; }
+.audit-mobile-card__date,
+.audit-mobile-card__meta span { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.75rem; overflow-wrap: anywhere; }
+.audit-entity-badge { max-width: 100%; padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; overflow-wrap: anywhere; }
+.audit-record-id { font-family: var(--font-mono); }
+
+@media (max-width: 768px) {
+  .audit-logs-page { padding: 1rem; }
+  .audit-logs-surface { overflow: visible; }
+}
+
+@media (max-width: 430px) {
+  .audit-logs-page { padding-inline: 0.75rem; }
+  .audit-mobile-card__topline,
+  .audit-mobile-card__meta { align-items: flex-start; flex-direction: column; }
+}

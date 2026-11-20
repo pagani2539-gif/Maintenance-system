@@ -43,15 +43,10 @@ The system uses PostgreSQL. The primary tables are:
 
 ## API Design
 
-The API is organized by resource:
-
-- `/api/repairs`: CRUD operations for repair tickets, logs, and status updates.
-- `/api/inventory`: CRUD operations for equipment inventory and stock management.
-- `/api/withdrawals`: Handling equipment withdrawal requests, items, and returns.
-- `/api/purchase-orders`: Procurement workflow, stock replenishment upon receiving, and deletion with rollback.
-- `/api/stations`: Comprehensive station management, including automated code generation.
-- `/api/transactions`: Read-only queries for the unified inventory movement ledger history.
-- `/api/reports`: Analytics dashboard widgets data and CSV report generation.
+All resource endpoints use the versioned v2 contract under `/api/v2`. The API
+uses camelCase DTOs, Zod validation, stable response/error envelopes, and
+explicit action endpoints for workflow transitions. The unversioned system
+endpoints are limited to `/api`, `/api/health`, `/api-docs`, and `/api-docs/v2`.
 
 ## Directory Structure
 

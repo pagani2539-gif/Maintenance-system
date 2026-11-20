@@ -1,0 +1,234 @@
+/* Canonical data-table contract. This layer is loaded after legacy.css. */
+.data-table-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 1.5rem;
+  overflow: auto hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--table-radius, 12px);
+  background: var(--bg-card);
+  box-shadow: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hover) transparent;
+}
+
+/* Sticky affordance is intentionally a divider, not a persistent shadow. */
+.data-table-container::after { display: none; }
+
+.data-table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table thead { height: var(--table-header-height); }
+
+.data-table th,
+.data-table td {
+  padding: var(--table-cell-padding);
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  vertical-align: middle;
+  line-height: 1.6;
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-table-header);
+  background-color: var(--bg-app);
+  color: var(--text-muted);
+  font-size: var(--table-header-size);
+  font-weight: var(--table-header-weight);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.data-table td {
+  font-size: var(--table-text-size);
+  font-weight: var(--table-text-weight);
+}
+
+.data-table tbody tr { min-height: var(--table-row-height); }
+
+.data-table__cell-content {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.data-table__cell-content--nowrap {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table__cell-content--wrap-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.data-table__cell-content--wrap {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.data-table__cell-content.is-overflowing { cursor: help; }
+
+.data-table__cell-content.is-overflowing:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.data-table__overflow-tooltip {
+  position: fixed;
+  z-index: 10000;
+  padding: 10px 12px;
+  border: 1px solid var(--border-hover);
+  border-radius: 8px;
+  background: var(--bg-floating, #ffffff);
+  box-shadow: var(--shadow-md);
+  color: var(--text-main);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.data-table--has-actions th:last-child,
+.data-table--has-actions td:last-child,
+.sticky-actions-col-th,
+.sticky-actions-col-td {
+  position: sticky;
+  right: 0;
+  overflow: visible;
+  border-left: var(--table-sticky-divider);
+  box-shadow: var(--table-sticky-shadow);
+}
+
+.data-table--has-actions td:last-child,
+.sticky-actions-col-td {
+  z-index: var(--z-table-action);
+  background-color: var(--bg-card);
+}
+
+.sticky-actions-col-td .table-action-group {
+  width: 100%;
+}
+
+.data-table--has-actions th:last-child,
+.sticky-actions-col-th {
+  z-index: calc(var(--z-table-action) + 1);
+  background-color: var(--bg-app);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.data-table tr:hover td,
+.data-table tr.data-table-row:hover .sticky-actions-col-td,
+.data-table tr.data-table-row.is-selected td,
+.data-table tr.data-table-row.is-selected .sticky-actions-col-td {
+  background-color: var(--primary-light);
+}
+
+.data-table tr:last-child td { border-bottom: 0; }
+
+.data-table__sort-button {
+  min-width: 0;
+}
+
+.data-table__header-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.data-table td .badge,
+.data-table td .status-badge {
+  max-width: 100%;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Outlined table surfaces: keep structure through borders while allowing the
+   shared application gradient to remain visible behind every table layer. */
+/* stylelint-disable declaration-no-important -- legacy table cells use inline backgrounds */
+.main-content .data-table-container,
+.main-content .table-container,
+.main-content .table-scroll-container,
+.main-content .responsive-table-scroll,
+.main-content table,
+.main-content thead,
+.main-content tbody,
+.main-content tr,
+.main-content th,
+.main-content td,
+.main-content .sticky-actions-col-th,
+.main-content .sticky-actions-col-td {
+  background-color: transparent !important;
+}
+
+.main-content .data-table-container,
+.main-content .table-container,
+.main-content .table-scroll-container {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.main-content table th,
+.main-content table td {
+  border-color: var(--border);
+}
+
+/* Raw data tables follow the same readable wrapping contract. Controls and
+   badges retain their own nowrap rules, while prose can use the available row. */
+.main-content table:not(.data-table) th,
+.main-content table:not(.data-table) td {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.main-content table tbody tr:hover > td,
+.main-content table tbody tr.is-selected > td,
+.main-content .data-table tr.data-table-row:hover .sticky-actions-col-td,
+.main-content .data-table tr.data-table-row.is-selected .sticky-actions-col-td {
+  background-color: var(--primary-light) !important;
+}
+
+/* Keep the application gradient as one continuous canvas. Sticky actions use
+   a translucent veil instead of repainting that gradient from a new origin. */
+.main-content .data-table--has-actions th:last-child,
+.main-content .data-table--has-actions td:last-child,
+.main-content .sticky-actions-col-th,
+.main-content .sticky-actions-col-td {
+  background-color: color-mix(in srgb, var(--bg-app) 16%, transparent) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-left: 0;
+}
+
+.main-content .data-table tr.data-table-row:hover .sticky-actions-col-td,
+.main-content .data-table tr.data-table-row.is-selected .sticky-actions-col-td {
+  background-color: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+}
+/* stylelint-enable declaration-no-important */

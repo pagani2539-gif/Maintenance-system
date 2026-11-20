@@ -37,6 +37,7 @@ import TablePagination from '../components/tables/TablePagination';
 import { useTableUrlState } from '../hooks/useTableUrlState';
 import { exportToCsv } from '../utils/csvExporter';
 import { getApiErrorMessage } from '../utils/apiError';
+import { getRepairStatusLabel } from '../constants/terminology';
 
 const ClaimList: React.FC = () => {
   const { notify, confirm } = useNotification();
@@ -138,7 +139,7 @@ const ClaimList: React.FC = () => {
         repair_note: modalData.note,
         note: modalData.note
       });
-      notify(status === 'เสร็จสิ้น' ? 'บันทึกการเคลมเสร็จสิ้นเรียบร้อยแล้ว' : `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`);
+      notify(status === 'เสร็จสิ้น' ? 'บันทึกการเคลมเสร็จสิ้นเรียบร้อยแล้ว' : `เปลี่ยนสถานะเป็น "${getRepairStatusLabel(status)}" เรียบร้อยแล้ว`);
       setShowModal(null);
       setModalData({ technician: '', note: '' });
       fetchData();
@@ -226,7 +227,7 @@ const ClaimList: React.FC = () => {
       }
     },
     {
-      id: 'status', header: 'สถานะ', accessor: 'status', priority: 1, width: '120px', align: 'center',
+      id: 'status', header: 'สถานะ', accessor: 'status', priority: 1, width: '150px', minWidth: '150px', align: 'center', cellMode: 'wrap-2',
       render: (val) => <span className={`badge badge-${val}`} style={{ minWidth: '90px', justifyContent: 'center' }}>{val === 'กำลังซ่อม' ? 'กำลังเคลม' : val}</span>
     },
     {
@@ -286,7 +287,7 @@ const ClaimList: React.FC = () => {
   const renderDetailDrawer = useCallback((row: Repair) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className={`badge badge-${row.status}`}>{row.status === 'กำลังซ่อม' ? 'กำลังเคลม' : row.status}</span>
+        <span className={`badge badge-${row.status}`}>{row.status === 'กำลังซ่อม' ? 'กำลังเคลม' : getRepairStatusLabel(row.status)}</span>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{formatDateTimeThai(row.received_at)}</span>
       </div>
 
@@ -374,7 +375,7 @@ const ClaimList: React.FC = () => {
           { label: 'งานทั้งหมด', val: stats.claim.total, icon: ShieldAlert, status: 'All' },
           { label: 'รอดำเนินการ', val: stats.claim.pending, icon: ShieldAlert, status: 'รอดำเนินการ' },
           { label: 'กำลังเคลม', val: stats.claim.in_progress, icon: FileWarning, status: 'กำลังซ่อม' },
-          { label: 'รออะไหล่/ศูนย์', val: stats.claim.on_hold, icon: Hourglass, status: 'รออะไหล่' },
+          { label: 'รออุปกรณ์/ศูนย์', val: stats.claim.on_hold, icon: Hourglass, status: 'รออะไหล่' },
           { label: 'เคลมเสร็จสิ้น', val: stats.claim.completed, icon: CheckCircle2, status: 'เสร็จสิ้น' }
         ].map((s, i) => (
           <Card key={i} onClick={() => setTableState({ filters: { ...urlState.filters, status: s.status }, page: 1 })} style={{ cursor: 'pointer', borderColor: urlState.filters.status === s.status ? 'var(--primary)' : undefined }}>
@@ -390,7 +391,7 @@ const ClaimList: React.FC = () => {
         searchValue={urlState.search}
         onSearchChange={(val) => setTableState({ search: val, page: 1 })}
         filters={[
-          { id: 'status', label: 'สถานะ', type: 'select', options: [{ label: 'รอดำเนินการ', value: 'รอดำเนินการ' }, { label: 'กำลังเคลม', value: 'กำลังซ่อม' }, { label: 'รออะไหล่', value: 'รออะไหล่' }, { label: 'เสร็จสิ้น', value: 'เสร็จสิ้น' }] },
+            { id: 'status', label: 'สถานะ', type: 'select', options: [{ label: 'รอดำเนินการ', value: 'รอดำเนินการ' }, { label: 'กำลังเคลม', value: 'กำลังซ่อม' }, { label: 'รออุปกรณ์', value: 'รออะไหล่' }, { label: 'เสร็จสิ้น', value: 'เสร็จสิ้น' }] },
           { id: 'priority', label: 'ความสำคัญ', type: 'select', options: [{ label: 'ปกติ', value: 'ปกติ' }, { label: 'ด่วน', value: 'ด่วน' }, { label: 'ด่วนมาก', value: 'ด่วนมาก' }, { label: 'วิกฤต', value: 'วิกฤต' }] },
           { id: 'location', label: 'สถานที่', type: 'select', options: locations }
         ]}
@@ -417,7 +418,7 @@ const ClaimList: React.FC = () => {
         mobileConfig={{
           title: (r) => r.device_name,
           subtitle: (r) => `ใบเคลม: ${r.ticket_no} · ${r.reporter}`,
-          statusBadge: (r) => <span className={`badge badge-${r.status}`}>{r.status === 'กำลังซ่อม' ? 'กำลังเคลม' : r.status}</span>
+          statusBadge: (r) => <span className={`badge badge-${r.status}`}>{r.status === 'กำลังซ่อม' ? 'กำลังเคลม' : getRepairStatusLabel(r.status)}</span>
         }}
       />
 
@@ -445,7 +446,7 @@ const ClaimList: React.FC = () => {
               {showModal.type === 'complete' ? (
                 <TextArea label="บันทึกการเคลม (Claim Note)" required rows={3} placeholder="สรุปผลการส่งเคลม..." value={modalData.note} onChange={e => setModalData({...modalData, note: e.target.value})} />
               ) : showModal.type === 'hold' ? (
-                <TextArea label="เหตุผลที่ระงับงาน" required rows={2} placeholder="เช่น รออะไหล่จากบริษัท..." value={modalData.note} onChange={e => setModalData({...modalData, note: e.target.value})} />
+                <TextArea label="เหตุผลที่ระงับงาน" required rows={2} placeholder="เช่น รออุปกรณ์จากบริษัท..." value={modalData.note} onChange={e => setModalData({...modalData, note: e.target.value})} />
               ) : null}
               <div className="modal-actions">
                 <Button type="button" variant="outline" onClick={() => setShowModal(null)}>ยกเลิก</Button>

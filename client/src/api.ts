@@ -1,5 +1,7 @@
 import axios from 'axios';
-import type { Repair, RepairDetail, RepairStatsResponse, InventoryItem, Withdrawal, InventoryStats, DashboardData, GlobalSearchResults, PurchaseOrder, StationDetailResponse, Station, StationArea, VendorContact, Company, CompanyLogo, User, SystemSettings, AuditLog, AssetLifecycleItem, Contract, AssetManualStatus, StockCount, StockCountItem, StockCountDetailResponse, StockCountCompleteSummary, AssetTimelineResponse, Technician, TechnicianKitSummary, TechnicianHoldingsDetail, TechnicianStockMovement, TechnicianStockItemInput } from './types';
+import type { ApiV2Meta } from './types';
+import type { Repair, RepairDetail, RepairStatsResponse, InventoryItem, InventoryAdjustment, InventoryTransaction, Withdrawal, InventoryStats, DashboardApiPayload, GlobalSearchResults, PurchaseOrder, StationDetailResponse, Station, StationArea, VendorContact, Company, CompanyLogo, User, SystemSettings, AuditLog, AssetLifecycleItem, Contract, AssetManualStatus, StockCount, StockCountItem, StockCountDetailResponse, StockCountCompleteSummary, AssetTimelineResponse, Technician, TechnicianKitSummary, TechnicianHoldingsDetail, TechnicianStockMovement, TechnicianStockItemInput } from './types';
+import { normalizeDashboardData } from './utils/dashboardData';
 
 const TOKEN_KEY = 'maintenance_auth_token';
 
@@ -9,17 +11,77 @@ export const tokenStorage = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
-const API_URL = import.meta.env.DEV 
-  ? 'http://localhost:5221/api' 
-  : '/api';
+const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+const devApiOrigin = typeof window !== 'undefined'
+  ? `${window.location.protocol}//${window.location.hostname}:5221`
+  : 'http://localhost:5221';
+const apiV2Url = (value: string) => {
+  if (value.endsWith('/api/v2')) return value;
+  if (value.endsWith('/api')) return `${value}/v2`;
+  return `${value}/api/v2`;
+};
+const API_URL = configuredApiUrl
+  ? apiV2Url(configuredApiUrl)
+  : (import.meta.env.DEV ? `${devApiOrigin}/api/v2` : '/api/v2');
 
-export const UPLOAD_URL = import.meta.env.DEV 
-  ? 'http://localhost:5221' 
-  : window.location.origin;
+export const UPLOAD_URL = configuredApiUrl
+  ? configuredApiUrl.replace(/\/api(?:\/v2)?$/, '')
+  : (import.meta.env.DEV ? devApiOrigin : window.location.origin);
+
+const toCamelKey = (key: string) => key.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+const toSnakeKey = (key: string) => key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+const mapKeys = (value: unknown, mapper: (key: string) => string): unknown => {
+  if (Array.isArray(value)) return value.map((item) => mapKeys(item, mapper));
+  if (!value || typeof value !== 'object' || value instanceof Date
+    || (typeof Blob !== 'undefined' && value instanceof Blob)) return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [mapper(key), mapKeys(item, mapper)]));
+};
+
+const toApiKeys = <T>(value: T): T => mapKeys(value, toCamelKey) as T;
+const toClientKeys = <T>(value: T): T => mapKeys(value, toSnakeKey) as T;
+
+const createIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+};
+
+const toV2Multipart = (source: FormData) => {
+  const payload: Record<string, unknown> = {};
+  const files: Blob[] = [];
+  source.forEach((value, key) => {
+    if (typeof value === 'string') {
+      payload[key] = value;
+    } else {
+      files.push(value);
+    }
+  });
+
+  const result = new FormData();
+  result.append('payload', JSON.stringify(toApiKeys(payload)));
+  files.forEach((file) => result.append('files', file));
+  return result;
+};
 
 const api = axios.create({
   baseURL: API_URL,
 });
+
+type PaginatedResponse<T> = Awaited<ReturnType<typeof api.get<T>>> & { v2Meta?: ApiV2Meta };
+
+const getAllPages = async <T>(resource: string, params?: Record<string, unknown>): Promise<T[]> => {
+  const firstResponse = await api.get<T[]>(resource, {
+    params: { ...(params || {}), page: 1, pageSize: 100 }
+  }) as PaginatedResponse<T[]>;
+  const totalPages = firstResponse.v2Meta?.totalPages ?? 1;
+  if (totalPages <= 1) return firstResponse.data;
+
+  const remainingResponses = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) => api.get<T[]>(resource, {
+      params: { ...(params || {}), page: index + 2, pageSize: 100 }
+    }))
+  );
+  return [firstResponse.data, ...remainingResponses.map(response => response.data)].flat();
+};
 
 // Attach JWT to every request when available
 api.interceptors.request.use((config) => {
@@ -28,13 +90,46 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  if (config.params) config.params = toApiKeys(config.params);
+  if (config.data instanceof FormData) {
+    config.data = toV2Multipart(config.data);
+    if (config.headers) delete config.headers['Content-Type'];
+  } else if (config.data && typeof config.data === 'object') {
+    config.data = toApiKeys(config.data);
+  }
+
+  const method = String(config.method || 'get').toUpperCase();
+  if (['POST', 'PATCH', 'DELETE'].includes(method) && !config.headers?.['Idempotency-Key']) {
+    config.headers = config.headers || {};
+    config.headers['Idempotency-Key'] = createIdempotencyKey();
+  }
   return config;
 });
 
 // On 401, clear token + redirect to /login (skip if already on auth pages)
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const envelope = response.data;
+    if (envelope && typeof envelope === 'object' && !Array.isArray(envelope)
+      && Object.prototype.hasOwnProperty.call(envelope, 'data')
+      && Object.prototype.hasOwnProperty.call(envelope, 'meta')) {
+      (response as typeof response & { v2Meta?: unknown }).v2Meta = envelope.meta;
+      response.data = toClientKeys(envelope.data);
+    }
+    return response;
+  },
   (error) => {
+    const errorBody = error.response?.data;
+    if (errorBody?.error && typeof errorBody.error === 'object') {
+      error.response.data = {
+        ...errorBody,
+        error: errorBody.error.message,
+        message: errorBody.error.message,
+        errorCode: errorBody.error.code,
+        errorDetails: errorBody.error.details,
+      };
+    }
     if (error.response?.status === 401) {
       tokenStorage.clear();
       const path = window.location.pathname;
@@ -48,8 +143,9 @@ api.interceptors.response.use(
 
 export const repairApi = {
   getAll: async (params: { status?: string; location?: string; station_id?: number | string; search?: string; type?: string; priority?: string; sortBy?: string; technician?: string; unassigned?: boolean }) => {
-    const response = await api.get<Repair[]>('/repairs', { params });
-    return response.data;
+    const resource = params?.type === 'claim' ? '/claims' : '/repairs';
+    const requestParams = params?.type === 'claim' ? { ...params, type: undefined } : params;
+    return getAllPages<Repair>(resource, requestParams || {});
   },
   
   getStats: async () => {
@@ -58,8 +154,8 @@ export const repairApi = {
   },
   
   getDashboardStats: async (params?: { startDate?: string; endDate?: string }) => {
-    const response = await api.get<DashboardData>('/repairs/dashboard-stats', { params });
-    return response.data;
+    const response = await api.get<DashboardApiPayload>('/repairs/dashboard-stats', { params });
+    return normalizeDashboardData(response.data);
   },
   
   getUnreadCount: async () => {
@@ -82,7 +178,7 @@ export const repairApi = {
   },
 
   createClaim: async (formData: FormData) => {
-    const response = await api.post<{ id: number; ticket_no: string }>('/repairs/claim', formData, {
+    const response = await api.post<{ id: number; ticket_no: string }>('/claims', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -97,7 +193,7 @@ export const repairApi = {
     technician?: string; 
     repair_note?: string 
   }) => {
-    const response = await api.patch(`/repairs/${id}/status`, data);
+    const response = await api.post(`/repairs/${id}/actions/status-transition`, data);
     return response.data;
   },
 
@@ -122,30 +218,29 @@ export const repairApi = {
     new_model: string;
     technician: string;
   }) => {
-    const response = await api.post(`/repairs/${id}/replace-device`, data);
+    const response = await api.post(`/repairs/${id}/actions/replace-device`, data);
     return response.data;
   },
 
   delete: async (id: number | string) => {
-    const response = await api.delete(`/repairs/remove/${id}`);
+    const response = await api.delete(`/repairs/${id}`);
     return response.data;
   },
 
   updateCompany: async (id: number | string, companyId: number) => {
-    const response = await api.patch(`/repairs/${id}/company`, { company_id: companyId });
+    const response = await api.patch(`/repairs/${id}`, { companyId });
     return response.data;
   },
 
   markAsRead: async (id: number | string) => {
-    const response = await api.patch(`/repairs/${id}/read`);
+    const response = await api.post(`/repairs/${id}/actions/mark-read`);
     return response.data;
   }
 };
 
 export const inventoryApi = {
   getAll: async (params?: { search?: string }) => {
-    const response = await api.get<InventoryItem[]>('/inventory', { params });
-    return response.data;
+    return getAllPages<InventoryItem>('/inventory', params || {});
   },
   getInstances: async (id: number | string) => {
     const response = await api.get<Array<{ id: number; serial_number: string; condition: string }>>(`/inventory/${id}/instances`);
@@ -168,17 +263,33 @@ export const inventoryApi = {
     return response.data;
   },
   addSerialNumbers: async (id: number | string, serialNumbers: string[]) => {
-    const response = await api.post(`/inventory/${id}/serial-numbers`, {
-      serial_numbers: serialNumbers
+    const response = await api.post(`/inventory/${id}/instances`, {
+      serialNumbers
     });
     return response.data;
   },
   importBulk: async (items: Array<{ name: string; model?: string; description?: string; storage_location?: string; quantity?: number; min_stock?: number; requires_sn?: number }>) => {
-    const response = await api.post<{ message: string; created: number; updated: number; total: number }>('/inventory/import', { items });
+    const response = await api.post<{ message: string; created: number; updated: number; total: number }>('/inventory/imports', { items });
+    return response.data;
+  },
+  getAdjustments: async (status?: 'PENDING' | 'APPROVED' | 'REJECTED') => {
+    const response = await api.get<InventoryAdjustment[]>('/inventory/adjustments', { params: status ? { status } : undefined });
+    return response.data;
+  },
+  createAdjustment: async (id: number | string, data: { operation: 'ADD' | 'REMOVE'; quantity: number; reason: string; note?: string }) => {
+    const response = await api.post(`/inventory/${id}/adjustments`, data);
+    return response.data;
+  },
+  approveAdjustment: async (id: number | string, review_note?: string) => {
+    const response = await api.post(`/inventory-adjustments/${id}/actions/approve`, { reviewNote: review_note });
+    return response.data;
+  },
+  rejectAdjustment: async (id: number | string, review_note: string) => {
+    const response = await api.post(`/inventory-adjustments/${id}/actions/reject`, { reviewNote: review_note });
     return response.data;
   },
   updateInstanceCondition: async (instanceId: number | string, condition: string) => {
-    const response = await api.patch(`/inventory/instances/${instanceId}/condition`, { condition });
+    const response = await api.patch(`/inventory/instances/${instanceId}`, { condition });
     return response.data;
   },
   delete: async (id: number | string) => {
@@ -186,8 +297,7 @@ export const inventoryApi = {
     return response.data;
   },
   getLifecycleReport: async () => {
-    const response = await api.get<AssetLifecycleItem[]>('/inventory/lifecycle-report');
-    return response.data;
+    return getAllPages<AssetLifecycleItem>('/inventory/reports/lifecycle');
   },
   getInstanceTimeline: async (instanceId: number | string) => {
     const response = await api.get<AssetTimelineResponse>(`/inventory/instances/${instanceId}/timeline`);
@@ -197,8 +307,7 @@ export const inventoryApi = {
 
 export const stockCountApi = {
   getAll: async () => {
-    const response = await api.get<StockCount[]>('/stock-counts');
-    return response.data;
+    return getAllPages<StockCount>('/stock-counts');
   },
   getById: async (id: number | string) => {
     const response = await api.get<StockCountDetailResponse>(`/stock-counts/${id}`);
@@ -213,32 +322,31 @@ export const stockCountApi = {
     return response.data;
   },
   complete: async (id: number | string) => {
-    const response = await api.post<StockCountCompleteSummary>(`/stock-counts/${id}/complete`);
+    const response = await api.post<StockCountCompleteSummary>(`/stock-counts/${id}/actions/complete`);
     return response.data;
   },
   cancel: async (id: number | string) => {
-    const response = await api.post<{ message: string }>(`/stock-counts/${id}/cancel`);
+    const response = await api.post<{ message: string }>(`/stock-counts/${id}/actions/cancel`);
     return response.data;
   }
 };
 
 export const withdrawalApi = {
   getAll: async () => {
-    const response = await api.get<Withdrawal[]>('/withdrawals');
-    return response.data;
+    return getAllPages<Withdrawal>('/withdrawals');
   },
   getById: async (id: number | string) => {
     const response = await api.get<Withdrawal>(`/withdrawals/${id}`);
     return response.data;
   },
   updateItemSn: async (withdrawalId: number | string, itemId: number | string, serialNumbers: string[]) => {
-    const response = await api.put(`/withdrawals/${withdrawalId}/items/${itemId}/serial-numbers`, {
-      serial_numbers: serialNumbers
+    const response = await api.patch(`/withdrawals/${withdrawalId}/items/${itemId}`, {
+      serialNumbers
     });
     return response.data;
   },
   updateCompany: async (id: number | string, companyId: number) => {
-    const response = await api.patch(`/withdrawals/${id}/company`, { company_id: companyId });
+    const response = await api.patch(`/withdrawals/${id}`, { companyId });
     return response.data;
   },
   create: async (data: {
@@ -267,13 +375,12 @@ export const withdrawalApi = {
 
 export const transactionApi = {
   getAll: async (params?: { inventory_id?: number | string; withdrawal_id?: number | string; station_id?: number | string; pending_only?: boolean }) => {
-    const response = await api.get('/transactions', { params });
-    return response.data;
+    return getAllPages<InventoryTransaction>('/transactions', params || {});
   },
   getLatest: async () => {
     const response = await api.get<{
       id: number;
-      transaction_type: 'ADD_STOCK' | 'WITHDRAW' | 'BORROW' | 'RETURN';
+      transaction_type: 'ADD_STOCK' | 'WITHDRAW' | 'BORROW' | 'RETURN' | 'ADJUSTMENT';
       quantity_added: number;
       quantity_withdrawn: number;
       quantity_borrowed: number;
@@ -284,7 +391,7 @@ export const transactionApi = {
     return response.data;
   },
   return: async (data: FormData | Record<string, unknown>) => {
-    const response = await api.post('/transactions/return', data, {
+    const response = await api.post('/returns', data, {
       headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined
     });
     return response.data;
@@ -304,8 +411,7 @@ export const searchApi = {
 
 export const purchaseOrderApi = {
   getAll: async (params?: { status?: string; search?: string }) => {
-    const response = await api.get<PurchaseOrder[]>('/purchase-orders', { params });
-    return response.data;
+    return getAllPages<PurchaseOrder>('/purchase-orders', params || {});
   },
   getById: async (id: number | string) => {
     const response = await api.get<PurchaseOrder>(`/purchase-orders/${id}`);
@@ -354,7 +460,7 @@ export const purchaseOrderApi = {
     return response.data;
   },
   updateCompany: async (id: number | string, companyId: number) => {
-    const response = await api.patch(`/purchase-orders/${id}/company`, { company_id: companyId });
+    const response = await api.patch(`/purchase-orders/${id}`, { companyId });
     return response.data;
   },
   delete: async (id: number | string) => {
@@ -362,11 +468,11 @@ export const purchaseOrderApi = {
     return response.data;
   },
   receive: async (id: number | string, data?: { items?: { inventory_id: number; received_quantity: number }[] }) => {
-    const response = await api.post(`/purchase-orders/${id}/receive`, data);
+    const response = await api.post(`/purchase-orders/${id}/receipts`, data);
     return response.data;
   },
   autoGenerate: async () => {
-    const response = await api.post('/purchase-orders/auto-generate');
+    const response = await api.post('/purchase-orders/actions/auto-generate');
     return response.data;
   }
 };
@@ -395,8 +501,7 @@ export const reportApi = {
 
 export const stationApi = {
   getUniqueList: async (params?: { status?: number }) => {
-    const response = await api.get<Station[]>('/stations', { params });
-    return response.data;
+    return getAllPages<Station>('/stations', params || {});
   },
   getDetails: async (params: { location?: string; station_id?: number | string }) => {
     const response = await api.get<StationDetailResponse>('/stations/details', { params });
@@ -409,7 +514,7 @@ export const stationApi = {
   createArea: async (stationId: number | string, name: string) => {
     return { id: 0, station_id: Number(stationId), name, status: 1 } as StationArea;
   },
-  create: async (data: Omit<Station, 'id' | 'status' | 'code'>) => {
+  create: async (data: Omit<Station, 'id' | 'status' | 'code'> & { gps_coordinates?: string }) => {
     const response = await api.post<Station>('/stations', data);
     return response.data;
   },
@@ -417,16 +522,16 @@ export const stationApi = {
     const response = await api.delete<{ message: string }>(`/stations/${stationId}`);
     return response.data;
   },
-  update: async (stationId: number | string, data: Omit<Station, 'id' | 'status' | 'code'>) => {
+  update: async (stationId: number | string, data: Omit<Station, 'id' | 'status' | 'code'> & { gps_coordinates?: string }) => {
     const response = await api.patch<Station>(`/stations/${stationId}`, data);
     return response.data;
   },
   verify: async (stationId: number | string) => {
-    const response = await api.post<Station>(`/stations/${stationId}/verify`);
+    const response = await api.post<Station>(`/stations/${stationId}/actions/verify`);
     return response.data;
   },
   moveAsset: async (stationId: number | string, data: { inventory_id: number; instance_id?: number; quantity?: number; to_station_id: number; note?: string }) => {
-    const response = await api.post(`/stations/${stationId}/assets/move`, data);
+    const response = await api.post(`/stations/${stationId}/asset-movements`, data);
     return response.data as { message: string; moved: Array<{ instance_id?: number; quantity: number }> };
   },
   setAssetStatus: async (
@@ -434,8 +539,8 @@ export const stationApi = {
     inventoryId: number | string,
     body: { status: string; note?: string }
   ) => {
-    const response = await api.put<AssetManualStatus>(
-      `/stations/${stationId}/assets/${inventoryId}/status`,
+    const response = await api.patch<AssetManualStatus>(
+      `/stations/${stationId}/assets/${inventoryId}`,
       body
     );
     return response.data;
@@ -454,8 +559,7 @@ type ContractInput = {
 
 export const contractApi = {
   getAll: async (params?: { status?: number }) => {
-    const response = await api.get<Contract[]>('/contracts', { params });
-    return response.data;
+    return getAllPages<Contract>('/contracts', params || {});
   },
   create: async (data: ContractInput) => {
     const response = await api.post<Contract>('/contracts', data);
@@ -474,8 +578,7 @@ export const contractApi = {
 export const settingsApi = {
   // Companies
   getCompanies: async () => {
-    const response = await api.get<Company[]>('/settings/companies');
-    return response.data;
+    return getAllPages<Company>('/settings/companies');
   },
   getCompanyById: async (id: number) => {
     const response = await api.get<Company>(`/settings/companies/${id}`);
@@ -486,7 +589,7 @@ export const settingsApi = {
     return response.data;
   },
   updateCompany: async (id: number, data: Partial<Company>) => {
-    const response = await api.put<{ message: string }>(`/settings/companies/${id}`, data);
+    const response = await api.patch<{ message: string }>(`/settings/companies/${id}`, data);
     return response.data;
   },
   deleteCompany: async (id: number) => {
@@ -494,16 +597,13 @@ export const settingsApi = {
     return response.data;
   },
   setDefaultCompany: async (id: number) => {
-    const response = await api.patch<{ message: string }>(`/settings/companies/${id}/default`);
+    const response = await api.post<{ message: string }>(`/settings/companies/${id}/actions/set-default`);
     return response.data;
   },
 
   // Logos
   getLogos: async (companyId?: number) => {
-    const response = await api.get<CompanyLogo[]>('/settings/logos', {
-      params: companyId ? { company_id: companyId } : undefined,
-    });
-    return response.data;
+    return getAllPages<CompanyLogo>('/settings/logos', companyId ? { companyId } : {});
   },
   uploadLogo: async (formData: FormData) => {
     const response = await api.post<CompanyLogo>('/settings/logos', formData, {
@@ -512,7 +612,7 @@ export const settingsApi = {
     return response.data;
   },
   setDefaultLogo: async (id: number) => {
-    const response = await api.patch<{ message: string }>(`/settings/logos/${id}/default`);
+    const response = await api.post<{ message: string }>(`/settings/logos/${id}/actions/set-default`);
     return response.data;
   },
   deleteLogo: async (id: number) => {
@@ -526,13 +626,19 @@ export const settingsApi = {
     return response.data;
   },
   updateSystemSettings: async (data: SystemSettings) => {
-    const response = await api.put<{ message: string }>('/settings/system', data);
+    const response = await api.patch<{ message: string }>('/settings/system', data);
     return response.data;
   },
 
   // Backups
   getBackups: async () => {
     const response = await api.get<Array<{ filename: string; size: number; created_at: string }>>('/settings/backups');
+    return response.data;
+  },
+  downloadBackup: async (filename: string) => {
+    const response = await api.get<Blob>(`/settings/backups/download/${encodeURIComponent(filename)}`, {
+      responseType: 'blob',
+    });
     return response.data;
   },
   createBackup: async () => {
@@ -544,7 +650,7 @@ export const settingsApi = {
     return response.data;
   },
   restoreBackup: async (data: { filename: string; password?: string; confirm_text?: string }) => {
-    const response = await api.post<{ message: string }>('/settings/backups/restore', data);
+    const response = await api.post<{ message: string }>('/settings/backups/actions/restore', data);
     return response.data;
   },
 };
@@ -559,7 +665,7 @@ export const authApi = {
     return response.data;
   },
   changePassword: async (current_password: string, new_password: string) => {
-    const response = await api.post<{ message: string; token: string }>('/auth/change-password', {
+    const response = await api.post<{ message: string; token: string }>('/auth/password', {
       current_password,
       new_password,
     });
@@ -569,15 +675,14 @@ export const authApi = {
 
 export const userApi = {
   list: async () => {
-    const response = await api.get<User[]>('/users');
-    return response.data;
+    return getAllPages<User>('/users');
   },
   create: async (data: { username: string; password: string; full_name: string; is_full?: boolean; permissions?: object }) => {
     const response = await api.post<{ id: number; message: string }>('/users', data);
     return response.data;
   },
   update: async (id: number, data: Partial<{ full_name: string; password: string; is_full: boolean; permissions: object; is_active: boolean }>) => {
-    const response = await api.put<{ message: string }>(`/users/${id}`, data);
+    const response = await api.patch<{ message: string }>(`/users/${id}`, data);
     return response.data;
   },
   remove: async (id: number) => {
@@ -585,15 +690,22 @@ export const userApi = {
     return response.data;
   },
   getAuditLogs: async (params?: { limit?: number; offset?: number; search?: string }) => {
-    const response = await api.get<{ logs: AuditLog[]; total: number }>('/users/audit-logs', { params });
+    const limit = params?.limit || 50;
+    const offset = params?.offset || 0;
+    const response = await api.get<{ logs: AuditLog[]; total: number }>('/users/audit-logs', {
+      params: {
+        page: Math.floor(offset / limit) + 1,
+        pageSize: limit,
+        q: params?.search,
+      },
+    });
     return response.data;
   },
 };
 
 export const technicianApi = {
   list: async (params?: { active?: boolean }) => {
-    const response = await api.get<Technician[]>('/technicians', { params });
-    return response.data;
+    return getAllPages<Technician>('/technicians', params || {});
   },
   create: async (data: { full_name: string; code?: string; phone?: string; user_id?: number | null }) => {
     const response = await api.post<{ id: number; message: string }>('/technicians', data);
@@ -608,20 +720,18 @@ export const technicianApi = {
 export const technicianStockApi = {
   // Summary per technician (no param) — for the master list page
   getKitSummary: async () => {
-    const response = await api.get<TechnicianKitSummary[]>('/technician-stock/holdings');
-    return response.data;
+    return getAllPages<TechnicianKitSummary>('/technician-stock/holdings');
   },
   // One technician's on-hand items + serialized units
   getHoldings: async (technicianId: number | string) => {
-    const response = await api.get<TechnicianHoldingsDetail>('/technician-stock/holdings', { params: { technician_id: technicianId } });
+    const response = await api.get<TechnicianHoldingsDetail>('/technician-stock/holdings', { params: { technicianId, pageSize: 100 } });
     return response.data;
   },
   getMovements: async (params?: { technician_id?: number | string; station_id?: number | string; type?: string; inventory_id?: number | string }) => {
-    const response = await api.get<TechnicianStockMovement[]>('/technician-stock/movements', { params });
-    return response.data;
+    return getAllPages<TechnicianStockMovement>('/technician-stock/movements', params || {});
   },
   load: async (data: { technician_id: number; items: TechnicianStockItemInput[]; note?: string }) => {
-    const response = await api.post<{ message: string }>('/technician-stock/load', data);
+    const response = await api.post<{ message: string }>('/technician-stock/actions/load', data);
     return response.data;
   },
   install: async (data: {
@@ -633,11 +743,11 @@ export const technicianStockApi = {
     removed_model?: string;
     note?: string;
   }) => {
-    const response = await api.post<{ message: string }>('/technician-stock/install', data);
+    const response = await api.post<{ message: string }>('/technician-stock/actions/install', data);
     return response.data;
   },
   returnStock: async (data: { technician_id: number; items: TechnicianStockItemInput[]; note?: string }) => {
-    const response = await api.post<{ message: string }>('/technician-stock/return', data);
+    const response = await api.post<{ message: string }>('/technician-stock/actions/return', data);
     return response.data;
   },
   deleteMovement: async (id: number | string) => {

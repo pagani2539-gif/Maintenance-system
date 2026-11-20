@@ -47,6 +47,13 @@ export default defineConfig({
       },
     })
   ],
+  build: {
+    // Hashed chunks are immutable, but already-open tabs can still request a
+    // previous release for a while after a deploy. Keep old chunks in dist so
+    // those tabs receive the file they already know about instead of a 404.
+    // Prune old assets only as a separate, deliberate maintenance operation.
+    emptyOutDir: false,
+  },
   server: {
     host: true,
     port: process.env.PORT ? Number(process.env.PORT) : 5222,

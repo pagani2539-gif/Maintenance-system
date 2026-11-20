@@ -23,6 +23,7 @@ import PrintTemplate from '../components/PrintTemplate';
 import { PrintDialog } from '../components/PrintDialog';
 import PermissionGate from '../components/PermissionGate';
 import { Select } from '../components/ui/Input';
+import { getRepairStatusLabel, translateRepairStatusText } from '../constants/terminology';
 import StationSelector from '../components/ui/StationSelector';
 import FormSection from '../components/ui/FormSection';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -170,7 +171,7 @@ const RepairDetail: React.FC = () => {
         new_serial: trimmedNewSerial,
         technician: 'ช่างเทคนิค' 
       });
-      notify('บันทึกการเปลี่ยนอะไหล่เรียบร้อยแล้ว');
+      notify('บันทึกการเปลี่ยนอุปกรณ์เรียบร้อยแล้ว');
       setShowDeviceModal(false);
       fetchRepair();
     } catch (err) {
@@ -350,7 +351,7 @@ const RepairDetail: React.FC = () => {
             <div>
               <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>สถานะ</label>
               <span className={`badge badge-${repair.status}`} style={{ fontSize: '0.85rem', padding: '6px 16px', fontWeight: 800 }}>
-                {repair.status}
+                {getRepairStatusLabel(repair.status)}
               </span>
             </div>
             <div>
@@ -470,7 +471,7 @@ const RepairDetail: React.FC = () => {
                     </div>
                     <div style={{ background: index === 0 ? 'var(--bg-app)' : 'transparent', padding: index === 0 ? '1.25rem' : '0', borderRadius: '16px', flex: 1, transition: 'all 0.3s' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: index === 0 ? 'var(--primary)' : 'var(--text-main)' }}>{log.action}</span>
+                        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: index === 0 ? 'var(--primary)' : 'var(--text-main)' }}>{translateRepairStatusText(log.action)}</span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, background: 'var(--bg-subtle)', padding: '4px 10px', borderRadius: '99px' }}>{parseDate(log.created_at).toLocaleString('th-TH')}</span>
                       </div>
                       <p style={{ fontSize: '1rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.6', fontWeight: 500 }}>{log.note}</p>
@@ -520,7 +521,7 @@ const RepairDetail: React.FC = () => {
             <div className="card glass-card" style={{ borderRadius: '24px', padding: '1.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <Wrench size={20} color="var(--primary)" /> อะไหล่ที่เปลี่ยน
+                  <Wrench size={20} color="var(--primary)" /> อุปกรณ์ที่เปลี่ยน
                 </h3>
                 <PermissionGate require={repair.type === 'claim' ? 'manage.claims' : 'manage.repairs'}>
                   <button className="btn btn-outline" style={{ padding: '6px', border: 'none' }} onClick={() => setShowDeviceModal(true)}>
@@ -530,7 +531,7 @@ const RepairDetail: React.FC = () => {
               </div>
               {repair.devices.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', background: 'var(--bg-app)', borderRadius: '20px' }}>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>ยังไม่มีประวัติการเปลี่ยนอะไหล่</p>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>ยังไม่มีประวัติการเปลี่ยนอุปกรณ์</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -542,12 +543,12 @@ const RepairDetail: React.FC = () => {
                       <div style={{ marginBottom: '12px' }}>
                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--danger)', textTransform: 'uppercase', marginBottom: '4px' }}>อุปกรณ์ที่ถอดออก</div>
                          <div style={{ fontWeight: 800 }}>{dev.old_model}</div>
-                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>S/N (หมายเลขเครื่อง): {dev.old_serial}</div>
+                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>หมายเลขเครื่อง (S/N): {dev.old_serial}</div>
                       </div>
                       <div>
                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', marginBottom: '4px' }}>อุปกรณ์ที่ติดตั้งใหม่</div>
                          <div style={{ fontWeight: 800 }}>{dev.new_model}</div>
-                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>S/N (หมายเลขเครื่อง): {dev.new_serial}</div>
+                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>หมายเลขเครื่อง (S/N): {dev.new_serial}</div>
                       </div>
                     </div>
                   ))}
@@ -654,7 +655,7 @@ const RepairDetail: React.FC = () => {
               >
                 <option value="รอดำเนินการ">รอดำเนินการ</option>
                 <option value="กำลังซ่อม">กำลังซ่อม</option>
-                <option value="รออะไหล่">รออะไหล่</option>
+                <option value="รออะไหล่">รออุปกรณ์</option>
                 <option value="เสร็จสิ้น">เสร็จสิ้น</option>
               </Select>
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
@@ -674,7 +675,7 @@ const RepairDetail: React.FC = () => {
       {showDeviceModal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '600px' }}>
-            <h3><Wrench size={20} color="var(--primary)" /> บันทึกการเปลี่ยนอะไหล่</h3>
+            <h3><Wrench size={20} color="var(--primary)" /> บันทึกการเปลี่ยนอุปกรณ์</h3>
             <form onSubmit={handleDeviceReplace}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

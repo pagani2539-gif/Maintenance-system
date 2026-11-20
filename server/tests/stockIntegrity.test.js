@@ -34,14 +34,15 @@ describe('Stock integrity guards', () => {
   };
 
   const createWithdrawal = async ({ station, inventory, quantity = 1, serial_numbers = [] }) => (
-    auth(request(app).post('/api/withdrawals')).send({
+    auth(request(app).post('/api/v2/withdrawals')).send({
+      recipient: 'Stock Integrity Test Recipient',
       type: 'ติดตั้งใหม่',
-      project_name: runKey,
+      projectName: runKey,
       location: station.name,
-      station_id: Number(station.id),
-      contract_reference_type: 'none',
-      contract_reference_note: 'integration test',
-      items: [{ inventory_id: Number(inventory.id), quantity, serial_numbers }],
+      stationId: Number(station.id),
+      contractReferenceType: 'none',
+      contractReferenceNote: 'integration test',
+      items: [{ inventoryId: Number(inventory.id), quantity, serialNumbers: serial_numbers }],
     })
   );
 
@@ -51,8 +52,8 @@ describe('Stock integrity guards', () => {
       INSERT INTO users (username, password_hash, full_name, is_full, is_active)
       VALUES ($1, $2, $3, 1, 1)
     `, [username, hash, 'Stock Integrity Test Admin']);
-    const login = await request(app).post('/api/auth/login').send({ username, password });
-    token = login.body.token;
+    const login = await request(app).post('/api/v2/auth/login').send({ username, password });
+    token = login.body.data.token;
   });
 
   afterAll(async () => {
@@ -76,7 +77,7 @@ describe('Stock integrity guards', () => {
     const inventory = await createInventory('negative_item', 5);
 
     const response = await createWithdrawal({ station, inventory, quantity: -2 });
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(422);
 
     const { rows } = await query('SELECT quantity FROM inventory WHERE id = $1', [inventory.id]);
     expect(Number(rows[0].quantity)).toBe(5);
@@ -130,11 +131,11 @@ describe('Stock integrity guards', () => {
 
     const { rows: itemRows } = await query(
       'SELECT id FROM withdrawal_items WHERE withdrawal_id = $1',
-      [created.body.id]
+      [created.body.data.id]
     );
     const assigned = await auth(
-      request(app).put(`/api/withdrawals/${created.body.id}/items/${itemRows[0].id}/serial-numbers`)
-    ).send({ serial_numbers: [`${runKey}-LATE-SN`] });
+      request(app).patch(`/api/v2/withdrawals/${created.body.data.id}/items/${itemRows[0].id}`)
+    ).send({ serialNumbers: [`${runKey}-LATE-SN`] });
     expect(assigned.statusCode).toBe(200);
 
     const { rows: lotRows } = await query(
@@ -156,11 +157,13 @@ describe('Stock integrity guards', () => {
       SELECT id FROM inventory_transactions
       WHERE withdrawal_id = $1 AND transaction_type = 'WITHDRAW'
       ORDER BY id DESC LIMIT 1
-    `, [created.body.id]);
-    const response = await auth(request(app).post('/api/transactions/return'))
-      .field('transaction_id', String(txRows[0].id))
-      .field('inventory_id', String(otherInventory.id))
-      .field('quantity', '1');
+    `, [created.body.data.id]);
+    const response = await auth(request(app).post('/api/v2/returns'))
+      .field('payload', JSON.stringify({
+        transactionId: Number(txRows[0].id),
+        inventoryId: Number(otherInventory.id),
+        quantity: 1,
+      }));
     expect(response.statusCode).toBe(400);
   });
 
@@ -175,7 +178,7 @@ describe('Stock integrity guards', () => {
     const created = await createWithdrawal({ station, inventory, quantity: 1, serial_numbers: [serial] });
     expect(created.statusCode).toBe(201);
 
-    const cancelled = await auth(request(app).delete(`/api/withdrawals/${created.body.id}`));
+    const cancelled = await auth(request(app).delete(`/api/v2/withdrawals/${created.body.data.id}`));
     expect(cancelled.statusCode).toBe(200);
 
     const { rows: stockRows } = await query('SELECT quantity FROM inventory WHERE id = $1', [inventory.id]);
@@ -217,8 +220,8 @@ describe('Stock integrity guards', () => {
     `, [`${runKey}_REPAIR`, station.name, station.id, oldInstance.id, inventory.id]);
 
     const response = await auth(
-      request(app).post(`/api/repairs/${repairRows[0].id}/replace-device`)
-    ).send({ old_serial: oldSerial, old_model: 'OLD', new_serial: newSerial, new_model: 'NEW' });
+      request(app).post(`/api/v2/repairs/${repairRows[0].id}/actions/replace-device`)
+    ).send({ oldSerial, oldModel: 'OLD', newSerial, newModel: 'NEW' });
     expect(response.statusCode).toBe(200);
 
     const { rows: stockRows } = await query('SELECT quantity FROM inventory WHERE id = $1', [inventory.id]);
@@ -246,8 +249,8 @@ describe('Stock integrity guards', () => {
     expect(created.statusCode).toBe(201);
 
     const moved = await auth(
-      request(app).post(`/api/stations/${sourceStation.id}/assets/move`)
-    ).send({ inventory_id: Number(inventory.id), quantity: 2, to_station_id: Number(targetStation.id) });
+      request(app).post(`/api/v2/stations/${sourceStation.id}/asset-movements`)
+    ).send({ inventoryId: Number(inventory.id), quantity: 2, toStationId: Number(targetStation.id) });
     expect(moved.statusCode).toBe(200);
 
     const { rows: activeRows } = await query(`
@@ -255,17 +258,19 @@ describe('Stock integrity guards', () => {
       FROM inventory_transactions
       WHERE withdrawal_id = $1 AND transaction_type = 'WITHDRAW' AND status <> 'RETURNED'
       ORDER BY station_id
-    `, [created.body.id]);
+    `, [created.body.data.id]);
     expect(activeRows.map(row => [Number(row.station_id), Number(row.quantity_withdrawn)])).toEqual([
       [Number(sourceStation.id), 2],
       [Number(targetStation.id), 2],
     ]);
 
     const targetTransaction = activeRows.find(row => Number(row.station_id) === Number(targetStation.id));
-    const returned = await auth(request(app).post('/api/transactions/return'))
-      .field('transaction_id', String(targetTransaction.id))
-      .field('inventory_id', String(inventory.id))
-      .field('quantity', '2');
+    const returned = await auth(request(app).post('/api/v2/returns'))
+      .field('payload', JSON.stringify({
+        transactionId: Number(targetTransaction.id),
+        inventoryId: Number(inventory.id),
+        quantity: 2,
+      }));
     expect(returned.statusCode).toBe(200);
 
     const { rows: balances } = await query(`
@@ -275,5 +280,43 @@ describe('Stock integrity guards', () => {
     expect(balances.map(row => [Number(row.station_id), Number(row.quantity)])).toEqual([
       [Number(sourceStation.id), 2],
     ]);
+  });
+
+  it('imports by name and model and records only the stock delta', async () => {
+    const inventory = await createInventory('import_item', 5);
+    await query('UPDATE inventory SET model = $1 WHERE id = $2', ['MODEL-A', inventory.id]);
+
+    const imported = await auth(request(app).post('/api/v2/inventory/imports')).send({
+      items: [
+        { name: `${runKey} import_item`, model: 'MODEL-A', quantity: 8, minStock: 1, requiresSn: 0 },
+        { name: `${runKey} import_item`, model: 'MODEL-B', quantity: 3, minStock: 1, requiresSn: 0 },
+      ],
+    });
+    expect(imported.statusCode).toBe(200);
+    expect(imported.body.data.updated).toBe(1);
+    expect(imported.body.data.created).toBe(1);
+
+    const { rows: items } = await query(
+      'SELECT id, model, quantity FROM inventory WHERE name = $1 ORDER BY model',
+      [`${runKey} import_item`]
+    );
+    expect(items.map(row => [row.model, Number(row.quantity)])).toEqual([
+      ['MODEL-A', 8],
+      ['MODEL-B', 3],
+    ]);
+    inventoryIds.push(Number(items[1].id));
+
+    const { rows: ledger } = await query(`
+      SELECT id, transaction_type, quantity_added, quantity_withdrawn
+      FROM inventory_transactions
+      WHERE inventory_id = $1 AND note LIKE 'นำเข้าข้อมูลผ่าน CSV (ปรับยอด%'
+    `, [inventory.id]);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0].transaction_type).toBe('ADJUSTMENT');
+    expect(Number(ledger[0].quantity_added)).toBe(3);
+    expect(Number(ledger[0].quantity_withdrawn)).toBe(0);
+
+    const refusedDelete = await auth(request(app).delete(`/api/v2/transactions/${ledger[0].id}`));
+    expect(refusedDelete.statusCode).toBe(409);
   });
 });
